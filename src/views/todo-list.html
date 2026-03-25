@@ -15,12 +15,12 @@
 <!-- ── Add buttons ──────────────────────────────────────── -->
 <div class="add-bar">
   <button class="add-btn" id="btn-add">+ Add Todo</button>
-  <button class="add-btn add-btn-secondary" id="btn-quick-add">⚡ Quick Add</button>
+  <button class="add-btn add-btn-secondary" id="btn-quick-add"><span class="icon icon-quick" aria-hidden="true"></span> Quick Add</button>
 </div>
 
 <!-- ── Search bar ───────────────────────────────────────── -->
 <div class="search-bar">
-  <span class="search-icon">🔍</span>
+  <span class="search-icon"><span class="icon icon-search" aria-hidden="true"></span></span>
   <input
     class="search-input"
     id="search"
@@ -137,17 +137,17 @@
 
     let html = '';
 
-    html += renderSection('active',   '⚡', 'Active',   active,   false);
-    html += renderSection('upcoming', '📅', 'Upcoming', upcoming, false);
-    html += renderSection('done',     '✓',  'Done',     done,     true);
+    html += renderSection('active',   '<span class="icon icon-active"></span>', 'Active',   active,   false);
+    html += renderSection('upcoming', '<span class="icon icon-upcoming"></span>', 'Upcoming', upcoming, false);
+    html += renderSection('done',     '<span class="icon icon-done"></span>',  'Done',     done,     true);
 
     if (filtered.length === 0 && todos.length > 0) {
       html = '<div class="no-results">No todos match your search.</div>';
     } else if (todos.length === 0) {
-      html = '<div class="empty-state">'
-           + '<div class="empty-state-icon">📋</div>'
-           + 'No todos yet. Click <strong>+ Add Todo</strong> to get started!'
-           + '</div>';
+          html = '<div class="empty-state">'
+            + '<div class="empty-state-icon"><span class="icon icon-list" aria-hidden="true"></span></div>'
+            + 'No todos yet. Click <strong>+ Add Todo</strong> to get started!'
+            + '</div>';
     }
 
     sectionsEl.innerHTML = html;
@@ -210,19 +210,19 @@
     // ── Action buttons (right) ──
     html += '<div class="todo-actions">';
     html += '  <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(item.id) + '" title="Edit">';
-    html += '    ✏️';
+    html += '    <span class="icon icon-edit" aria-hidden="true"></span>';
     html += '  </button>';
 
     if (!isDone) {
       html += '  <button class="action-btn btn-postpone" data-action="postpone" data-id="' + esc(item.id) + '" title="Postpone (+1 day)">';
-      html += '    →';
+      html += '    <span class="icon icon-postpone" aria-hidden="true"></span>';
       html += '  </button>';
       html += '  <button class="action-btn btn-done" data-action="markDone" data-id="' + esc(item.id) + '" title="Mark done">';
-      html += '    ✓';
+      html += '    <span class="icon icon-done" aria-hidden="true"></span>';
       html += '  </button>';
     } else {
       html += '  <button class="action-btn btn-undo" data-action="markUndone" data-id="' + esc(item.id) + '" title="Mark undone">';
-      html += '    ↩';
+      html += '    <span class="icon icon-undo" aria-hidden="true"></span>';
       html += '  </button>';
     }
 
