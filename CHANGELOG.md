@@ -5,6 +5,38 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.4.0] – 2026-03-25
+
+### Added
+- **TODO Webview** — The TODOs view is now a rich webview (replacing the
+  tree view).  Three collapsible sections: **Active** (overdue + today),
+  **Upcoming** (future), and **Done**.
+- **Search** — Full-text search bar that filters todos by note text, tags,
+  and displayed date.  Located at the top of the TODO view.
+- **Two-line item layout** — Each todo displays the note on line 1 and
+  due date (or "Today" / "Tomorrow" / "Yesterday") + colour-coded tags
+  on line 2 in a smaller font.
+- **Inline action buttons** — Edit (✏️), Postpone (+1 day →), Mark Done (✓)
+  appear on hover.  Done items show an Undo (↩) button instead.
+- **Add / Quick-Add buttons** — Dedicated buttons at the top of the webview
+  for adding new todos.
+- **Auto-ID backfill** — Existing todos without IDs are automatically
+  assigned unique IDs on first load (migration-safe).
+
+### Changed
+- **TODO view type** — Changed from `TreeDataProvider` to
+  `WebviewViewProvider`.  All actions (mark done, postpone, edit, delete)
+  are now handled via webview message passing instead of tree context menus.
+- **Status bar** — Updated to use the new `TodoListViewProvider`.
+- **Build pipeline** — `esbuild.mjs` now compiles both `record-calendar`
+  and `todo-list` SCSS/HTML assets in a loop.
+- **Commands cleaned up** — Removed tree-specific commands (`markDone`,
+  `markUndone`, `moveToNextDay`, `reschedule`, `edit`, `delete`) from
+  `package.json`; these are now webview-internal.  Kept `Add Todo`,
+  `Quick Add Todo`, and `Toggle Show Done` for command-palette access.
+
+---
+
 ## [0.3.0] – 2026-03-25
 
 ### Added

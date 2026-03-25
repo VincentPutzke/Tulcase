@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<!-- ── Add buttons ──────────────────────────────────────── -->
+<div class="add-bar">
+  <button class="add-btn" id="btn-add">+ Add Todo</button>
+  <button class="add-btn add-btn-secondary" id="btn-quick-add">⚡ Quick Add</button>
+</div>
+
+<!-- ── Search bar ───────────────────────────────────────── -->
+<div class="search-bar">
+  <span class="search-icon">🔍</span>
+  <input
+    class="search-input"
+    id="search"
+    type="text"
+    placeholder="Search todos and tags…"
+    spellcheck="false"
+  >
+</div>
+
+<!-- ── Sections container ───────────────────────────────── -->
+<div id="sections"></div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── State ───────────────────────────────────────────────
+  let todos   = [];        // TodoItem[]
+  let tagMap  = {};        // Record<string, TagDef>
+  let today   = '';        // YYYY-MM-DD
+  let query   = '';        // current search text
+  /** Track which sections the user has collapsed. */
+  const collapsed = { active: false, upcoming: false, done: true };
+
+  // ── DOM refs ────────────────────────────────────────────
+  const searchEl   = document.getElementById('search');
+  const sectionsEl = document.getElementById('sections');
+
+  // ── Utility helpers ─────────────────────────────────────
+
+  /** Escape HTML entities. */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /** Format YYYY-MM-DD for display. Returns "Today" / "Yesterday" / "Tomorrow" or "Mon, Mar 25". */
+  function fmtDate(dateStr) {
+    if (dateStr === today) { return 'Today'; }
+
+    // Check yesterday
+    const d = new Date(today);
+    d.setDate(d.getDate() - 1);
+    const yest = isoDate(d);
+    if (dateStr === yest) { return 'Yesterday'; }
+
+    // Check tomorrow
+    const t = new Date(today);
+    t.setDate(t.getDate() + 1);
+    const tmrw = isoDate(t);
+    if (dateStr === tmrw) { return 'Tomorrow'; }
+
+    // General date
+    const parts = dateStr.split('-').map(Number);
+    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function isoDate(d) {
+    return d.getFullYear()
+      + '-' + String(d.getMonth() + 1).padStart(2, '0')
+      + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // ── Search / filter ─────────────────────────────────────
+
+  /** Test whether a todo matches the current search query. */
+  function matchesQuery(todo) {
+    if (!query) { return true; }
+    const q = query.toLowerCase();
+    if (todo.note.toLowerCase().includes(q)) { return true; }
+    if (todo.tags.some(t => t.toLowerCase().includes(q))) { return true; }
+    // Also match against date display
+    if (fmtDate(todo.date).toLowerCase().includes(q)) { return true; }
+    return false;
+  }
+
+  // ── Categorisation ──────────────────────────────────────
+
+  /** Split todos into active / upcoming / done buckets. */
+  function bucketise(items) {
+    const active   = [];
+    const upcoming = [];
+    const done     = [];
+
+    for (const item of items) {
+      if (item.done) {
+        done.push(item);
+      } else if (item.date <= today) {
+        active.push(item);
+      } else {
+        upcoming.push(item);
+      }
+    }
+
+    // Sort active: overdue first (oldest first), then today
+    active.sort((a, b) => a.date.localeCompare(b.date));
+    // Sort upcoming: nearest first
+    upcoming.sort((a, b) => a.date.localeCompare(b.date));
+    // Sort done: most recently completed first (reverse date)
+    done.sort((a, b) => b.date.localeCompare(a.date));
+
+    return { active, upcoming, done };
+  }
+
+  // ── Rendering ───────────────────────────────────────────
+
+  function render() {
+    const filtered = todos.filter(matchesQuery);
+    const { active, upcoming, done } = bucketise(filtered);
+
+    let html = '';
+
+    html += renderSection('active',   '⚡', 'Active',   active,   false);
+    html += renderSection('upcoming', '📅', 'Upcoming', upcoming, false);
+    html += renderSection('done',     '✓',  'Done',     done,     true);
+
+    if (filtered.length === 0 && todos.length > 0) {
+      html = '<div class="no-results">No todos match your search.</div>';
+    } else if (todos.length === 0) {
+      html = '<div class="empty-state">'
+           + '<div class="empty-state-icon">📋</div>'
+           + 'No todos yet. Click <strong>+ Add Todo</strong> to get started!'
+           + '</div>';
+    }
+
+    sectionsEl.innerHTML = html;
+    bindEvents();
+  }
+
+  /** Render a collapsible section with items. */
+  function renderSection(key, icon, label, items, isDone) {
+    if (items.length === 0) { return ''; }
+
+    const isCollapsed = collapsed[key];
+    const chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
+    const bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
+
+    let html = '<div class="section" data-section="' + key + '">';
+    html += '<div class="section-header" data-toggle="' + key + '">';
+    html += '  <span class="' + chevronCls + '">▼</span>';
+    html += '  <span class="section-icon">' + icon + '</span>';
+    html += '  <span class="section-label">' + label + '</span>';
+    html += '  <span class="section-badge">' + items.length + '</span>';
+    html += '</div>';
+    html += '<div class="' + bodyCls + '">';
+
+    for (const item of items) {
+      html += renderItem(item, isDone);
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /** Render a single TODO item (2-line layout). */
+  function renderItem(item, isDone) {
+    const isOverdue = !item.done && item.date < today;
+    const classes   = ['todo-item'];
+    if (isOverdue) { classes.push('overdue'); }
+    if (isDone)    { classes.push('done'); }
+
+    let html = '<div class="' + classes.join(' ') + '" data-id="' + esc(item.id) + '">';
+
+    // ── Content (left, 2 lines) ──
+    html += '<div class="todo-content">';
+    html += '  <div class="todo-note">' + esc(item.note) + '</div>';
+    html += '  <div class="todo-meta">';
+    html += '    <span class="todo-date">' + esc(fmtDate(item.date)) + '</span>';
+
+    if (item.tags && item.tags.length > 0) {
+      html += '<span class="todo-tags">';
+      for (const tag of item.tags) {
+        const def   = tagMap[tag];
+        const color = def ? def.color : '#8b8fa3';
+        html += '<span class="todo-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+      }
+      html += '</span>';
+    }
+
+    html += '  </div>'; // .todo-meta
+    html += '</div>';    // .todo-content
+
+    // ── Action buttons (right) ──
+    html += '<div class="todo-actions">';
+    html += '  <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(item.id) + '" title="Edit">';
+    html += '    ✏️';
+    html += '  </button>';
+
+    if (!isDone) {
+      html += '  <button class="action-btn btn-postpone" data-action="postpone" data-id="' + esc(item.id) + '" title="Postpone (+1 day)">';
+      html += '    →';
+      html += '  </button>';
+      html += '  <button class="action-btn btn-done" data-action="markDone" data-id="' + esc(item.id) + '" title="Mark done">';
+      html += '    ✓';
+      html += '  </button>';
+    } else {
+      html += '  <button class="action-btn btn-undo" data-action="markUndone" data-id="' + esc(item.id) + '" title="Mark undone">';
+      html += '    ↩';
+      html += '  </button>';
+    }
+
+    html += '</div>'; // .todo-actions
+    html += '</div>'; // .todo-item
+
+    return html;
+  }
+
+  // ── Event binding ───────────────────────────────────────
+
+  function bindEvents() {
+    // Section toggle
+    document.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.getAttribute('data-toggle');
+        collapsed[key] = !collapsed[key];
+        render();
+      });
+    });
+
+    // Action buttons
+    document.querySelectorAll('[data-action]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const action = el.getAttribute('data-action');
+        const id     = el.getAttribute('data-id');
+        vscode.postMessage({ type: action, id: id });
+      });
+    });
+  }
+
+  // ── Search input ────────────────────────────────────────
+  searchEl.addEventListener('input', () => {
+    query = searchEl.value.trim();
+    render();
+  });
+
+  // ── Add buttons ─────────────────────────────────────────
+  document.getElementById('btn-add').addEventListener('click', () => {
+    vscode.postMessage({ type: 'addTodo' });
+  });
+  document.getElementById('btn-quick-add').addEventListener('click', () => {
+    vscode.postMessage({ type: 'quickAddTodo' });
+  });
+
+  // ── Message handling from extension host ────────────────
+  window.addEventListener('message', e => {
+    const msg = e.data;
+    if (msg.type === 'updateData') {
+      todos  = msg.todos  || [];
+      tagMap = msg.tagMap  || {};
+      today  = msg.today   || '';
+      render();
+    }
+  });
+
+  // ── Request initial data ────────────────────────────────
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

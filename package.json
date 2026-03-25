@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Arbeitsplatz",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -62,7 +62,8 @@
       "arbeitsplatz": [
         {
           "id": "arbeitsplatz.todos",
-          "name": "TODOs"
+          "name": "TODOs",
+          "type": "webview"
         },
         {
           "id": "arbeitsplatz.commands",
@@ -100,41 +101,6 @@
         "command": "arbeitsplatz.todo.quickAdd",
         "title": "Quick Add Todo",
         "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.todo.markDone",
-        "title": "Mark Done",
-        "category": "Arbeitsplatz",
-        "icon": "$(check)"
-      },
-      {
-        "command": "arbeitsplatz.todo.markUndone",
-        "title": "Mark Undone",
-        "category": "Arbeitsplatz",
-        "icon": "$(circle-large-outline)"
-      },
-      {
-        "command": "arbeitsplatz.todo.moveToNextDay",
-        "title": "Move to Next Day",
-        "category": "Arbeitsplatz",
-        "icon": "$(arrow-right)"
-      },
-      {
-        "command": "arbeitsplatz.todo.reschedule",
-        "title": "Reschedule",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.todo.edit",
-        "title": "Edit Todo",
-        "category": "Arbeitsplatz",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "arbeitsplatz.todo.delete",
-        "title": "Delete Todo",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
       },
       {
         "command": "arbeitsplatz.todo.toggleShowDone",
@@ -296,16 +262,6 @@
     "menus": {
       "view/title": [
         {
-          "command": "arbeitsplatz.todo.add",
-          "when": "view == arbeitsplatz.todos",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.todo.toggleShowDone",
-          "when": "view == arbeitsplatz.todos",
-          "group": "navigation"
-        },
-        {
           "command": "arbeitsplatz.command.add",
           "when": "view == arbeitsplatz.commands",
           "group": "navigation"
@@ -342,36 +298,6 @@
         }
       ],
       "view/item/context": [
-        {
-          "command": "arbeitsplatz.todo.markDone",
-          "when": "view == arbeitsplatz.todos && viewItem == todoItem",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.todo.markUndone",
-          "when": "view == arbeitsplatz.todos && viewItem == todoItemDone",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.todo.moveToNextDay",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.todo.delete",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
-          "group": "inline@3"
-        },
-        {
-          "command": "arbeitsplatz.todo.edit",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.todo.reschedule",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
-          "group": "1_modify@2"
-        },
         {
           "command": "arbeitsplatz.command.copy",
           "when": "view == arbeitsplatz.commands && viewItem == commandItem",
