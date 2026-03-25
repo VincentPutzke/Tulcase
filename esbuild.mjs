@@ -1,5 +1,8 @@
 // @ts-check
 import esbuild from 'esbuild';
+import * as sass from 'sass';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 const isWatch = process.argv.includes('--watch');
 
@@ -16,7 +19,31 @@ const buildOptions = {
     minify: false,
 };
 
+/**
+ * Compile SCSS → CSS and copy the compiled CSS + HTML template into out/.
+ * Called before every esbuild pass so the webview assets are always up-to-date.
+ */
+function buildWebviewAssets() {
+    fs.mkdirSync('out', { recursive: true });
+
+    // Compile SCSS → CSS
+    const scssResult = sass.compile('src/views/record-calendar.scss', {
+        style: 'compressed',
+    });
+    fs.writeFileSync('out/record-calendar.css', scssResult.css, 'utf-8');
+
+    // Copy HTML template verbatim (tokens are substituted at runtime in TS)
+    fs.copyFileSync(
+        path.join('src', 'views', 'record-calendar.html'),
+        path.join('out', 'record-calendar.html'),
+    );
+
+    console.log('Webview assets built (SCSS + HTML).');
+}
+
 async function main() {
+    buildWebviewAssets();
+
     if (isWatch) {
         const ctx = await esbuild.context(buildOptions);
         await ctx.watch();

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Calendar column ──────────────────────────────────── -->
+  <div class="cal-col" id="cal-col">
+
+    <!-- Month navigation -->
+    <div class="month-nav">
+      <button class="nav-btn" id="prev">&#8249;</button>
+      <div class="month-label" id="month-label"></div>
+      <button class="nav-btn" id="next">&#8250;</button>
+    </div>
+
+    <!-- Day-of-week headers (kept separate so they have a fixed height
+         and a visible bottom separator line below them) -->
+    <div class="day-headers" id="day-headers"></div>
+
+    <!-- Calendar grid — contains only day cells (6 rows × 7 columns).
+         --cell is set by JS; justify/align-content: space-between
+         distributes remaining panel space as gaps. -->
+    <div class="calendar" id="calendar"></div>
+
+  </div>
+
+  <!-- ── Vertical divider ─────────────────────────────────── -->
+  <div class="col-divider"></div>
+
+  <!-- ── Detail column ────────────────────────────────────── -->
+  <div class="detail-col">
+
+    <!-- Month summary card -->
+    <div class="detail-header">
+      <div class="detail-month" id="detail-month"></div>
+      <div class="detail-stats" id="detail-stats"></div>
+    </div>
+
+    <!-- Day badge + entries — separated by a top border line -->
+    <div class="entries-section">
+      <div class="detail-day-label" id="detail-day-label"></div>
+      <div class="entries" id="entries">
+        <div class="hint">Select a day to view entries.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /.layout -->
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── Constants ───────────────────────────────────────────
+  const MONTH_NAMES = [
+    'January','February','March','April','May','June',
+    'July','August','September','October','November','December',
+  ];
+  const DAY_ABBR = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+  // ── State ───────────────────────────────────────────────
+  let year      = new Date().getFullYear();
+  let month     = new Date().getMonth() + 1;
+  let monthData = null;   // RecordDb | null
+  let selected  = null;   // 'YYYY-MM-DD' | null
+
+  // ── Utility ─────────────────────────────────────────────
+  function fmt(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h + ':' + String(m).padStart(2, '0');
+  }
+
+  function escape(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function todayISO() {
+    const d = new Date();
+    return d.getFullYear()
+      + '-' + String(d.getMonth() + 1).padStart(2, '0')
+      + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /** Map total minutes → intensity level 0-4 */
+  function level(min) {
+    if (min === 0)   return 0;
+    if (min <= 120)  return 1;   // ≤ 2 h
+    if (min <= 300)  return 2;   // ≤ 5 h
+    if (min <= 480)  return 3;   // ≤ 8 h
+    return 4;
+  }
+
+  function dayTotalMin(dateStr) {
+    const entries = monthData?.days?.[dateStr] ?? [];
+    return entries.reduce((s, e) => s + e.time_spent_min, 0);
+  }
+
+  // ── Cell sizing ─────────────────────────────────────────
+  /**
+   * Compute the largest square cell size that fits the full 6-row × 7-column
+   * calendar inside the available space.  Extra space distributes as gaps
+   * (CSS justify-content / align-content: space-between).
+   *
+   * @returns {number} cell side length in pixels
+   */
+  function computeCellSize() {
+    const calCol   = document.getElementById('cal-col');
+    const nav      = calCol.querySelector('.month-nav');
+    const hdrs     = document.getElementById('day-headers');
+
+    const totalW = calCol.clientWidth;
+    const totalH = calCol.clientHeight;
+
+    // Height consumed by nav + headers + their margins/padding
+    const occupied = nav.offsetHeight + hdrs.offsetHeight + 6 /* spacing */;
+    const availH   = totalH - occupied;
+    const availW   = totalW;
+
+    const COLS = 7;
+    const ROWS = 6;
+    // We want COLS cells to fit horizontally and ROWS cells vertically.
+    // (Space-between means no gap is added at the edges, so we don't subtract
+    //  any fixed gap from the available size.)
+    const fromW = Math.floor(availW / COLS);
+    const fromH = Math.floor(availH / ROWS);
+
+    // Clamp: minimum 16 px so cells remain tappable; no explicit maximum —
+    // the "not further" constraint is enforced by taking the min of both axes.
+    return Math.max(16, Math.min(fromW, fromH));
+  }
+
+  /** Apply --cell to calendar grid and header row so they stay in sync. */
+  function applyCellSize() {
+    const size = computeCellSize();
+    const px   = size + 'px';
+    document.getElementById('calendar').style.setProperty('--cell', px);
+    document.getElementById('day-headers').style.setProperty('--cell', px);
+  }
+
+  // ── ResizeObserver ──────────────────────────────────────
+  // Re-compute cell size whenever the calendar column is resized.
+  const ro = new ResizeObserver(() => applyCellSize());
+  ro.observe(document.getElementById('cal-col'));
+
+  // ── Rendering ───────────────────────────────────────────
+  function render() {
+    renderHeaders();
+    renderCalendar();
+    renderDetail();
+    applyCellSize();   // re-fit after DOM content changes
+  }
+
+  /** Render the static Mon-Sun header strip. */
+  function renderHeaders() {
+    const hdrEl = document.getElementById('day-headers');
+    hdrEl.innerHTML = '';
+    DAY_ABBR.forEach(label => {
+      const h = document.createElement('div');
+      h.className   = 'day-hdr';
+      h.textContent = label;
+      hdrEl.appendChild(h);
+    });
+  }
+
+  /** Render the 6-row × 7-column grid of day cells. */
+  function renderCalendar() {
+    document.getElementById('month-label').textContent =
+      MONTH_NAMES[month - 1] + ' ' + year;
+
+    const cal = document.getElementById('calendar');
+    cal.innerHTML = '';
+
+    const firstDow    = new Date(year, month - 1, 1).getDay(); // 0 = Sun
+    const startOffset = (firstDow + 6) % 7;                    // shift to Mon-first
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const today       = todayISO();
+
+    // Leading empty cells (week padding before day 1)
+    for (let i = 0; i < startOffset; i++) {
+      const e = document.createElement('div');
+      e.className = 'day empty';
+      cal.appendChild(e);
+    }
+
+    // Day cells
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = year
+        + '-' + String(month).padStart(2, '0')
+        + '-' + String(d).padStart(2, '0');
+      const min = dayTotalMin(iso);
+
+      const cell = document.createElement('div');
+      cell.className = 'day l' + level(min);
+      if (iso === today)    cell.classList.add('today');
+      if (iso === selected) cell.classList.add('selected');
+      cell.setAttribute('title', 'Double-click to log time on ' + iso);
+
+      const numEl = document.createElement('div');
+      numEl.className   = 'day-num';
+      numEl.textContent = String(d);
+      cell.appendChild(numEl);
+
+      if (min > 0) {
+        const hEl = document.createElement('div');
+        hEl.className   = 'day-hours';
+        hEl.textContent = fmt(min);
+        cell.appendChild(hEl);
+      }
+
+      cell.addEventListener('click', () => {
+        selected = iso;
+        document.querySelectorAll('.day.selected')
+          .forEach(el => el.classList.remove('selected'));
+        cell.classList.add('selected');
+        renderDetail();
+      });
+      cell.addEventListener('dblclick', () => {
+        vscode.postMessage({ type: 'openAddDialog', dateStr: iso });
+      });
+
+      cal.appendChild(cell);
+    }
+
+    // Trailing empty cells to fill the last row (keeps grid always 6 rows)
+    const totalCells = startOffset + daysInMonth;
+    const remainder  = totalCells % 7;
+    const trailing   = remainder === 0 ? 0 : 7 - remainder;
+    for (let i = 0; i < trailing; i++) {
+      const e = document.createElement('div');
+      e.className = 'day empty';
+      cal.appendChild(e);
+    }
+  }
+
+  /** Render the right-hand detail panel for the selected day. */
+  function renderDetail() {
+    document.getElementById('detail-month').textContent =
+      MONTH_NAMES[month - 1] + ' ' + year;
+
+    // ── Monthly summary ──────────────────────────────────
+    let totalMin   = 0;
+    let workedDays = 0;
+    if (monthData?.days) {
+      for (const entries of Object.values(monthData.days)) {
+        const d = entries.reduce((s, e) => s + e.time_spent_min, 0);
+        if (d > 0) { totalMin += d; workedDays++; }
+      }
+    }
+    const avg = workedDays > 0 ? Math.round(totalMin / workedDays) : 0;
+    document.getElementById('detail-stats').innerHTML =
+      'Total: <strong>' + fmt(totalMin) + '</strong><br>'
+      + 'Avg: <strong>' + fmt(avg) + '</strong> / worked day';
+
+    // ── Day entries ──────────────────────────────────────
+    const dayLabel  = document.getElementById('detail-day-label');
+    const entriesEl = document.getElementById('entries');
+
+    if (!selected) {
+      dayLabel.textContent = '';
+      entriesEl.innerHTML  = '<div class="hint">Select a day to view entries.</div>';
+      return;
+    }
+
+    const parts = selected.split('-');
+    dayLabel.textContent =
+      parts[2] + ' ' + MONTH_NAMES[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+
+    const entries = monthData?.days?.[selected] ?? [];
+    entriesEl.innerHTML = '';
+
+    if (entries.length === 0) {
+      entriesEl.innerHTML =
+        '<div class="hint">No entries — double-click a calendar cell to add one.</div>';
+      return;
+    }
+
+    entries.forEach(entry => {
+      const item = document.createElement('div');
+      item.className = 'entry';
+      item.innerHTML =
+        '<div class="entry-time">' + escape(fmt(entry.time_spent_min)) + '</div>' +
+        '<div class="entry-notes">' + escape(entry.notes) + '</div>';
+      entriesEl.appendChild(item);
+    });
+  }
+
+  // ── Navigation ──────────────────────────────────────────
+  document.getElementById('prev').addEventListener('click', () => {
+    month--;
+    if (month < 1) { month = 12; year--; }
+    selected = null;
+    requestMonth();
+  });
+
+  document.getElementById('next').addEventListener('click', () => {
+    month++;
+    if (month > 12) { month = 1; year++; }
+    selected = null;
+    requestMonth();
+  });
+
+  function requestMonth() {
+    vscode.postMessage({ type: 'loadMonth', year, month });
+  }
+
+  // ── Message bus ─────────────────────────────────────────
+  window.addEventListener('message', event => {
+    const msg = event.data;
+    if (msg.type === 'updateData') {
+      year      = msg.year;
+      month     = msg.month;
+      monthData = msg.data;
+      render();
+    }
+  });
+
+  // ── Boot ────────────────────────────────────────────────
+  renderHeaders();   // static headers are always the same
+  requestMonth();    // ask extension for this month's data
+}());
+</script>
+</body>
+</html>
