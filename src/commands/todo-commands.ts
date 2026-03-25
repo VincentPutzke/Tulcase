@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
+import { pickTags } from '../data/tag-picker';
 import { todayStr, tomorrowStr, addDays, formatDate } from '../data/time-utils';
 import type { ArbeitsplatzSettings } from '../config';
 import type { TodoStore, TodoItem } from '../models/todo.model';
@@ -39,17 +40,8 @@ async function addTodo(settings: ArbeitsplatzSettings, todoTree: TodoTreeProvide
     });
     if (!dateStr) { return; }
 
-    // Tag selection
-    const tagMap = await tagTree.getTagMap();
-    const tagNames = Object.keys(tagMap);
-    let tags: string[] = [];
-    if (tagNames.length > 0) {
-        const picked = await vscode.window.showQuickPick(
-            tagNames.map(t => ({ label: t })),
-            { canPickMany: true, placeHolder: 'Select tags (optional)' }
-        );
-        tags = picked?.map(p => p.label) ?? [];
-    }
+    // Tag selection via colour-coded picker
+    const tags = await pickTags(tagTree) ?? [];
 
     const data = await store.read<TodoStore>(settings.todosFile, { items: [] });
     data.items.push({ note, date: dateStr, done: false, tags });
@@ -190,14 +182,9 @@ async function editTodo(settings: ArbeitsplatzSettings, todoTree: TodoTreeProvid
             todo.date = newDate;
         }
     } else if (field.label === 'Tags') {
-        const tagMap = await tagTree.getTagMap();
-        const allTags = Object.keys(tagMap);
-        const picked = await vscode.window.showQuickPick(
-            allTags.map(t => ({ label: t, picked: todo.tags.includes(t) })),
-            { canPickMany: true, placeHolder: 'Select tags' }
-        );
+        const picked = await pickTags(tagTree, todo.tags);
         if (picked) {
-            todo.tags = picked.map(p => p.label);
+            todo.tags = picked;
         }
     }
 
