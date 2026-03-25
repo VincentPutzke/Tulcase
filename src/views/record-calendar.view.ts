@@ -150,116 +150,190 @@ export class RecordCalendarViewProvider implements vscode.WebviewViewProvider {
     padding     : 10px 12px;
     height      : 100vh;
     overflow    : hidden;
-  }
-
-  /* ── Two-column layout ────────────────────────────────── */
-  .layout {
-    display               : grid;
-    grid-template-columns : 1fr 220px;
-    gap                   : 14px;
-    height                : 100%;
-  }
-
-  .cal-col, .detail-col {
-    overflow   : hidden;
-    display    : flex;
+    display     : flex;
     flex-direction : column;
   }
 
-  /* ── Month navigation ─────────────────────────────────── */
+  /* ── Two-column layout ─────────────────────────────────── */
+  /*
+   * The layout is a flex row so both columns share 100% of the remaining
+   * body height.  min-height: 0 on all flex children is critical: without it
+   * flex items refuse to shrink below their intrinsic content height and the
+   * calendar rows overflow when the panel is wide.
+   */
+  .layout {
+    display   : flex;
+    flex      : 1;
+    gap       : 0;
+    min-height: 0;
+  }
+
+  .cal-col {
+    flex           : 1;
+    min-width      : 0;
+    min-height     : 0;
+    display        : flex;
+    flex-direction : column;
+    padding-right  : 14px;
+    overflow       : hidden;
+  }
+
+  /* Vertical divider ── a 1 px hairline between the two columns */
+  .col-divider {
+    width         : 1px;
+    align-self    : stretch;
+    background    : var(--vscode-panel-border, rgba(128,128,128,.3));
+    flex-shrink   : 0;
+    margin        : 2px 0;
+  }
+
+  .detail-col {
+    width          : 220px;
+    flex-shrink    : 0;
+    min-height     : 0;
+    display        : flex;
+    flex-direction : column;
+    padding-left   : 14px;
+    overflow       : hidden;
+  }
+
+  /* ── Month navigation bar ──────────────────────────────── */
   .month-nav {
-    display         : flex;
-    align-items     : center;
-    margin-bottom   : 8px;
+    display          : flex;
+    align-items      : center;
+    background       : var(--vscode-toolbar-activeBackground,
+                          var(--vscode-editor-inactiveSelectionBackground,
+                          rgba(128,128,128,.12)));
+    border-radius    : 6px;
+    padding          : 3px 6px;
+    margin-bottom    : 8px;
+    border           : 1px solid var(--vscode-widget-border, rgba(128,128,128,.2));
   }
 
   .nav-btn {
     background    : transparent;
-    color         : var(--vscode-button-foreground, #fff);
-    border        : 1px solid var(--vscode-button-border, transparent);
+    color         : var(--vscode-foreground);
+    border        : none;
     border-radius : 4px;
-    width         : 24px;
-    height        : 24px;
+    width         : 22px;
+    height        : 22px;
     font-size     : 16px;
     line-height   : 1;
     cursor        : pointer;
     display       : flex;
     align-items   : center;
     justify-content : center;
-    transition    : background 0.15s;
+    transition    : background 0.12s;
   }
-  .nav-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.2)); }
+  .nav-btn:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.25)); }
 
   .month-label {
-    flex        : 1;
-    text-align  : center;
-    font-size   : 13px;
-    font-weight : 600;
-    letter-spacing : 0.04em;
-    color       : var(--vscode-foreground);
+    flex           : 1;
+    text-align     : center;
+    font-size      : 12px;
+    font-weight    : 700;
+    letter-spacing : 0.06em;
+    color          : var(--vscode-foreground);
+    text-transform : uppercase;
   }
 
   /* ── Calendar grid ─────────────────────────────────────── */
+  /*
+   * grid-template-rows:
+   *   auto    — first 7 cells = day-of-week headers (natural height)
+   *   repeat(6, 1fr) — up to 6 week rows share the remaining space equally
+   *
+   * This prevents height growth when the panel is stretched horizontally
+   * because rows are height-controlled by the grid, not by cell content.
+   */
   .calendar {
     display               : grid;
     grid-template-columns : repeat(7, 1fr);
+    grid-template-rows    : auto repeat(6, 1fr);
     gap                   : 3px;
     flex                  : 1;
+    min-height            : 0;
   }
 
   .day-hdr {
     text-align    : center;
     font-size     : 10px;
-    font-weight   : 600;
+    font-weight   : 700;
     color         : var(--vscode-descriptionForeground);
-    padding-bottom: 4px;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
+    background    : var(--vscode-editor-inactiveSelectionBackground,
+                      rgba(128,128,128,.1));
+    border-radius : 3px;
+    padding       : 3px 0;
+    /* sits in the auto row – no other sizing needed */
   }
 
   .day {
-    aspect-ratio    : 1 / 1;
+    /* No aspect-ratio — height is dictated by the grid row (1fr). */
     border-radius   : 5px;
     display         : flex;
     flex-direction  : column;
     align-items     : center;
     justify-content : center;
     cursor          : pointer;
-    border          : 1px solid transparent;
-    transition      : transform 0.1s, border-color 0.1s;
+    border          : 1px solid var(--vscode-widget-border, rgba(128,128,128,.18));
+    transition      : transform 0.1s, border-color 0.1s, box-shadow 0.1s;
     user-select     : none;
-    position        : relative;
     overflow        : hidden;
+    min-height      : 0;
   }
-  .day:hover { transform: scale(1.07); border-color: var(--vscode-focusBorder) !important; }
+  .day:hover {
+    transform    : scale(1.06);
+    border-color : var(--vscode-focusBorder) !important;
+    box-shadow   : 0 2px 6px rgba(0,0,0,.25);
+    z-index      : 1;
+    position     : relative;
+  }
   .day.empty { visibility: hidden; pointer-events: none; }
 
-  /* ── Level colours — adapts to any VS Code theme ─────── */
-  /* Level 0 — no work */
-  .day.l0 { background: var(--vscode-editor-background); }
-
-  /* Level 1 — ≤ 2 h (subtle green tint) */
-  .day.l1 { background: color-mix(in srgb, var(--vscode-charts-green, #4ec9b0) 20%, var(--vscode-editor-background)); }
-
-  /* Level 2 — ≤ 5 h */
-  .day.l2 { background: color-mix(in srgb, var(--vscode-charts-green, #4ec9b0) 45%, var(--vscode-editor-background)); }
-
-  /* Level 3 — ≤ 8 h */
+  /* ── Intensity levels — theme-adaptive colour ramp ──────
+   *  l0  no work   → very subtle tinted background
+   *  l1  ≤ 2 h     → 22 % green mix
+   *  l2  ≤ 5 h     → 50 % green mix
+   *  l3  ≤ 8 h     → 78 % green mix, white text
+   *  l4  > 8 h     → full green, bold text
+   * color-mix() resolves against the current VS Code theme variables
+   * so the gradient looks good in both dark and light themes.           */
+  .day.l0 {
+    background : var(--vscode-input-background,
+                   color-mix(in srgb, var(--vscode-foreground, #ccc) 5%,
+                             var(--vscode-editor-background)));
+  }
+  .day.l1 {
+    background : color-mix(in srgb,
+                   var(--vscode-charts-green, #4ec9b0) 22%,
+                   var(--vscode-editor-background));
+  }
+  .day.l2 {
+    background : color-mix(in srgb,
+                   var(--vscode-charts-green, #4ec9b0) 50%,
+                   var(--vscode-editor-background));
+  }
   .day.l3 {
-    background : color-mix(in srgb, var(--vscode-charts-green, #4ec9b0) 75%, var(--vscode-editor-background));
+    background : color-mix(in srgb,
+                   var(--vscode-charts-green, #4ec9b0) 78%,
+                   var(--vscode-editor-background));
     color      : var(--vscode-button-foreground, #fff);
   }
-
-  /* Level 4 — > 8 h (full saturation) */
   .day.l4 {
-    background : var(--vscode-charts-green, #4ec9b0);
-    color      : var(--vscode-button-foreground, #fff);
-    font-weight: 600;
+    background  : var(--vscode-charts-green, #4ec9b0);
+    color       : var(--vscode-button-foreground, #fff);
+    font-weight : 700;
+    border-color: color-mix(in srgb, var(--vscode-charts-green, #4ec9b0) 70%, #000) !important;
   }
 
-  /* Today ring */
-  .day.today  { border-color: var(--vscode-charts-blue, #75beff) !important; border-width: 2px !important; }
+  /* Today — blue outline ring */
+  .day.today {
+    border-color : var(--vscode-charts-blue, #75beff) !important;
+    border-width : 2px !important;
+  }
 
-  /* Selected fill (primary button colour) */
+  /* Selected — primary-colour ring + subtle glow */
   .day.selected {
     border-color : var(--vscode-button-background, #0e639c) !important;
     border-width : 2px !important;
@@ -267,33 +341,44 @@ export class RecordCalendarViewProvider implements vscode.WebviewViewProvider {
   }
 
   .day-num   { font-size: 11px; font-weight: 500; line-height: 1; }
-  .day-hours { font-size: 9px;  opacity: 0.85; line-height: 1; margin-top: 2px; }
+  .day-hours { font-size: 9px;  opacity: 0.85;   line-height: 1; margin-top: 2px; }
 
   /* ── Detail column ─────────────────────────────────────── */
   .detail-header {
-    border-bottom  : 1px solid var(--vscode-panel-border, rgba(128,128,128,.3));
-    padding-bottom : 8px;
-    margin-bottom  : 8px;
+    background    : var(--vscode-editor-inactiveSelectionBackground,
+                      rgba(128,128,128,.1));
+    border        : 1px solid var(--vscode-widget-border, rgba(128,128,128,.2));
+    border-radius : 6px;
+    padding       : 8px 10px;
+    margin-bottom : 10px;
   }
 
   .detail-month {
     font-size   : 13px;
     font-weight : 700;
+    color       : var(--vscode-foreground);
   }
 
   .detail-stats {
-    font-size : 11px;
-    color     : var(--vscode-descriptionForeground);
-    margin-top: 3px;
-    line-height : 1.5;
+    font-size   : 11px;
+    color       : var(--vscode-descriptionForeground);
+    margin-top  : 4px;
+    line-height : 1.6;
   }
 
   .detail-day-label {
-    font-size   : 11px;
-    font-weight : 600;
-    color       : var(--vscode-charts-blue, #75beff);
-    margin-bottom: 6px;
+    display       : inline-block;
+    font-size     : 11px;
+    font-weight   : 700;
+    color         : var(--vscode-button-foreground, #fff);
+    background    : var(--vscode-charts-blue, #75beff);
+    border-radius : 4px;
+    padding       : 2px 8px;
+    margin-bottom : 8px;
+    letter-spacing: 0.04em;
   }
+  /* hide the label when empty */
+  .detail-day-label:empty { display: none; }
 
   .entries {
     display        : flex;
@@ -301,22 +386,38 @@ export class RecordCalendarViewProvider implements vscode.WebviewViewProvider {
     gap            : 5px;
     overflow-y     : auto;
     flex           : 1;
+    min-height     : 0;
   }
 
   .entry {
-    background    : var(--vscode-editor-background);
-    border-radius : 4px;
-    padding       : 5px 8px;
+    background    : var(--vscode-editor-inactiveSelectionBackground,
+                      rgba(128,128,128,.08));
+    border-radius : 5px;
+    padding       : 6px 9px;
     border-left   : 3px solid var(--vscode-charts-blue, #75beff);
+    border-top    : 1px solid var(--vscode-widget-border, rgba(128,128,128,.15));
+    border-right  : 1px solid var(--vscode-widget-border, rgba(128,128,128,.15));
+    border-bottom : 1px solid var(--vscode-widget-border, rgba(128,128,128,.15));
   }
 
-  .entry-time  { font-size: 11px; font-weight: 700; color: var(--vscode-charts-blue, #75beff); }
-  .entry-notes { font-size: 11px; margin-top: 2px; word-break: break-word; }
+  .entry-time  {
+    font-size  : 11px;
+    font-weight: 700;
+    color      : var(--vscode-charts-blue, #75beff);
+  }
+  .entry-notes {
+    font-size   : 11px;
+    margin-top  : 3px;
+    word-break  : break-word;
+    color       : var(--vscode-foreground);
+    opacity     : 0.9;
+  }
 
   .hint {
     font-size  : 11px;
     color      : var(--vscode-descriptionForeground);
     font-style : italic;
+    padding    : 4px 2px;
   }
 </style>
 </head>
@@ -332,6 +433,9 @@ export class RecordCalendarViewProvider implements vscode.WebviewViewProvider {
     </div>
     <div class="calendar" id="calendar"></div>
   </div>
+
+  <!-- ── Vertical divider ───────────────────────────── -->
+  <div class="col-divider"></div>
 
   <!-- ── Detail column ──────────────────────────────── -->
   <div class="detail-col">
