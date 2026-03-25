@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Arbeitsplatz",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -156,6 +156,11 @@
       {
         "command": "arbeitsplatz.tag.changeColor",
         "title": "Change Tag Color",
+        "category": "Arbeitsplatz"
+      },
+      {
+        "command": "arbeitsplatz.tag.changeCategory",
+        "title": "Change Tag Category",
         "category": "Arbeitsplatz"
       },
       {
@@ -456,6 +461,11 @@
           "command": "arbeitsplatz.tag.changeColor",
           "when": "view == arbeitsplatz.tags && viewItem == tagItem",
           "group": "1_modify@2"
+        },
+        {
+          "command": "arbeitsplatz.tag.changeCategory",
+          "when": "view == arbeitsplatz.tags && viewItem == tagItem",
+          "group": "1_modify@3"
         },
         {
           "command": "arbeitsplatz.tag.delete",

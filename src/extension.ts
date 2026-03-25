@@ -39,9 +39,9 @@ export function activate(context: vscode.ExtensionContext): void {
     // 1. Resolve settings
     const settings = buildSettings();
 
-    // 2. Initialize providers
-    const todoTree    = new TodoTreeProvider(settings);
+    // 2. Initialize providers (tagTree first — todoTree uses it for colour lookups)
     const tagTree     = new TagTreeProvider(settings);
+    const todoTree    = new TodoTreeProvider(settings, tagTree);
     const commandTree = new CommandTreeProvider(settings);
     const linkTree    = new LinkTreeProvider(settings);
     const listTree    = new ListTreeProvider(settings);
