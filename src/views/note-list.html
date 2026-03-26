@@ -12,26 +12,35 @@
 </head>
 <body>
 
-<!-- ── Add buttons ──────────────────────────────────────── -->
-<div class="add-bar">
-  <button class="add-btn" id="btn-add">+ Add Note</button>
-  <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
-</div>
+<!--
+  Adaptive layout (Links pattern).
+  Sidebar (narrow): controls above tree, stacked vertically.
+  Panel  (wide):    controls on the right, tree on the left.
+-->
+<div class="layout" id="layout">
 
-<!-- ── Search bar ───────────────────────────────────────── -->
-<div class="search-bar">
-  <span class="search-icon"></span>
-  <input
-    class="search-input"
-    id="search"
-    type="text"
-    placeholder="Search notes and tags..."
-    spellcheck="false"
-  >
-</div>
+  <!-- ── Controls pane (add buttons + search) ───────────── -->
+  <div class="controls-pane">
+    <div class="add-bar">
+      <button class="add-btn" id="btn-add">+ Add Note</button>
+      <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon"></span>
+      <input
+        class="search-input"
+        id="search"
+        type="text"
+        placeholder="Search notes and tags..."
+        spellcheck="false"
+      >
+    </div>
+  </div>
 
-<!-- ── Sections container ───────────────────────────────── -->
-<div id="sections"></div>
+  <!-- ── Tree pane (folder / note list) ─────────────────── -->
+  <div class="tree-pane" id="sections"></div>
+
+</div>
 
 <script nonce="{{NONCE}}">
 (function () {
@@ -209,44 +218,44 @@
   function renderNote(note) {
     var lines = lineCount(note.content);
 
-    var html = '<div class="note-item" data-id="' + esc(note.id) + '">';
+    var html = '<div class="tree-item" data-id="' + esc(note.id) + '">';
 
-    html += '<div class="note-row" data-action="open" data-id="' + esc(note.id) + '">';
-    html += '  <span class="note-icon">' + ICONS.note + '</span>';
-    html += '  <div class="note-content">';
-    html += '    <div class="note-label">' + esc(note.label) + '</div>';
-    html += '    <div class="note-meta">';
+    html += '<div class="tree-item-row" data-action="open" data-id="' + esc(note.id) + '">';
+    html += '  <span class="tree-item-icon">' + ICONS.note + '</span>';
+    html += '  <div class="tree-item-content">';
+    html += '    <div class="tree-item-label">' + esc(note.label) + '</div>';
+    html += '    <div class="tree-item-meta">';
 
     // Tags
     if (note.tags && note.tags.length > 0) {
-      html += '<span class="note-tags">';
+      html += '<span class="tree-item-tags">';
       for (var ti = 0; ti < note.tags.length; ti++) {
         var tag   = note.tags[ti];
         var def   = tagMap[tag];
         var color = def ? def.color : '#8b8fa3';
-        html += '<span class="note-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+        html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
       }
       html += '</span>';
     }
 
     // Line count
-    html += '<span class="note-lines">' + lines + ' line' + (lines !== 1 ? 's' : '') + '</span>';
+    html += '<span class="tree-item-detail">' + lines + ' line' + (lines !== 1 ? 's' : '') + '</span>';
 
-    html += '    </div>';  // .note-meta
-    html += '  </div>';    // .note-content
+    html += '    </div>';  // .tree-item-meta
+    html += '  </div>';    // .tree-item-content
 
     // Action buttons
-    html += '  <div class="note-actions">';
+    html += '  <div class="tree-item-actions">';
     html += '    <button class="action-btn btn-edit" data-action="editMeta" data-id="' + esc(note.id) + '" title="Edit metadata">';
     html += ICONS.edit;
     html += '    </button>';
     html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(note.id) + '" title="Delete">';
     html += ICONS.delete;
     html += '    </button>';
-    html += '  </div>';    // .note-actions
+    html += '  </div>';    // .tree-item-actions
 
-    html += '</div>';      // .note-row
-    html += '</div>';      // .note-item
+    html += '</div>';      // .tree-item-row
+    html += '</div>';      // .tree-item
 
     return html;
   }
@@ -266,7 +275,7 @@
     });
 
     // Note click → open
-    document.querySelectorAll('.note-row[data-action="open"]').forEach(function(el) {
+    document.querySelectorAll('.tree-item-row[data-action="open"]').forEach(function(el) {
       el.addEventListener('click', function(e) {
         if (e.target.closest('.action-btn')) { return; }
         var id = el.getAttribute('data-id');
@@ -276,7 +285,7 @@
 
     // Action buttons
     document.querySelectorAll('[data-action]').forEach(function(el) {
-      if (el.classList.contains('note-row')) { return; } // skip the row itself
+      if (el.classList.contains('tree-item-row')) { return; } // skip the row itself
       el.addEventListener('click', function(e) {
         e.stopPropagation();
         var action = el.getAttribute('data-action');

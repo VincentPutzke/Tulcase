@@ -1,59 +1,16 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
 import { todayStr, addDays } from '../data/time-utils';
 import { generateId } from '../utils/id';
-import type { TulcaseSettings } from '../config';
 import type { TodoStore } from '../models/todo.model';
-import type { TagTreeProvider } from '../providers/tag-tree.provider';
+import { BaseListViewProvider } from './base-list.view';
 
 const store = new JsonStore();
 
-/**
- * WebviewViewProvider that renders a rich TODO list with three sections:
- *   Active  — overdue + due today (not done)
- *   Upcoming — future date (not done)
- *   Done    — completed items
- *
- * Each item shows two lines (note + date/tags) with action buttons.
- * A search bar filters by text and tags.
- *
- * HTML lives in src/views/todo-list.html.
- * Styles live in src/views/todo-list.scss (compiled to out/todo-list.css).
- */
-export class TodoListViewProvider implements vscode.WebviewViewProvider {
+export class TodoListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.todos';
-
-    private _view?: vscode.WebviewView;
-
-    constructor(
-        private readonly settings: TulcaseSettings,
-        private readonly tagTree: TagTreeProvider,
-    ) {}
-
-    // ── WebviewViewProvider ────────────────────────────────────────────────────
-
-    resolveWebviewView(
-        webviewView: vscode.WebviewView,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
-    ): void {
-        this._view = webviewView;
-
-        webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html    = this._buildHtml();
-
-        webviewView.webview.onDidReceiveMessage(msg => this._handleMessage(msg));
-    }
-
-    /** Called from extension when the file watcher detects a change. */
-    refresh(): void {
-        if (this._view?.visible) {
-            void this._sendData();
-        }
-    }
+    protected readonly viewName = 'todo-list';
 
     // ── Stats (used by StatusBar) ─────────────────────────────────────────────
 
@@ -72,7 +29,7 @@ export class TodoListViewProvider implements vscode.WebviewViewProvider {
 
     // ── Message handling ───────────────────────────────────────────────────────
 
-    private async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
+    protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
@@ -104,7 +61,7 @@ export class TodoListViewProvider implements vscode.WebviewViewProvider {
     // ── Data push ─────────────────────────────────────────────────────────────
 
     /** Load todos + tag map and push to the webview. */
-    private async _sendData(): Promise<void> {
+    protected async _sendData(): Promise<void> {
         if (!this._view) { return; }
 
         const data   = await store.read<TodoStore>(this.settings.todosFile, { items: [] });
@@ -244,28 +201,6 @@ export class TodoListViewProvider implements vscode.WebviewViewProvider {
         await this._sendData();
         vscode.window.showInformationMessage(`Todo added: ${note}`);
     }
-
-    // ── HTML builder ───────────────────────────────────────────────────────────
-
-    /**
-     * Load the HTML template and compiled CSS from the out/ directory,
-     * inject a fresh CSP nonce, and return the complete HTML string.
-     */
-    private _buildHtml(): string {
-        const nonce  = getNonce();
-        const outDir = path.join(__dirname);
-
-        const htmlTemplate = fs.readFileSync(
-            path.join(outDir, 'todo-list.html'), 'utf-8',
-        );
-        const css = fs.readFileSync(
-            path.join(outDir, 'todo-list.css'), 'utf-8',
-        );
-
-        return htmlTemplate
-            .replace(/\{\{NONCE\}\}/g, nonce)
-            .replace('{{STYLE}}', css);
-    }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -292,14 +227,4 @@ function parseQuickInput(input: string): { note: string; tags: string[]; date: s
         .trim();
 
     return { note, tags, date };
-}
-
-/** Cryptographically random nonce for Content-Security-Policy. */
-function getNonce(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let nonce = '';
-    for (let i = 0; i < 32; i++) {
-        nonce += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return nonce;
 }

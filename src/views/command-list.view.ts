@@ -1,66 +1,24 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
-import type { TulcaseSettings } from '../config';
 import type {
     CommandItem,
     CommandStore,
     LegacyCommandStore,
     LegacyCommandEntry,
 } from '../models/command.model';
-import type { TagTreeProvider } from '../providers/tag-tree.provider';
+import { BaseListViewProvider } from './base-list.view';
 
 const store = new JsonStore();
 
-/**
- * WebviewViewProvider that renders a rich Command list with:
- *   - Folder tree organisation (collapsible sections)
- *   - Collapsible multiline command text per item
- *   - Action buttons: edit, copy, send-to-terminal
- *   - Tag support with colour-coded labels
- *   - Search across label, command text, tags, and folders
- *
- * HTML lives in src/views/command-list.html.
- * Styles live in src/views/command-list.scss (compiled to out/command-list.css).
- */
-export class CommandListViewProvider implements vscode.WebviewViewProvider {
+export class CommandListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.commands';
-
-    private _view?: vscode.WebviewView;
-
-    constructor(
-        private readonly settings: TulcaseSettings,
-        private readonly tagTree: TagTreeProvider,
-    ) {}
-
-    // ── WebviewViewProvider ────────────────────────────────────────────────────
-
-    resolveWebviewView(
-        webviewView: vscode.WebviewView,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
-    ): void {
-        this._view = webviewView;
-
-        webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html    = this._buildHtml();
-
-        webviewView.webview.onDidReceiveMessage(msg => this._handleMessage(msg));
-    }
-
-    /** Called from extension when the file watcher detects a change. */
-    refresh(): void {
-        if (this._view?.visible) {
-            void this._sendData();
-        }
-    }
+    protected readonly viewName = 'command-list';
 
     // ── Message handling ───────────────────────────────────────────────────────
 
-    private async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
+    protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
@@ -89,7 +47,7 @@ export class CommandListViewProvider implements vscode.WebviewViewProvider {
     // ── Data push ─────────────────────────────────────────────────────────────
 
     /** Load commands + tag map and push to the webview. */
-    private async _sendData(): Promise<void> {
+    protected async _sendData(): Promise<void> {
         if (!this._view) { return; }
 
         const data   = await this._readstore();
@@ -372,34 +330,4 @@ export class CommandListViewProvider implements vscode.WebviewViewProvider {
 
         return { items };
     }
-
-    // ── HTML builder ───────────────────────────────────────────────────────────
-
-    private _buildHtml(): string {
-        const nonce  = getNonce();
-        const outDir = path.join(__dirname);
-
-        const htmlTemplate = fs.readFileSync(
-            path.join(outDir, 'command-list.html'), 'utf-8',
-        );
-        const css = fs.readFileSync(
-            path.join(outDir, 'command-list.css'), 'utf-8',
-        );
-
-        return htmlTemplate
-            .replace(/\{\{NONCE\}\}/g, nonce)
-            .replace('{{STYLE}}', css);
-    }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-/** Cryptographically random nonce for Content-Security-Policy. */
-function getNonce(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let nonce = '';
-    for (let i = 0; i < 32; i++) {
-        nonce += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return nonce;
 }

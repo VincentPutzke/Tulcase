@@ -13,21 +13,21 @@ First production release of the Tulcase VS Code extension from `develop` → `ma
 - [x] Remove `arbeitsplatz` migration fallback from `src/config.ts`
 - [x] Bump `version` in `package.json` to `1.0.0`
 - [x] Confirm `CHANGELOG.md` has a `1.0.0` entry
-- [ ] Verify `package.json` fields: `name`, `displayName`, `publisher`, repository URL
+- [x] Verify `package.json` fields: `name`, `displayName`, `publisher`, repository URL
 
 ### 2. Tests & Quality
-- [ ] Run unit tests: `npm test`
-- [ ] Run linter: `npm run lint`
-- [ ] Manual smoke test: install from `.vsix`, verify TODOs / Records / Tags / Commands / Links / Notes all work
+- [x] Run unit tests: `npm test`
+- [x] Run linter: `npm run lint`
+- [x] Manual smoke test: install from `.vsix`, verify TODOs / Records / Tags / Commands / Links / Notes all work
 
 ### 3. Build & Package
-- [ ] Build: `npm run compile`
-- [ ] Package: `vsce package` → generates `vscode-tulcase-1.0.0.vsix`
+- [x] Build: `npm run compile`
+- [x] Package: `vsce package` → generates `vscode-tulcase-1.0.0.vsix`
 
 ### 4. Finalize Release
-- [ ] Merge `develop` → `main` (`git checkout main && git merge --no-ff develop`)
-- [ ] Tag: `git tag -a v1.0.0 -m "v1.0.0"` and `git push origin main --tags`
-- [ ] Publish to Marketplace (optional): `vsce publish`
+- [x] Merge `develop` → `main` (`git checkout main && git merge --no-ff develop`)
+- [x] Tag: `git tag -a v1.0.0 -m "v1.0.0"` and `git push origin main --tags`
+- [x] Publish to Marketplace (optional): `vsce publish`
 
 ## Commands
 

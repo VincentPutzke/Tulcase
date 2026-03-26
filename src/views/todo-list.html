@@ -12,26 +12,30 @@
 </head>
 <body>
 
-<!-- ── Add buttons ──────────────────────────────────────── -->
-<div class="add-bar">
-  <button class="add-btn" id="btn-add">+ Add Todo</button>
-  <button class="add-btn add-btn-secondary" id="btn-quick-add">Quick Add</button>
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-add">+ Add Todo</button>
+    <button class="add-btn add-btn-secondary" id="btn-quick-add">Quick Add</button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="search"
+      type="text"
+      placeholder="Search todos and tags…"
+      spellcheck="false"
+    >
+  </div>
 </div>
 
-<!-- ── Search bar ───────────────────────────────────────── -->
-<div class="search-bar">
-  <span class="search-icon"></span>
-  <input
-    class="search-input"
-    id="search"
-    type="text"
-    placeholder="Search todos and tags…"
-    spellcheck="false"
-  >
-</div>
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane" id="sections"></div>
 
-<!-- ── Sections container ───────────────────────────────── -->
-<div id="sections"></div>
+</div>
 
 <script nonce="{{NONCE}}">
 (function () {
@@ -188,33 +192,33 @@
   /** Render a single TODO item (2-line layout). */
   function renderItem(item, isDone) {
     const isOverdue = !item.done && item.date < today;
-    const classes   = ['todo-item'];
+    const classes   = ['tree-item'];
     if (isOverdue) { classes.push('overdue'); }
     if (isDone)    { classes.push('done'); }
 
     let html = '<div class="' + classes.join(' ') + '" data-id="' + esc(item.id) + '">';
 
     // ── Content (left, 2 lines) ──
-    html += '<div class="todo-content">';
-    html += '  <div class="todo-note">' + esc(item.note) + '</div>';
-    html += '  <div class="todo-meta">';
+    html += '<div class="tree-item-content">';
+    html += '  <div class="tree-item-label">' + esc(item.note) + '</div>';
+    html += '  <div class="tree-item-meta">';
     html += '    <span class="todo-date">' + esc(fmtDate(item.date)) + '</span>';
 
     if (item.tags && item.tags.length > 0) {
-      html += '<span class="todo-tags">';
+      html += '<span class="tree-item-tags">';
       for (const tag of item.tags) {
         const def   = tagMap[tag];
         const color = def ? def.color : '#8b8fa3';
-        html += '<span class="todo-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+        html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
       }
       html += '</span>';
     }
 
-    html += '  </div>'; // .todo-meta
-    html += '</div>';    // .todo-content
+    html += '  </div>'; // .tree-item-meta
+    html += '</div>';    // .tree-item-content
 
     // ── Action buttons (right) ──
-    html += '<div class="todo-actions">';
+    html += '<div class="tree-item-actions">';
     html += '  <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(item.id) + '" title="Edit">';
     html += '    <svg class="icon icon-edit" width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">';
     html += '      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
@@ -246,8 +250,8 @@
       html += '  </button>';
     }
 
-    html += '</div>'; // .todo-actions
-    html += '</div>'; // .todo-item
+    html += '</div>'; // .tree-item-actions
+    html += '</div>'; // .tree-item
 
     return html;
   }
