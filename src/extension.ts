@@ -24,7 +24,7 @@ import { DataFileWatcher } from './watchers/file-watcher';
 import { TodoListViewProvider } from './views/todo-list.view';
 import { TagTreeProvider } from './providers/tag-tree.provider';
 import { CommandListViewProvider } from './views/command-list.view';
-import { LinkTreeProvider } from './providers/link-tree.provider';
+import { LinkListViewProvider } from './views/link-list.view';
 import { NoteListViewProvider } from './views/note-list.view';
 import { NoteFileSystemProvider } from './data/note-fs';
 import { NoteTagDecorator } from './data/note-decorations';
@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const tagTree     = new TagTreeProvider(settings);
     const todoList    = new TodoListViewProvider(settings, tagTree);
     const commandList = new CommandListViewProvider(settings, tagTree);
-    const linkTree    = new LinkTreeProvider(settings);
+    const linkList    = new LinkListViewProvider(settings, tagTree);
     const noteList    = new NoteListViewProvider(settings, tagTree);
     const noteFs      = new NoteFileSystemProvider(settings);
     const noteDecorator = new NoteTagDecorator(tagTree);
@@ -66,7 +66,11 @@ export function activate(context: vscode.ExtensionContext): void {
             commandList,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
-        vscode.window.registerTreeDataProvider('arbeitsplatz.links', linkTree),
+        vscode.window.registerWebviewViewProvider(
+            LinkListViewProvider.viewType,
+            linkList,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
         vscode.workspace.registerFileSystemProvider(NoteFileSystemProvider.scheme, noteFs),
         vscode.window.registerWebviewViewProvider(
             NoteListViewProvider.viewType,
@@ -90,7 +94,7 @@ export function activate(context: vscode.ExtensionContext): void {
         todoList.refresh();
         tagTree.refresh();
         commandList.refresh();
-        linkTree.refresh();
+        linkList.refresh();
         noteList.refresh();
         recordCalendar.refresh();
         statusBar.update();
@@ -100,7 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerTodoCommands(context, settings, todoList, tagTree);
     registerTagCommands(context, settings, tagTree, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);
-    registerLinkCommands(context, settings, linkTree);
+    registerLinkCommands(context, settings, linkList);
     registerListCommands(context, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
 
@@ -120,7 +124,7 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher.onTodosChanged(() => { todoList.refresh(); statusBar.update(); });
     watcher.onTagsChanged(() => tagTree.refresh());
     watcher.onCommandsChanged(() => commandList.refresh());
-    watcher.onLinksChanged(() => linkTree.refresh());
+    watcher.onLinksChanged(() => linkList.refresh());
     watcher.onListsChanged(() => { noteList.refresh(); noteDecorator.refreshAll(); });
     watcher.onRecordsChanged(() => recordCalendar.refresh());
     watcher.onTagsChanged(() => noteDecorator.refreshAll());

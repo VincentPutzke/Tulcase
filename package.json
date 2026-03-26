@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Arbeitsplatz",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -77,7 +77,8 @@
         },
         {
           "id": "arbeitsplatz.links",
-          "name": "Links"
+          "name": "Links",
+          "type": "webview"
         },
         {
           "id": "arbeitsplatz.tags",
@@ -168,39 +169,10 @@
         "icon": "$(trash)"
       },
       {
-        "command": "arbeitsplatz.link.addLink",
+        "command": "arbeitsplatz.link.add",
         "title": "Add Link",
         "category": "Arbeitsplatz",
         "icon": "$(add)"
-      },
-      {
-        "command": "arbeitsplatz.link.addFolder",
-        "title": "Add Folder",
-        "category": "Arbeitsplatz",
-        "icon": "$(new-folder)"
-      },
-      {
-        "command": "arbeitsplatz.link.open",
-        "title": "Open Link",
-        "category": "Arbeitsplatz",
-        "icon": "$(globe)"
-      },
-      {
-        "command": "arbeitsplatz.link.copyUrl",
-        "title": "Copy URL",
-        "category": "Arbeitsplatz",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "arbeitsplatz.link.edit",
-        "title": "Edit Link",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.link.delete",
-        "title": "Delete Link/Folder",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
       },
       {
         "command": "arbeitsplatz.note.add",
@@ -229,16 +201,7 @@
     ],
     "menus": {
       "view/title": [
-        {
-          "command": "arbeitsplatz.link.addLink",
-          "when": "view == arbeitsplatz.links",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.link.addFolder",
-          "when": "view == arbeitsplatz.links",
-          "group": "navigation"
-        },
+
         {
           "command": "arbeitsplatz.note.add",
           "when": "view == arbeitsplatz.lists",
@@ -261,36 +224,7 @@
         }
       ],
       "view/item/context": [
-        {
-          "command": "arbeitsplatz.link.open",
-          "when": "view == arbeitsplatz.links && viewItem == linkItem",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.link.copyUrl",
-          "when": "view == arbeitsplatz.links && viewItem == linkItem",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.link.edit",
-          "when": "view == arbeitsplatz.links && viewItem =~ /^link/",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.link.addLink",
-          "when": "view == arbeitsplatz.links && viewItem == linkFolder",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "arbeitsplatz.link.addFolder",
-          "when": "view == arbeitsplatz.links && viewItem == linkFolder",
-          "group": "1_modify@3"
-        },
-        {
-          "command": "arbeitsplatz.link.delete",
-          "when": "view == arbeitsplatz.links && viewItem =~ /^link/",
-          "group": "2_delete@1"
-        },
+
         {
           "command": "arbeitsplatz.tag.rename",
           "when": "view == arbeitsplatz.tags && viewItem == tagItem",
