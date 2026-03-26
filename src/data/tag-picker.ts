@@ -52,7 +52,7 @@ export async function pickTags(
 
         for (const [name, def] of tags) {
             items.push({
-                label: `$(circle-filled) ${name}`,
+                label: name,
                 tagName: name,
                 description: def.color,
                 iconPath: colorCircleUri(def.color),

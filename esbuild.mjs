@@ -26,17 +26,25 @@ const buildOptions = {
 function buildWebviewAssets() {
     fs.mkdirSync('out', { recursive: true });
 
-    // Compile SCSS → CSS
-    const scssResult = sass.compile('src/views/record-calendar.scss', {
-        style: 'compressed',
-    });
-    fs.writeFileSync('out/record-calendar.css', scssResult.css, 'utf-8');
+    // All webview asset pairs: { scss, html, name }
+    const webviews = [
+        { name: 'record-calendar' },
+        { name: 'todo-list' },
+    ];
 
-    // Copy HTML template verbatim (tokens are substituted at runtime in TS)
-    fs.copyFileSync(
-        path.join('src', 'views', 'record-calendar.html'),
-        path.join('out', 'record-calendar.html'),
-    );
+    for (const wv of webviews) {
+        // Compile SCSS → CSS
+        const scssResult = sass.compile(`src/views/${wv.name}.scss`, {
+            style: 'compressed',
+        });
+        fs.writeFileSync(`out/${wv.name}.css`, scssResult.css, 'utf-8');
+
+        // Copy HTML template verbatim (tokens are substituted at runtime in TS)
+        fs.copyFileSync(
+            path.join('src', 'views', `${wv.name}.html`),
+            path.join('out', `${wv.name}.html`),
+        );
+    }
 
     console.log('Webview assets built (SCSS + HTML).');
 }

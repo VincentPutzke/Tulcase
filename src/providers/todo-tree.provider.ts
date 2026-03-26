@@ -158,7 +158,7 @@ function buildTooltip(
     md.supportHtml = true;
 
     md.appendMarkdown(`**${escapeMarkdown(todo.note)}**\n\n`);
-    md.appendMarkdown(`📅 ${formatDisplayDate(todo.date)}\n\n`);
+    md.appendMarkdown(`**Date:** ${formatDisplayDate(todo.date)}\n\n`);
 
     if (todo.tags.length > 0) {
         const tagParts = todo.tags.map(t => {
