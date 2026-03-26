@@ -20,7 +20,7 @@
 
 <!-- ── Search bar ───────────────────────────────────────── -->
 <div class="search-bar">
-  <span class="search-icon">Search</span>
+  <span class="search-icon"></span>
   <input
     class="search-input"
     id="search"
@@ -137,16 +137,17 @@
 
     let html = '';
 
-    html += renderSection('active',   '', 'Active',   active,   false);
-    html += renderSection('upcoming', '', 'Upcoming', upcoming, false);
-    html += renderSection('done',     '', 'Done',     done,     true);
+    html += renderSection('active',   '',    'Active',   active,   false);
+    html += renderSection('upcoming', '',    'Upcoming', upcoming, false);
+    html += renderSection('done',     '✓',   'Done',     done,     true);
 
     if (filtered.length === 0 && todos.length > 0) {
       html = '<div class="no-results">No todos match your search.</div>';
     } else if (todos.length === 0) {
-       html += '<div class="empty-state">'
-         + 'No todos yet. Click <strong>+ Add Todo</strong> to get started!'
-         + '</div>';
+        html = '<div class="empty-state">'
+          + '<div class="empty-state-icon">☐</div>'
+           + 'No todos yet. Click <strong>+ Add Todo</strong> to get started!'
+           + '</div>';
     }
 
     sectionsEl.innerHTML = html;
@@ -209,19 +210,19 @@
     // ── Action buttons (right) ──
     html += '<div class="todo-actions">';
     html += '  <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(item.id) + '" title="Edit">';
-    html += '    Edit';
+    html += '    ✏';
     html += '  </button>';
 
     if (!isDone) {
       html += '  <button class="action-btn btn-postpone" data-action="postpone" data-id="' + esc(item.id) + '" title="Postpone (+1 day)">';
-      html += '    Postpone';
+      html += '    →';
       html += '  </button>';
       html += '  <button class="action-btn btn-done" data-action="markDone" data-id="' + esc(item.id) + '" title="Mark done">';
-      html += '    Done';
+      html += '    ✓';
       html += '  </button>';
     } else {
       html += '  <button class="action-btn btn-undo" data-action="markUndone" data-id="' + esc(item.id) + '" title="Mark undone">';
-      html += '    Undo';
+      html += '    ↩';
       html += '  </button>';
     }
 
