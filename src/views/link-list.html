@@ -250,36 +250,36 @@
 
   /** Render a single link item. */
   function renderLinkItem(node) {
-    var html = '<div class="link-item" data-id="' + esc(node.id) + '">';
+    var html = '<div class="tree-item" data-id="' + esc(node.id) + '">';
 
-    html += '<div class="link-row" data-action="open" data-id="' + esc(node.id) + '">';
-    html += '  <span class="link-icon">' + ICONS.globe + '</span>';
-    html += '  <div class="link-content">';
-    html += '    <div class="link-label">' + esc(node.label) + '</div>';
-    html += '    <div class="link-meta">';
+    html += '<div class="tree-item-row" data-action="open" data-id="' + esc(node.id) + '">';
+    html += '  <span class="tree-item-icon">' + ICONS.globe + '</span>';
+    html += '  <div class="tree-item-content">';
+    html += '    <div class="tree-item-label">' + esc(node.label) + '</div>';
+    html += '    <div class="tree-item-meta">';
 
     // Tags
     if (node.tags && node.tags.length > 0) {
-      html += '<span class="link-tags">';
+      html += '<span class="tree-item-tags">';
       for (var ti = 0; ti < node.tags.length; ti++) {
         var tag   = node.tags[ti];
         var def   = tagMap[tag];
         var color = def ? def.color : '#8b8fa3';
-        html += '<span class="link-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+        html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
       }
       html += '</span>';
     }
 
     // URL (truncated for display)
     if (node.url) {
-      html += '<span class="link-url" title="' + esc(node.url) + '">' + esc(node.url) + '</span>';
+      html += '<span class="tree-item-detail link-url" title="' + esc(node.url) + '">' + esc(node.url) + '</span>';
     }
 
-    html += '    </div>';  // .link-meta
-    html += '  </div>';    // .link-content
+    html += '    </div>';  // .tree-item-meta
+    html += '  </div>';    // .tree-item-content
 
     // Action buttons
-    html += '  <div class="link-actions">';
+    html += '  <div class="tree-item-actions">';
     html += '    <button class="action-btn btn-copy" data-action="copyUrl" data-id="' + esc(node.id) + '" title="Copy URL">';
     html += ICONS.copy;
     html += '    </button>';
@@ -289,10 +289,10 @@
     html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(node.id) + '" title="Delete">';
     html += ICONS.delete;
     html += '    </button>';
-    html += '  </div>';    // .link-actions
+    html += '  </div>';    // .tree-item-actions
 
-    html += '</div>';      // .link-row
-    html += '</div>';      // .link-item
+    html += '</div>';      // .tree-item-row
+    html += '</div>';      // .tree-item
 
     return html;
   }
@@ -311,7 +311,7 @@
     });
 
     // Link click → open in browser
-    document.querySelectorAll('.link-row[data-action="open"]').forEach(function(el) {
+    document.querySelectorAll('.tree-item-row[data-action="open"]').forEach(function(el) {
       el.addEventListener('click', function(e) {
         if (e.target.closest('.action-btn')) { return; }
         var id = el.getAttribute('data-id');
@@ -321,7 +321,7 @@
 
     // Action buttons
     document.querySelectorAll('[data-action]').forEach(function(el) {
-      if (el.classList.contains('link-row')) { return; } // skip the row itself
+      if (el.classList.contains('tree-item-row')) { return; } // skip the row itself
       el.addEventListener('click', function(e) {
         e.stopPropagation();
         var action = el.getAttribute('data-action');
