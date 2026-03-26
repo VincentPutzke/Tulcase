@@ -5,6 +5,52 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] – 2026-03-26
+
+### Added
+- **Notes system** — The Lists feature has been completely reworked into a
+  full note-taking system.  Lists are now "Notes" — markdown-style
+  documents with rich editing support.
+- **Sidebar webview** — Notes appear in the activity-bar sidebar (below
+  Commands) as a rich webview with folder tree, search bar, tag pills,
+  line counts, and inline action buttons.
+- **Editor integration** — Clicking a note opens it in the main editor
+  area using a virtual filesystem (`aplist:` scheme).  Multiple notes can
+  be open in separate tabs simultaneously.
+- **Markdown syntax highlighting** — Notes use the built-in Markdown
+  grammar for headlines, bullet points, bold/italic, code blocks, etc.
+  No render/preview mode — raw text with syntax colouring only.
+- **Tag decorations** — Tags written as `#tagname` in note content are
+  decorated inline with the tag's colour from the tag store (coloured
+  background pill), updated on every edit with 300 ms debounce.
+- **Auto-formatter** — `DocumentFormattingEditProvider` that normalises
+  bullet style (`*` → `-`), ensures blank lines before headlines, trims
+  trailing whitespace, and adds a final newline.
+- **Auto-save on close** — Note content is automatically persisted when
+  the editor tab is closed.
+- **Nested folders** — Folders can contain sub-folders and notes with
+  unlimited nesting depth.
+- **Legacy migration** — Old `MiniList[]` data auto-converts to the new
+  `NoteStore` format on first load.  Checklist items become markdown
+  task-list syntax (`- [x]` / `- [ ]`).
+- **17 new unit tests** covering migration, folder tree building, note
+  filtering, line counting, and formatting helpers (78 total passing).
+
+### Changed
+- **Lists view location** — Moved from the bottom panel
+  (`arbeitsplatz-panel`) to the activity-bar sidebar (`arbeitsplatz`).
+- **View type** — Changed from plain tree to rich webview.
+- **Commands** — Replaced 7 old `arbeitsplatz.list.*` commands with a
+  single `arbeitsplatz.note.add` palette command.  All interactions
+  happen through the webview sidebar.
+
+### Removed
+- **ListTreeProvider** — Replaced by `NoteListViewProvider` (webview).
+- **Old list context menus** — No longer needed with webview action
+  buttons.
+
+---
+
 ## [0.5.0] – 2026-03-26
 
 ### Added
