@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "0.7.0",
+  "version": "1.0.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -201,7 +201,6 @@
     ],
     "menus": {
       "view/title": [
-
         {
           "command": "tulcase.note.add",
           "when": "view == tulcase.lists",
@@ -224,7 +223,6 @@
         }
       ],
       "view/item/context": [
-
         {
           "command": "tulcase.tag.rename",
           "when": "view == tulcase.tags && viewItem == tagItem",
@@ -278,6 +276,7 @@
     "prettier": "^3.2.0",
     "sass": "^1.98.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.57.2",
     "vitest": "^2.0.0"
   }
 }

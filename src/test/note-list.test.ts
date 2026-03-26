@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type {
     NoteItem,
     NoteFolder,
-    NoteStore,
 } from '../models/note.model';
 
 // ── Unit-testable helpers extracted from note-list.view.ts ────────────────────

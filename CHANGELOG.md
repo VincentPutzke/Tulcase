@@ -5,6 +5,25 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.0] – 2026-03-26
+
+### Summary
+First production release. The extension has been fully rebranded from **Arbeitsplatz** to **Tulcase** and now operates as a standalone extension with no legacy fallbacks.
+
+### Added
+- Tags view relocated to the bottom panel (left of Records) for better discoverability.
+- `release-plan-v1.0.0.md` documenting the release checklist.
+
+### Changed
+- Extension renamed from `arbeitsplatz` / `Arbeitsplatz` to `tulcase` / `Tulcase` throughout all source files, configuration keys, view IDs, and documentation.
+- Data directory now resolves exclusively under `tulcase` (Windows: `%APPDATA%/tulcase`, macOS: `~/Library/Application Support/tulcase`, Linux: `~/.local/share/tulcase`). No more legacy `arbeitsplatz` fallback.
+- `package.json` view declarations updated: `tulcase.tags` moved from the activity-bar sidebar into the bottom panel, placed to the left of `tulcase.records`.
+
+### Removed
+- `migrateLegacyBaseDir()` function and all `arbeitsplatz` config-key fallbacks from `src/config.ts`.
+
+---
+
 ## [0.7.0] – 2026-03-26
 
 ### Added

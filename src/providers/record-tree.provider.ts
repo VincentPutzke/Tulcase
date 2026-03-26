@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { minutesToHHMM } from '../data/time-utils';
 import type { TulcaseSettings } from '../config';
-import type { RecordDb, RecordEntry } from '../models/record.model';
+import type { RecordDb } from '../models/record.model';
 
 type RecordTreeNode = RecordYearItem | RecordMonthItem;
 

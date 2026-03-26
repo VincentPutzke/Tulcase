@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -25,8 +24,6 @@ export interface TulcaseSettings {
 function resolveBaseDir(): string {
     const config = vscode.workspace.getConfiguration('tulcase');
     const configured = config.get<string>('dataDirectory', '').trim();
-    const legacyConfigured = vscode.workspace.getConfiguration('arbeitsplatz')
-        .get<string>('dataDirectory', '').trim();
 
     if (configured) {
         // Expand ~ to home directory
@@ -34,13 +31,6 @@ function resolveBaseDir(): string {
             return path.join(os.homedir(), configured.slice(1));
         }
         return configured;
-    }
-
-    if (legacyConfigured) {
-        if (legacyConfigured.startsWith('~')) {
-            return path.join(os.homedir(), legacyConfigured.slice(1));
-        }
-        return legacyConfigured;
     }
 
     // Platform-specific default
@@ -54,37 +44,10 @@ function resolveBaseDir(): string {
 }
 
 /**
- * Copy the legacy Arbeitsplatz data directory to the new Tulcase directory
- * if the new location does not exist yet.
- */
-function migrateLegacyBaseDir(baseDir: string): void {
-    if (fs.existsSync(baseDir)) {
-        return;
-    }
-
-    const legacyBaseDir = path.join(
-        process.platform === 'win32'
-            ? (process.env['APPDATA'] || path.join(os.homedir(), 'AppData', 'Roaming'))
-            : process.platform === 'darwin'
-                ? path.join(os.homedir(), 'Library', 'Application Support')
-                : path.join(os.homedir(), '.local', 'share'),
-        'arbeitsplatz',
-    );
-
-    if (!fs.existsSync(legacyBaseDir)) {
-        return;
-    }
-
-    fs.mkdirSync(path.dirname(baseDir), { recursive: true });
-    fs.cpSync(legacyBaseDir, baseDir, { recursive: true });
-}
-
-/**
  * Build a complete Settings object from the resolved base directory.
  */
 export function buildSettings(baseDir?: string): TulcaseSettings {
     const base = baseDir || resolveBaseDir();
-    migrateLegacyBaseDir(base);
     return {
         baseDir: base,
         todosFile: path.join(base, 'todo_db', 'todos.json'),

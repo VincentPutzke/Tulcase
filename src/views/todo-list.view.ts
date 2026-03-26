@@ -3,10 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
-import { todayStr, tomorrowStr, addDays, formatDate } from '../data/time-utils';
+import { todayStr, addDays } from '../data/time-utils';
 import { generateId } from '../utils/id';
 import type { TulcaseSettings } from '../config';
-import type { TodoItem, TodoStore } from '../models/todo.model';
+import type { TodoStore } from '../models/todo.model';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
 const store = new JsonStore();

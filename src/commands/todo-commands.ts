@@ -4,7 +4,7 @@ import { todayStr } from '../data/time-utils';
 import type { TulcaseSettings } from '../config';
 import type { TodoStore } from '../models/todo.model';
 import type { TodoListViewProvider } from '../views/todo-list.view';
-import type { TagTreeProvider } from '../providers/tag-tree.provider';
+import type { TagTreeProvider as _TagTreeProvider } from '../providers/tag-tree.provider';
 
 const store = new JsonStore();
 
@@ -17,7 +17,7 @@ export function registerTodoCommands(
     context: vscode.ExtensionContext,
     settings: TulcaseSettings,
     todoList: TodoListViewProvider,
-    tagTree: TagTreeProvider
+    _tagTree: _TagTreeProvider
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.todo.add', () => {
@@ -65,7 +65,7 @@ function parseQuickInput(input: string): { note: string; tags: string[]; date: s
         date = dateMatch[1];
     }
 
-    let note = input
+    const note = input
         .replace(tagRegex, '')
         .replace(dateRegex, '')
         .replace(/\s+/g, ' ')
