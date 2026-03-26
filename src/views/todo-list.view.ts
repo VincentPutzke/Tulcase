@@ -156,7 +156,7 @@ export class TodoListViewProvider implements vscode.WebviewViewProvider {
             { label: 'Note',   description: item.note },
             { label: 'Date',   description: item.date },
             { label: 'Tags',   description: item.tags.join(', ') },
-            { label: 'Delete', description: '⚠ Remove this todo' },
+            { label: 'Delete', description: 'Remove this todo' },
         ], { placeHolder: 'What to edit?' });
 
         if (!field) { return; }

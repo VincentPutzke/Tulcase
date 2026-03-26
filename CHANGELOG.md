@@ -16,8 +16,8 @@ This project follows [Semantic Versioning](https://semver.org/).
 - **Two-line item layout** — Each todo displays the note on line 1 and
   due date (or "Today" / "Tomorrow" / "Yesterday") + colour-coded tags
   on line 2 in a smaller font.
-- **Inline action buttons** — Edit (✏️), Postpone (+1 day →), Mark Done (✓)
-  appear on hover.  Done items show an Undo (↩) button instead.
+-- **Inline action buttons** — Edit, Postpone (+1 day →), Mark Done
+  appear on hover.  Done items show an Undo button instead.
 - **Add / Quick-Add buttons** — Dedicated buttons at the top of the webview
   for adding new todos.
 - **Auto-ID backfill** — Existing todos without IDs are automatically

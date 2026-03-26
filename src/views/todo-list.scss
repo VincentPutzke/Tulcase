@@ -327,22 +327,6 @@ body {
   }
 }
 
-/* Generic blank icon used across webviews instead of emojis. */
-.icon {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--vscode-foreground);
-  border-radius: 3px;
-  background: transparent;
-  vertical-align: -2px;
-  flex-shrink: 0;
-}
-
-/* Small variants */
-.icon.icon-search { width: 12px; height: 12px; }
-.empty-state .icon { width: 20px; height: 20px; }
-
 // ── No-results hint ───────────────────────────────────────────────────────────
 .no-results {
   text-align : center;
