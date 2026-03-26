@@ -5,6 +5,40 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0] – 2026-03-26
+
+### Added
+- **Links webview panel** — replaced the tree-data-provider with a rich
+  WebviewViewProvider matching the visual style of TODOs, Commands, and Notes.
+- **Adaptive layout** — the Links panel detects its container width via CSS
+  container queries: in a sidebar it renders vertically (controls on top, tree
+  below), in the bottom panel it renders horizontally (tree on the left,
+  controls on the right).
+- Recursive folder/link tree with collapsible sections, folder badges,
+  and alphabetical sorting.
+- Per-link action buttons on hover: **open in browser**, **copy URL**,
+  **edit** (label / URL / tags), **delete**.
+- Per-folder action buttons: **add link**, **add sub-folder**, **rename**,
+  **delete**.
+- Colour-coded tag badges on link items.
+- Inline URL preview (truncated with tooltip).
+- Full-text search across link labels, URLs, and tags with branch pruning
+  (empty folders are hidden during search).
+- Palette command `Arbeitsplatz: Add Link` (`arbeitsplatz.link.add`) with
+  tag picker integration.
+- 10 new unit tests for search/filter helpers (84 total).
+
+### Changed
+- `link-commands.ts` simplified to a palette-only shim — all CRUD is now
+  handled inside `LinkListViewProvider`.
+- `package.json` view declaration updated to `type: "webview"`.
+- Old tree-based commands and context-menu entries removed.
+
+### Removed
+- `LinkTreeProvider` / `LinkTreeItem` classes (superseded by webview).
+
+---
+
 ## [0.6.0] – 2026-03-26
 
 ### Added
