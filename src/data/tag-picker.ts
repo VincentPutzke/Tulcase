@@ -3,7 +3,7 @@ import type { TagDef } from '../models/tag.model';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
 /**
- * Reusable tag selection popup (QuickPick) for the Arbeitsplatz extension.
+ * Reusable tag selection popup (QuickPick) for the Tulcase extension.
  *
  * Shows all configured tags with colour-circle icons, grouped by category.
  * Supports multi-select and pre-selection (for edit flows).

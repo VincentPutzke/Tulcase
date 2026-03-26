@@ -10,8 +10,8 @@ export class StatusBar implements vscode.Disposable {
 
     constructor(private todoList: TodoListViewProvider) {
         this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-        this.item.command = 'arbeitsplatz.todos.focus';
-        this.item.tooltip = 'Arbeitsplatz TODOs';
+        this.item.command = 'tulcase.todos.focus';
+        this.item.tooltip = 'Tulcase TODOs';
         this.update();
     }
 

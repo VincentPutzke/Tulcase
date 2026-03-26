@@ -26,11 +26,11 @@
 ## 2. Sidebar Layout
 
 The extension contributes a dedicated Activity Bar icon (left rail) that opens the
-**Arbeitsplatz** sidebar container with these views:
+**Tulcase** sidebar container with these views:
 
 ```
 ┌──────────────────────────┐
-│  🏠  ARBEITSPLATZ         │  ← Activity Bar icon
+│  🏠  TULCASE              │  ← Activity Bar icon
 ├──────────────────────────┤
 │  📋 TODOs           [+]  │  ← Tree View
 │  ├─ ⚠ Overdue (2)       │
@@ -86,7 +86,7 @@ The extension contributes a dedicated Activity Bar icon (left rail) that opens t
 
 | Web App | VS Code Extension |
 |---------|------------------|
-| Greeting banner ("Good morning, ...") | Status bar item: "🏠 Arbeitsplatz: 5 todos today" |
+| Greeting banner ("Good morning, ...") | Status bar item: "🏠 Tulcase: 5 todos today" |
 | Stat cards (open todos, overdue, commands, links) | Dashboard webview panel (Ctrl+Shift+D) |
 | Today's todo list | Inline in TODOs tree view (already visible) |
 | Navigation links | Not needed (sidebar handles navigation) |
@@ -222,7 +222,7 @@ User clicks globe icon next to "GitHub" in Links tree
 ### 4.4 Log Time
 
 ```
-User runs "Arbeitsplatz: Log Time" from Command Palette
+User runs "Tulcase: Log Time" from Command Palette
   → InputBox 1: "Date (YYYY-MM-DD, default: today)" → Enter
   → InputBox 2: "Time spent (e.g., 1:30, 1.5h, 90m)" → "1.5h"
   → InputBox 3: "Notes" → "Code review for PR #42"

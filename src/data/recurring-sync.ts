@@ -1,4 +1,4 @@
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import { JsonStore } from './json-store';
 import { formatDate } from './time-utils';
 import type { TodoStore, TodoItem } from '../models/todo.model';
@@ -11,7 +11,7 @@ const store = new JsonStore();
  * Idempotent — skips if already created for that day.
  */
 export async function syncRecurringTodos(
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     today?: Date
 ): Promise<{ items: TodoItem[]; actions: RecurringAction[] }> {
     const targetDay = today ?? new Date();

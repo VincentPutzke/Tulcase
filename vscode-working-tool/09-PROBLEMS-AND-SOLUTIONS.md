@@ -1,7 +1,7 @@
 # 09 — Known Problems & Solutions
 
 > Anticipated challenges, edge cases, and proven resolution strategies for the
-> Arbeitsplatz VS Code extension project.
+> Tulcase VS Code extension project.
 
 ---
 
@@ -225,18 +225,18 @@ VS Code's TreeView DnD API (since 1.66) supports this but has constraints.
 
 ```typescript
 class LinkDragAndDropController implements vscode.TreeDragAndDropController<LinkNode> {
-    dropMimeTypes = ['application/vnd.code.tree.arbeitsplatz.links'];
-    dragMimeTypes = ['application/vnd.code.tree.arbeitsplatz.links'];
+    dropMimeTypes = ['application/vnd.code.tree.tulcase.links'];
+    dragMimeTypes = ['application/vnd.code.tree.tulcase.links'];
 
     handleDrag(source: readonly LinkNode[], dataTransfer: vscode.DataTransfer): void {
         dataTransfer.set(
-            'application/vnd.code.tree.arbeitsplatz.links',
+            'application/vnd.code.tree.tulcase.links',
             new vscode.DataTransferItem(source)
         );
     }
 
     async handleDrop(target: LinkNode | undefined, dataTransfer: vscode.DataTransfer): Promise<void> {
-        const items = dataTransfer.get('application/vnd.code.tree.arbeitsplatz.links');
+        const items = dataTransfer.get('application/vnd.code.tree.tulcase.links');
         if (!items) return;
         const sources = items.value as LinkNode[];
 
@@ -281,7 +281,7 @@ while offline, OneDrive creates conflict copies (e.g., `todos-MachineName.json`)
 **Solution (Recommendation)**:
 
 1. **Primary recommendation**: Store the `*_db/` data in a local directory that is NOT
-   synced by OneDrive. Use `C:\Users\{user}\.arbeitsplatz` on Windows.
+   synced by OneDrive. Use `C:\Users\{user}\.tulcase` on Windows.
 
 2. **If cloud sync is desired**: Use a dedicated sync tool like Syncthing (designed for
    conflict resolution) instead of OneDrive, and configure it to resolve conflicts
@@ -348,14 +348,14 @@ class DashboardSerializer implements vscode.WebviewPanelSerializer {
 }
 
 // Register in activate():
-vscode.window.registerWebviewPanelSerializer('arbeitsplatz.dashboard', new DashboardSerializer());
+vscode.window.registerWebviewPanelSerializer('tulcase.dashboard', new DashboardSerializer());
 ```
 
 Also use `retainContextWhenHidden: true` for webviews that should keep state when hidden
 (at the cost of memory):
 ```typescript
 const panel = vscode.window.createWebviewPanel(
-    'arbeitsplatz.records',
+    'tulcase.records',
     'Records',
     vscode.ViewColumn.One,
     { retainContextWhenHidden: true }
@@ -376,7 +376,7 @@ implementation). It runs:
 1. **On activation**: Generate any due recurring todos. Idempotent — safe to call multiple times.
 2. **Hourly check**: A `setInterval` runs `syncRecurring()` every 60 minutes. If the date
    has rolled over (midnight boundary), new todos are generated.
-3. **On manual refresh**: "Arbeitsplatz: Refresh All" triggers sync.
+3. **On manual refresh**: "Tulcase: Refresh All" triggers sync.
 
 Since `lastCreatedDate` is stored per action, duplicate generation is impossible.
 

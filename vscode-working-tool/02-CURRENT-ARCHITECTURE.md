@@ -1,6 +1,6 @@
 # 02 — Current Architecture Analysis
 
-> Deep inspection of the existing Arbeitsplatz codebase: backend, frontend, data layer,
+> Deep inspection of the existing Tulcase codebase: backend, frontend, data layer,
 > and cross-cutting concerns. This document forms the basis for the migration strategy.
 
 ---
@@ -72,7 +72,7 @@ class Settings:
     todo_tags_file: Path   # {base}/todo_db/tags.json
 ```
 
-**Resolution order**: `ARBEITSPLATZ_BASE_DIR` env var → project root (2 levels above `config.py`).
+**Resolution order**: `TULCASE_BASE_DIR` env var → project root (2 levels above `config.py`).
 
 This is the single configuration object. We can replicate it identically in TypeScript.
 

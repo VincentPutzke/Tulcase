@@ -15,7 +15,7 @@ import { JsonStore } from '../data/json-store';
 import { NoteFileSystemProvider } from '../data/note-fs';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type {
     NoteItem,
     NoteFolder,
@@ -26,12 +26,12 @@ import type { TagTreeProvider } from '../providers/tag-tree.provider';
 const store = new JsonStore();
 
 export class NoteListViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'arbeitsplatz.lists';
+    public static readonly viewType = 'tulcase.lists';
 
     private _view?: vscode.WebviewView;
 
     constructor(
-        private readonly settings: ArbeitsplatzSettings,
+        private readonly settings: TulcaseSettings,
         private readonly tagTree: TagTreeProvider,
     ) {}
 

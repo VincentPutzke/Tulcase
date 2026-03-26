@@ -15,9 +15,9 @@ export function registerListCommands(
     _tagTree: TagTreeProvider,
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.note.add', () => {
+        vscode.commands.registerCommand('tulcase.note.add', () => {
             // Trigger the same 'addNote' flow that the webview button uses
-            vscode.commands.executeCommand('arbeitsplatz.lists.focus');
+            vscode.commands.executeCommand('tulcase.lists.focus');
             // Give the view a moment to focus, then post message
             setTimeout(() => noteList.refresh(), 200);
         }),

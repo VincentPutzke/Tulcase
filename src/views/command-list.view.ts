@@ -4,7 +4,7 @@ import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type {
     CommandItem,
     CommandStore,
@@ -27,12 +27,12 @@ const store = new JsonStore();
  * Styles live in src/views/command-list.scss (compiled to out/command-list.css).
  */
 export class CommandListViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'arbeitsplatz.commands';
+    public static readonly viewType = 'tulcase.commands';
 
     private _view?: vscode.WebviewView;
 
     constructor(
-        private readonly settings: ArbeitsplatzSettings,
+        private readonly settings: TulcaseSettings,
         private readonly tagTree: TagTreeProvider,
     ) {}
 
@@ -120,7 +120,7 @@ export class CommandListViewProvider implements vscode.WebviewViewProvider {
 
         let terminal = vscode.window.activeTerminal;
         if (!terminal) {
-            terminal = vscode.window.createTerminal('Arbeitsplatz');
+            terminal = vscode.window.createTerminal('Tulcase');
         }
         terminal.show();
         terminal.sendText(item.command);

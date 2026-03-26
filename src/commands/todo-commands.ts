@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { todayStr } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { TodoStore } from '../models/todo.model';
 import type { TodoListViewProvider } from '../views/todo-list.view';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
@@ -15,24 +15,24 @@ const store = new JsonStore();
  */
 export function registerTodoCommands(
     context: vscode.ExtensionContext,
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     todoList: TodoListViewProvider,
     tagTree: TagTreeProvider
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.todo.add', () => {
+        vscode.commands.registerCommand('tulcase.todo.add', () => {
             // Delegate to the webview provider (opens input dialogs + updates data)
             todoList.refresh();
         }),
-        vscode.commands.registerCommand('arbeitsplatz.todo.quickAdd', () => quickAddTodo(settings, todoList)),
-        vscode.commands.registerCommand('arbeitsplatz.todo.toggleShowDone', () => {
+        vscode.commands.registerCommand('tulcase.todo.quickAdd', () => quickAddTodo(settings, todoList)),
+        vscode.commands.registerCommand('tulcase.todo.toggleShowDone', () => {
             // In the webview, done section is collapsible in the UI directly — this is a noop now
             vscode.window.showInformationMessage('Use the Done section toggle inside the TODO view.');
         }),
     );
 }
 
-async function quickAddTodo(settings: ArbeitsplatzSettings, todoList: TodoListViewProvider): Promise<void> {
+async function quickAddTodo(settings: TulcaseSettings, todoList: TodoListViewProvider): Promise<void> {
     const input = await vscode.window.showInputBox({
         prompt: 'Quick add todo (use #tag for tags, YYYY-MM-DD for date)',
         placeHolder: 'Fix bug #backend 2026-03-20',

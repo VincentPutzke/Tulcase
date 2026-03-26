@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Arbeitsplatz VS Code extension are documented here.
+All notable changes to the Tulcase VS Code extension are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
 ---
@@ -24,7 +24,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - Inline URL preview (truncated with tooltip).
 - Full-text search across link labels, URLs, and tags with branch pruning
   (empty folders are hidden during search).
-- Palette command `Arbeitsplatz: Add Link` (`arbeitsplatz.link.add`) with
+- Palette command `Tulcase: Add Link` (`tulcase.link.add`) with
   tag picker integration.
 - 10 new unit tests for search/filter helpers (84 total).
 
@@ -72,10 +72,10 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **Lists view location** — Moved from the bottom panel
-  (`arbeitsplatz-panel`) to the activity-bar sidebar (`arbeitsplatz`).
+  (`tulcase-panel`) to the activity-bar sidebar (`tulcase`).
 - **View type** — Changed from plain tree to rich webview.
-- **Commands** — Replaced 7 old `arbeitsplatz.list.*` commands with a
-  single `arbeitsplatz.note.add` palette command.  All interactions
+- **Commands** — Replaced 7 old `tulcase.list.*` commands with a
+  single `tulcase.note.add` palette command.  All interactions
   happen through the webview sidebar.
 
 ### Removed
@@ -158,7 +158,7 @@ This project follows [Semantic Versioning](https://semver.org/).
   Shows all configured tags with colour-circle icons, grouped by category,
   with multi-select and pre-selection support.  Used in TODO add/edit flows
   and available for all entity types.
-- **`arbeitsplatz.tag.changeCategory`** command — Change a tag's category
+- **`tulcase.tag.changeCategory`** command — Change a tag's category
   from the tree-view context menu, with existing-category suggestions and
   a "New category…" option.
 - **Tag picker tests** (5 tests) — Validates `groupByCategory()` sorting,
@@ -182,7 +182,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 ## [0.2.0] – 2026-03-25
 
 ### Added
-- **Records: Calendar View** — `arbeitsplatz.records` is now a rich webview
+- **Records: Calendar View** — `tulcase.records` is now a rich webview
   panel rendered in the bottom panel area (alongside the terminal).  
   Features:
   - Monthly calendar grid, colour-coded by hours worked per day
@@ -199,7 +199,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - **View locations** restructured:
   - **Activity bar (left):** TODOs · Commands · Links · Tags
   - **Bottom panel:** Lists · Records
-- `arbeitsplatz.record.add` command (title-bar `+` button / `Ctrl+Shift+…`)
+- `tulcase.record.add` command (title-bar `+` button / `Ctrl+Shift+…`)
   now refreshes the calendar view after logging instead of updating a tree.
 
 ### Fixed

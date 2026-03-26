@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { CommandStore, CommandEntry } from '../models/command.model';
 
 /** A single command/snippet item in the tree */
@@ -23,7 +23,7 @@ export class CommandTreeProvider implements vscode.TreeDataProvider<CommandTreeI
 
     private store = new JsonStore();
 
-    constructor(private settings: ArbeitsplatzSettings) {}
+    constructor(private settings: TulcaseSettings) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);

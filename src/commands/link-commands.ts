@@ -8,18 +8,18 @@
  */
 
 import * as vscode from 'vscode';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { LinkListViewProvider } from '../views/link-list.view';
 
 export function registerLinkCommands(
     context: vscode.ExtensionContext,
-    _settings: ArbeitsplatzSettings,
+    _settings: TulcaseSettings,
     linkList: LinkListViewProvider,
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.link.add', () => {
+        vscode.commands.registerCommand('tulcase.link.add', () => {
             // Focus the Links panel and tell it to trigger add-link flow
-            vscode.commands.executeCommand('arbeitsplatz.links.focus');
+            vscode.commands.executeCommand('tulcase.links.focus');
             // The actual add-link logic happens inside the webview provider;
             // the provider exposes a public method for external callers.
             linkList.addLinkFromPalette();

@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { syncRecurringTodos } from '../data/recurring-sync';
 import { buildSettings } from '../config';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 
 import { vi } from 'vitest';
 vi.mock('vscode', () => ({
@@ -13,10 +13,10 @@ vi.mock('vscode', () => ({
 
 describe('Recurring Sync', () => {
     let tmpDir: string;
-    let settings: ArbeitsplatzSettings;
+    let settings: TulcaseSettings;
 
     beforeEach(() => {
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arbeitsplatz-recurring-test-'));
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tulcase-recurring-test-'));
         settings = buildSettings(tmpDir);
     });
 
@@ -109,12 +109,12 @@ describe('Recurring Sync', () => {
     });
 });
 
-function seedRecurring(settings: ArbeitsplatzSettings, actions: unknown[]): void {
+function seedRecurring(settings: TulcaseSettings, actions: unknown[]): void {
     fs.mkdirSync(path.dirname(settings.recurringFile), { recursive: true });
     fs.writeFileSync(settings.recurringFile, JSON.stringify({ actions }, null, 2));
 }
 
-function seedTodos(settings: ArbeitsplatzSettings, items: unknown[]): void {
+function seedTodos(settings: TulcaseSettings, items: unknown[]): void {
     fs.mkdirSync(path.dirname(settings.todosFile), { recursive: true });
     fs.writeFileSync(settings.todosFile, JSON.stringify({ items }, null, 2));
 }

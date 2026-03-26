@@ -119,7 +119,7 @@ Ported from: `test_recurring_generation.py`
 // test/fixtures.ts
 
 export function createTempDir(): string {
-    return fs.mkdtempSync(path.join(os.tmpdir(), 'arbeitsplatz-test-'));
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'tulcase-test-'));
 }
 
 export function seedTodos(baseDir: string, items: TodoItem[]): void {
@@ -193,14 +193,14 @@ import { expect } from 'chai';
 
 suite('Extension E2E', () => {
     test('extension activates successfully', async () => {
-        const ext = vscode.extensions.getExtension('your-publisher.arbeitsplatz');
+        const ext = vscode.extensions.getExtension('your-publisher.tulcase');
         await ext?.activate();
         expect(ext?.isActive).to.be.true;
     });
 
     test('todo tree view is registered', async () => {
         // Verify the tree view appears
-        await vscode.commands.executeCommand('arbeitsplatz.todos.focus');
+        await vscode.commands.executeCommand('tulcase.todos.focus');
         // Tree view should be visible
     });
 
@@ -339,7 +339,7 @@ jobs:
       - run: npx @vscode/vsce package
       - uses: actions/upload-artifact@v4
         with:
-          name: arbeitsplatz.vsix
+          name: tulcase.vsix
           path: '*.vsix'
 ```
 

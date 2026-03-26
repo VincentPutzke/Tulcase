@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { TagStore, TagDef } from '../models/tag.model';
 
 type TagTreeNode = TagCategory | TagTreeItem;
@@ -43,7 +43,7 @@ export class TagTreeProvider implements vscode.TreeDataProvider<TagTreeNode> {
 
     private store = new JsonStore();
 
-    constructor(private settings: ArbeitsplatzSettings) {}
+    constructor(private settings: TulcaseSettings) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);

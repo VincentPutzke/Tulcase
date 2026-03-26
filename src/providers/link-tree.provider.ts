@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { LinkStore, LinkNode } from '../models/link.model';
 
 /** Tree item for a link or folder in the tree */
@@ -33,7 +33,7 @@ export class LinkTreeProvider implements vscode.TreeDataProvider<LinkTreeItem> {
 
     private store = new JsonStore();
 
-    constructor(private settings: ArbeitsplatzSettings) {}
+    constructor(private settings: TulcaseSettings) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);
