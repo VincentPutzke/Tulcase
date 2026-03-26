@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { stripTagFromAll, renameTagInAll } from '../data/tag-propagation';
 import { buildSettings } from '../config';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 
 // Mock vscode module for config
 import { vi } from 'vitest';
@@ -14,10 +14,10 @@ vi.mock('vscode', () => ({
 
 describe('Tag Propagation', () => {
     let tmpDir: string;
-    let settings: ArbeitsplatzSettings;
+    let settings: TulcaseSettings;
 
     beforeEach(() => {
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arbeitsplatz-tag-test-'));
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tulcase-tag-test-'));
         settings = buildSettings(tmpDir);
 
         // Seed data

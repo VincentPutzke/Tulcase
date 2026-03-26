@@ -1,14 +1,14 @@
 # 01 — Project Overview & Vision
 
-> **Arbeitsplatz VS Code Extension** — A native VS Code extension that brings the full
-> Arbeitsplatz productivity suite (TODOs, time records, bookmarks, commands, lists, tags)
+> **Tulcase VS Code Extension** — A native VS Code extension that brings the full
+> Tulcase productivity suite (TODOs, time records, bookmarks, commands, lists, tags)
 > directly into the editor, without leaving the IDE.
 
 ---
 
 ## 1. What We Are Building
 
-A VS Code extension called **Arbeitsplatz** (working title: `vscode-tulcase`) that
+A VS Code extension called **Tulcase** (working title: `vscode-tulcase`) that
 replicates every feature of the existing Angular web application inside Visual Studio Code.
 The extension will use native VS Code UI primitives — tree views, webview panels, quick picks,
 status bar items, and the command palette — to deliver a first-class IDE experience that
@@ -43,7 +43,7 @@ as-is; the extension is an additional access point.
 
 ## 3. What the Web App Does Today
 
-The existing Arbeitsplatz application (v1.0.0) is a two-tier system:
+The existing Tulcase application (v1.0.0) is a two-tier system:
 
 1. **Backend** — Python 3.11 / FastAPI REST server on port 8321
 2. **Frontend** — Angular 21 SPA on port 4200

@@ -3,10 +3,10 @@ import * as path from 'path';
 import * as os from 'os';
 
 /**
- * Resolved file-system paths for all Arbeitsplatz data stores.
+ * Resolved file-system paths for all Tulcase data stores.
  * Mirrors Python's config.py Settings dataclass.
  */
-export interface ArbeitsplatzSettings {
+export interface TulcaseSettings {
     baseDir: string;
     todosFile: string;
     tagsFile: string;
@@ -22,7 +22,7 @@ export interface ArbeitsplatzSettings {
  * Resolve the base data directory from VS Code settings or platform default.
  */
 function resolveBaseDir(): string {
-    const config = vscode.workspace.getConfiguration('arbeitsplatz');
+    const config = vscode.workspace.getConfiguration('tulcase');
     const configured = config.get<string>('dataDirectory', '').trim();
 
     if (configured) {
@@ -35,18 +35,18 @@ function resolveBaseDir(): string {
 
     // Platform-specific default
     if (process.platform === 'win32') {
-        return path.join(process.env['APPDATA'] || path.join(os.homedir(), 'AppData', 'Roaming'), 'arbeitsplatz');
+        return path.join(process.env['APPDATA'] || path.join(os.homedir(), 'AppData', 'Roaming'), 'tulcase');
     }
     if (process.platform === 'darwin') {
-        return path.join(os.homedir(), 'Library', 'Application Support', 'arbeitsplatz');
+        return path.join(os.homedir(), 'Library', 'Application Support', 'tulcase');
     }
-    return path.join(os.homedir(), '.local', 'share', 'arbeitsplatz');
+    return path.join(os.homedir(), '.local', 'share', 'tulcase');
 }
 
 /**
  * Build a complete Settings object from the resolved base directory.
  */
-export function buildSettings(baseDir?: string): ArbeitsplatzSettings {
+export function buildSettings(baseDir?: string): TulcaseSettings {
     const base = baseDir || resolveBaseDir();
     return {
         baseDir: base,

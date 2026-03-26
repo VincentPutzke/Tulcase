@@ -1,15 +1,15 @@
-# Arbeitsplatz VS Code Extension — Project Documentation
+# Tulcase VS Code Extension — Project Documentation
 
-> **A complete planning & design document suite** for migrating the Arbeitsplatz
+> **A complete planning & design document suite** for migrating the Tulcase
 > web application into a native Visual Studio Code extension.
 >
-> Generated: 2026-03-16 · Based on full codebase analysis of Arbeitsplatz v1.0.0
+> Generated: 2026-03-16 · Based on full codebase analysis of Tulcase v1.0.0
 
 ---
 
 ## Executive Summary
 
-**What**: Build a VS Code extension that replicates the entire Arbeitsplatz productivity
+**What**: Build a VS Code extension that replicates the entire Tulcase productivity
 suite (TODOs, time records, bookmarks, command snippets, lists, tags) inside the editor.
 
 **Why**: Developers live in VS Code — switching to a browser tab breaks flow. The extension
@@ -53,7 +53,7 @@ local data directory is the recommended default.
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Server dependency | **None** — direct file I/O | Simpler setup, no Python runtime needed |
-| Data directory | User-space (`~/.arbeitsplatz`) | Shared across all VS Code windows |
+| Data directory | User-space (`~/.tulcase`) | Shared across all VS Code windows |
 | Concurrency | Lockfiles (`proper-lockfile`) | Safe multi-instance without schema changes |
 | UI framework (webviews) | Vanilla TS + VS Code Webview UI Toolkit | Small bundle, theme-native |
 | Build tool | esbuild | Fast, recommended by VS Code team |

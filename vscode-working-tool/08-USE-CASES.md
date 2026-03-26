@@ -59,10 +59,10 @@
 ### UC-02: Review and Triage Today's Todos
 
 **Actor**: Developer starting the work day  
-**Trigger**: Developer clicks the Arbeitsplatz icon in the Activity Bar
+**Trigger**: Developer clicks the Tulcase icon in the Activity Bar
 
 **Main Flow**:
-1. The Arbeitsplatz sidebar opens showing all tree views.
+1. The Tulcase sidebar opens showing all tree views.
 2. The TODOs tree has groups: `⚠ Overdue (2)`, `📅 Today (4)`, `📅 Tomorrow (1)`, etc.
 3. Developer expands "⚠ Overdue" and sees two tasks from last week.
 4. Developer right-clicks the first overdue task → "Move to Today".
@@ -197,7 +197,7 @@
 **Trigger**: Developer wants to record hours worked
 
 **Main Flow**:
-1. Developer opens Command Palette → "Arbeitsplatz: Log Time".
+1. Developer opens Command Palette → "Tulcase: Log Time".
 2. InputBox 1: *"Date (YYYY-MM-DD)"* → default shows today → Enter.
 3. InputBox 2: *"Time spent"* → types `1:30` → Enter.
 4. InputBox 3: *"Notes"* → types `Code review PR #42` → Enter.
@@ -250,7 +250,7 @@
 **Trigger**: Developer wants a task every Monday
 
 **Main Flow**:
-1. Developer opens Command Palette → "Arbeitsplatz: Add Recurring Task".
+1. Developer opens Command Palette → "Tulcase: Add Recurring Task".
 2. InputBox: *"Task note"* → types `Weekly team sync`.
 3. QuickPick: *"Schedule type"* → selects `Weekly`.
 4. QuickPick (multi-select): *"On which days?"* → selects `Monday`.
@@ -266,7 +266,7 @@
 **Trigger**: Start of the day
 
 **Main Flow**:
-1. Developer presses `Ctrl+Shift+D` or runs "Arbeitsplatz: Dashboard".
+1. Developer presses `Ctrl+Shift+D` or runs "Tulcase: Dashboard".
 2. A webview panel opens in the editor area.
 3. Shows:
    - "Good morning! You have **5 todos today**, **2 overdue**."
@@ -283,7 +283,7 @@
 
 **Main Flow**:
 1. Both VS Code windows have the extension installed.
-2. Both point to the same data directory (`~/.arbeitsplatz`).
+2. Both point to the same data directory (`~/.tulcase`).
 3. Developer adds a todo in Window 1.
 4. Window 1 writes to `todo_db/todos.json` (with lockfile).
 5. Window 2's file watcher detects the change within ~100ms.
@@ -306,16 +306,16 @@
 
 **Main Flow**:
 1. Extension detects no configured data directory and no default directory exists.
-2. A welcome webview panel opens: "Welcome to Arbeitsplatz!"
+2. A welcome webview panel opens: "Welcome to Tulcase!"
 3. Options presented:
-   - **Create new workspace**: Creates `~/.arbeitsplatz` with empty JSON stores.
+   - **Create new workspace**: Creates `~/.tulcase` with empty JSON stores.
    - **Use existing directory**: File picker / InputBox to select a path.
    - **Migrate from project**: Select a project root with `*_db/` directories;
      copies them to user-space.
 4. Developer selects "Create new workspace".
 5. Extension creates directory structure and empty JSON files.
 6. The sidebar populates with empty tree views + welcome messages.
-7. A sample todo is created: "✨ Welcome to Arbeitsplatz! Add your first task."
+7. A sample todo is created: "✨ Welcome to Tulcase! Add your first task."
 
 ---
 

@@ -9,7 +9,7 @@ describe('JsonStore', () => {
     let store: JsonStore;
 
     beforeEach(() => {
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arbeitsplatz-test-'));
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tulcase-test-'));
         store = new JsonStore();
     });
 

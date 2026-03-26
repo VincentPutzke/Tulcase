@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
-import { todayStr, tomorrowStr, formatDisplayDate, parseDate } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import { todayStr, tomorrowStr, formatDisplayDate } from '../data/time-utils';
+import type { TulcaseSettings } from '../config';
 import type { TodoItem, TodoStore } from '../models/todo.model';
+import type { TagDef } from '../models/tag.model';
+import type { TagTreeProvider } from './tag-tree.provider';
 
 type TodoTreeNode = DateBucket | TodoTreeItem;
 
@@ -22,13 +24,17 @@ class DateBucket extends vscode.TreeItem {
     }
 }
 
-/** A single todo item in the tree */
+/** A single todo item in the tree — displays tag colours when a tag map is available. */
 export class TodoTreeItem extends vscode.TreeItem {
-    constructor(public readonly todo: TodoItem, public readonly index: number) {
+    constructor(
+        public readonly todo: TodoItem,
+        public readonly index: number,
+        tagMap?: Record<string, TagDef>,
+    ) {
         super(todo.note, vscode.TreeItemCollapsibleState.None);
 
         this.description = todo.tags.length > 0 ? todo.tags.join(' ') : undefined;
-        this.tooltip = `${todo.note}\nDate: ${formatDisplayDate(todo.date)}${todo.tags.length ? '\nTags: ' + todo.tags.join(', ') : ''}`;
+        this.tooltip = buildTooltip(todo, tagMap);
 
         if (todo.done) {
             this.contextValue = 'todoItemDone';
@@ -47,7 +53,10 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeNode> {
     private store = new JsonStore();
     private showDone = false;
 
-    constructor(private settings: ArbeitsplatzSettings) {}
+    constructor(
+        private settings: TulcaseSettings,
+        private tagTree?: TagTreeProvider,
+    ) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);
@@ -77,6 +86,9 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeNode> {
         const today = todayStr();
         const tomorrow = tomorrowStr();
 
+        // Load tag definitions so tree items can show colour info
+        const tagMap = await this.tagTree?.getTagMap();
+
         const overdue: TodoTreeItem[] = [];
         const todayItems: TodoTreeItem[] = [];
         const tomorrowItems: TodoTreeItem[] = [];
@@ -84,7 +96,7 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeNode> {
         const done: TodoTreeItem[] = [];
 
         items.forEach((item, index) => {
-            const treeItem = new TodoTreeItem(item, index);
+            const treeItem = new TodoTreeItem(item, index, tagMap);
 
             if (item.done) {
                 done.push(treeItem);
@@ -133,4 +145,33 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeNode> {
             today: items.filter(i => i.date === todayDate).length,
         };
     }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Build a rich MarkdownString tooltip with colour swatches for each tag. */
+function buildTooltip(
+    todo: TodoItem,
+    tagMap?: Record<string, TagDef>,
+): vscode.MarkdownString {
+    const md = new vscode.MarkdownString('', true);
+    md.supportHtml = true;
+
+    md.appendMarkdown(`**${escapeMarkdown(todo.note)}**\n\n`);
+    md.appendMarkdown(`**Date:** ${formatDisplayDate(todo.date)}\n\n`);
+
+    if (todo.tags.length > 0) {
+        const tagParts = todo.tags.map(t => {
+            const color = tagMap?.[t]?.color ?? '#8b8fa3';
+            // Unicode full-circle ● as a colour swatch
+            return `<span style="color:${color};">●</span> ${escapeMarkdown(t)}`;
+        });
+        md.appendMarkdown(tagParts.join(' &nbsp; '));
+    }
+
+    return md;
+}
+
+function escapeMarkdown(s: string): string {
+    return s.replace(/([\\`*_{}\[\]()#+\-.!|])/g, '\\$1');
 }

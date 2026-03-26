@@ -2,23 +2,39 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { parseTimeToMinutes, todayStr, minutesToHHMM } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { RecordDb, RecordEntry } from '../models/record.model';
-import type { RecordTreeProvider } from '../providers/record-tree.provider';
+import type { RecordCalendarViewProvider } from '../views/record-calendar.view';
 
 const store = new JsonStore();
 
+/**
+ * Register all record-related VS Code commands.
+ *
+ * @param recordCalendar – the webview view provider; calling its refresh()
+ *   after a write keeps the calendar in sync.
+ */
 export function registerRecordCommands(
     context: vscode.ExtensionContext,
-    settings: ArbeitsplatzSettings,
-    recordTree: RecordTreeProvider
+    settings: TulcaseSettings,
+    recordCalendar: RecordCalendarViewProvider,
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.record.add', () => addRecord(settings, recordTree)),
+        vscode.commands.registerCommand(
+            'tulcase.record.add',
+            () => addRecord(settings, recordCalendar),
+        ),
     );
 }
 
-async function addRecord(settings: ArbeitsplatzSettings, recordTree: RecordTreeProvider): Promise<void> {
+/**
+ * Quick-add dialog for logging time without opening the calendar.
+ * The calendar view refreshes automatically after the write.
+ */
+async function addRecord(
+    settings: TulcaseSettings,
+    recordCalendar: RecordCalendarViewProvider,
+): Promise<void> {
     const dateStr = await vscode.window.showInputBox({
         prompt: 'Date (YYYY-MM-DD)',
         value: todayStr(),
@@ -36,27 +52,30 @@ async function addRecord(settings: ArbeitsplatzSettings, recordTree: RecordTreeP
     try {
         minutes = parseTimeToMinutes(timeStr);
     } catch {
-        vscode.window.showErrorMessage('Invalid time format. Use e.g. 1:30, 1.5h, 90');
+        void vscode.window.showErrorMessage('Invalid time format. Use e.g. 1:30, 1.5h, 90');
         return;
     }
 
-    const notes = await vscode.window.showInputBox({ prompt: 'Notes', placeHolder: 'What did you work on?' });
-    if (!notes) { return; }
+    const notes = await vscode.window.showInputBox({
+        prompt: 'Notes',
+        placeHolder: 'What did you work on?',
+    });
+    if (notes === undefined) { return; } // cancelled
 
-    // Parse year/month from date
     const [yearStr, monthStr] = dateStr.split('-');
-    const year = parseInt(yearStr, 10);
+    const year  = parseInt(yearStr, 10);
     const month = parseInt(monthStr, 10);
 
-    const filePath = path.join(settings.recordsDir, String(year), `${String(month).padStart(2, '0')}.json`);
+    const filePath = path.join(
+        settings.recordsDir,
+        String(year),
+        `${String(month).padStart(2, '0')}.json`,
+    );
     const data = await store.read<RecordDb>(filePath, { year, month, days: {} });
-
-    if (!data.days[dateStr]) {
-        data.days[dateStr] = [];
-    }
-
-    data.days[dateStr].push({ time_spent_min: minutes, notes });
+    if (!data.days[dateStr]) { data.days[dateStr] = []; }
+    (data.days[dateStr] as RecordEntry[]).push({ time_spent_min: minutes, notes: notes ?? '' });
     await store.write(filePath, data);
-    recordTree.refresh();
-    vscode.window.showInformationMessage(`Logged ${minutesToHHMM(minutes)} on ${dateStr}`);
+
+    recordCalendar.refresh();
+    void vscode.window.showInformationMessage(`Logged ${minutesToHHMM(minutes)} on ${dateStr}`);
 }

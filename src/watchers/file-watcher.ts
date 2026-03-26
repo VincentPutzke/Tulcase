@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 
 /**
  * Watches all data directories for changes and fires domain-specific refresh events.
@@ -27,7 +27,7 @@ export class DataFileWatcher implements vscode.Disposable {
     readonly onRecordsChanged = this._onRecordsChanged.event;
     readonly onRecurringChanged = this._onRecurringChanged.event;
 
-    constructor(private settings: ArbeitsplatzSettings) {
+    constructor(private settings: TulcaseSettings) {
         this.startWatching();
     }
 

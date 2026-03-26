@@ -1,8 +1,8 @@
 {
   "name": "vscode-tulcase",
-  "displayName": "Arbeitsplatz",
+  "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -23,445 +23,236 @@
     "snippets"
   ],
   "activationEvents": [
-    "onView:arbeitsplatz.todos",
-    "onView:arbeitsplatz.commands",
-    "onView:arbeitsplatz.links",
-    "onView:arbeitsplatz.lists",
-    "onView:arbeitsplatz.tags",
-    "onView:arbeitsplatz.records"
+    "onView:tulcase.todos",
+    "onView:tulcase.commands",
+    "onView:tulcase.links",
+    "onView:tulcase.lists",
+    "onView:tulcase.tags",
+    "onView:tulcase.records"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
-      "title": "Arbeitsplatz",
+      "title": "Tulcase",
       "properties": {
-        "arbeitsplatz.dataDirectory": {
+        "tulcase.dataDirectory": {
           "type": "string",
           "default": "",
-          "description": "Path to the Arbeitsplatz data directory. Leave empty to use the default (~/.arbeitsplatz)."
+          "description": "Path to the Tulcase data directory. Leave empty to use the default (~/.tulcase)."
         }
       }
     },
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "arbeitsplatz",
-          "title": "Arbeitsplatz",
+          "id": "tulcase",
+          "title": "Tulcase",
+          "icon": "media/icon.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "tulcase-panel",
+          "title": "Tulcase",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "arbeitsplatz": [
+      "tulcase": [
         {
-          "id": "arbeitsplatz.todos",
-          "name": "TODOs"
+          "id": "tulcase.todos",
+          "name": "TODOs",
+          "type": "webview"
         },
         {
-          "id": "arbeitsplatz.commands",
-          "name": "Commands"
+          "id": "tulcase.commands",
+          "name": "Commands",
+          "type": "webview"
         },
         {
-          "id": "arbeitsplatz.links",
-          "name": "Links"
+          "id": "tulcase.lists",
+          "name": "Notes",
+          "type": "webview"
         },
         {
-          "id": "arbeitsplatz.lists",
-          "name": "Lists"
-        },
+          "id": "tulcase.links",
+          "name": "Links",
+          "type": "webview"
+        }
+      ],
+      "tulcase-panel": [
         {
-          "id": "arbeitsplatz.tags",
+          "id": "tulcase.tags",
           "name": "Tags"
         },
         {
-          "id": "arbeitsplatz.records",
-          "name": "Records"
+          "id": "tulcase.records",
+          "name": "Records",
+          "type": "webview"
         }
       ]
     },
     "commands": [
       {
-        "command": "arbeitsplatz.todo.add",
+        "command": "tulcase.todo.add",
         "title": "Add Todo",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(add)"
       },
       {
-        "command": "arbeitsplatz.todo.quickAdd",
+        "command": "tulcase.todo.quickAdd",
         "title": "Quick Add Todo",
-        "category": "Arbeitsplatz"
+        "category": "Tulcase"
       },
       {
-        "command": "arbeitsplatz.todo.markDone",
-        "title": "Mark Done",
-        "category": "Arbeitsplatz",
-        "icon": "$(check)"
-      },
-      {
-        "command": "arbeitsplatz.todo.markUndone",
-        "title": "Mark Undone",
-        "category": "Arbeitsplatz",
-        "icon": "$(circle-large-outline)"
-      },
-      {
-        "command": "arbeitsplatz.todo.moveToNextDay",
-        "title": "Move to Next Day",
-        "category": "Arbeitsplatz",
-        "icon": "$(arrow-right)"
-      },
-      {
-        "command": "arbeitsplatz.todo.reschedule",
-        "title": "Reschedule",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.todo.edit",
-        "title": "Edit Todo",
-        "category": "Arbeitsplatz",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "arbeitsplatz.todo.delete",
-        "title": "Delete Todo",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "arbeitsplatz.todo.toggleShowDone",
+        "command": "tulcase.todo.toggleShowDone",
         "title": "Toggle Show Done",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(eye)"
       },
       {
-        "command": "arbeitsplatz.tag.add",
+        "command": "tulcase.tag.add",
         "title": "Add Tag",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(add)"
       },
       {
-        "command": "arbeitsplatz.tag.rename",
+        "command": "tulcase.tag.rename",
         "title": "Rename Tag",
-        "category": "Arbeitsplatz"
+        "category": "Tulcase"
       },
       {
-        "command": "arbeitsplatz.tag.changeColor",
+        "command": "tulcase.tag.changeColor",
         "title": "Change Tag Color",
-        "category": "Arbeitsplatz"
+        "category": "Tulcase"
       },
       {
-        "command": "arbeitsplatz.tag.delete",
+        "command": "tulcase.tag.changeCategory",
+        "title": "Change Tag Category",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.tag.delete",
         "title": "Delete Tag",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(trash)"
       },
       {
-        "command": "arbeitsplatz.command.add",
+        "command": "tulcase.command.add",
         "title": "Add Command",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(add)"
       },
       {
-        "command": "arbeitsplatz.command.copy",
+        "command": "tulcase.command.copy",
         "title": "Copy Command",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(copy)"
       },
       {
-        "command": "arbeitsplatz.command.runInTerminal",
+        "command": "tulcase.command.runInTerminal",
         "title": "Run in Terminal",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(terminal)"
       },
       {
-        "command": "arbeitsplatz.command.edit",
+        "command": "tulcase.command.edit",
         "title": "Edit Command",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(edit)"
       },
       {
-        "command": "arbeitsplatz.command.delete",
+        "command": "tulcase.command.delete",
         "title": "Delete Command",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(trash)"
       },
       {
-        "command": "arbeitsplatz.link.addLink",
+        "command": "tulcase.link.add",
         "title": "Add Link",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(add)"
       },
       {
-        "command": "arbeitsplatz.link.addFolder",
-        "title": "Add Folder",
-        "category": "Arbeitsplatz",
-        "icon": "$(new-folder)"
-      },
-      {
-        "command": "arbeitsplatz.link.open",
-        "title": "Open Link",
-        "category": "Arbeitsplatz",
-        "icon": "$(globe)"
-      },
-      {
-        "command": "arbeitsplatz.link.copyUrl",
-        "title": "Copy URL",
-        "category": "Arbeitsplatz",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "arbeitsplatz.link.edit",
-        "title": "Edit Link",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.link.delete",
-        "title": "Delete Link/Folder",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "arbeitsplatz.list.add",
-        "title": "Add List",
-        "category": "Arbeitsplatz",
+        "command": "tulcase.note.add",
+        "title": "Add Note",
+        "category": "Tulcase",
         "icon": "$(add)"
       },
       {
-        "command": "arbeitsplatz.list.addItem",
-        "title": "Add List Item",
-        "category": "Arbeitsplatz",
-        "icon": "$(add)"
-      },
-      {
-        "command": "arbeitsplatz.list.toggleItem",
-        "title": "Toggle List Item",
-        "category": "Arbeitsplatz",
-        "icon": "$(check)"
-      },
-      {
-        "command": "arbeitsplatz.list.editItem",
-        "title": "Edit List Item",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.list.edit",
-        "title": "Edit List",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.list.delete",
-        "title": "Delete List",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "arbeitsplatz.list.deleteItem",
-        "title": "Delete List Item",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "arbeitsplatz.record.add",
+        "command": "tulcase.record.add",
         "title": "Log Time",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(add)"
       },
       {
-        "command": "arbeitsplatz.refresh",
+        "command": "tulcase.refresh",
         "title": "Refresh All",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(refresh)"
       },
       {
-        "command": "arbeitsplatz.openDashboard",
+        "command": "tulcase.openDashboard",
         "title": "Open Dashboard",
-        "category": "Arbeitsplatz",
+        "category": "Tulcase",
         "icon": "$(home)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "arbeitsplatz.todo.add",
-          "when": "view == arbeitsplatz.todos",
+          "command": "tulcase.note.add",
+          "when": "view == tulcase.lists",
           "group": "navigation"
         },
         {
-          "command": "arbeitsplatz.todo.toggleShowDone",
-          "when": "view == arbeitsplatz.todos",
+          "command": "tulcase.tag.add",
+          "when": "view == tulcase.tags",
           "group": "navigation"
         },
         {
-          "command": "arbeitsplatz.command.add",
-          "when": "view == arbeitsplatz.commands",
+          "command": "tulcase.record.add",
+          "when": "view == tulcase.records",
           "group": "navigation"
         },
         {
-          "command": "arbeitsplatz.link.addLink",
-          "when": "view == arbeitsplatz.links",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.link.addFolder",
-          "when": "view == arbeitsplatz.links",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.list.add",
-          "when": "view == arbeitsplatz.lists",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.tag.add",
-          "when": "view == arbeitsplatz.tags",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.record.add",
-          "when": "view == arbeitsplatz.records",
-          "group": "navigation"
-        },
-        {
-          "command": "arbeitsplatz.refresh",
-          "when": "view =~ /^arbeitsplatz\\./",
+          "command": "tulcase.refresh",
+          "when": "view =~ /^tulcase\\./",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "arbeitsplatz.todo.markDone",
-          "when": "view == arbeitsplatz.todos && viewItem == todoItem",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.todo.markUndone",
-          "when": "view == arbeitsplatz.todos && viewItem == todoItemDone",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.todo.moveToNextDay",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.todo.delete",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
-          "group": "inline@3"
-        },
-        {
-          "command": "arbeitsplatz.todo.edit",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
+          "command": "tulcase.tag.rename",
+          "when": "view == tulcase.tags && viewItem == tagItem",
           "group": "1_modify@1"
         },
         {
-          "command": "arbeitsplatz.todo.reschedule",
-          "when": "view == arbeitsplatz.todos && viewItem =~ /^todoItem/",
+          "command": "tulcase.tag.changeColor",
+          "when": "view == tulcase.tags && viewItem == tagItem",
           "group": "1_modify@2"
         },
         {
-          "command": "arbeitsplatz.command.copy",
-          "when": "view == arbeitsplatz.commands && viewItem == commandItem",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.command.runInTerminal",
-          "when": "view == arbeitsplatz.commands && viewItem == commandItem",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.command.edit",
-          "when": "view == arbeitsplatz.commands && viewItem == commandItem",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.command.delete",
-          "when": "view == arbeitsplatz.commands && viewItem == commandItem",
-          "group": "2_delete@1"
-        },
-        {
-          "command": "arbeitsplatz.link.open",
-          "when": "view == arbeitsplatz.links && viewItem == linkItem",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.link.copyUrl",
-          "when": "view == arbeitsplatz.links && viewItem == linkItem",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.link.edit",
-          "when": "view == arbeitsplatz.links && viewItem =~ /^link/",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.link.addLink",
-          "when": "view == arbeitsplatz.links && viewItem == linkFolder",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "arbeitsplatz.link.addFolder",
-          "when": "view == arbeitsplatz.links && viewItem == linkFolder",
+          "command": "tulcase.tag.changeCategory",
+          "when": "view == tulcase.tags && viewItem == tagItem",
           "group": "1_modify@3"
         },
         {
-          "command": "arbeitsplatz.link.delete",
-          "when": "view == arbeitsplatz.links && viewItem =~ /^link/",
-          "group": "2_delete@1"
-        },
-        {
-          "command": "arbeitsplatz.list.addItem",
-          "when": "view == arbeitsplatz.lists && viewItem == listParent",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.list.toggleItem",
-          "when": "view == arbeitsplatz.lists && viewItem =~ /^listItem/",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.list.deleteItem",
-          "when": "view == arbeitsplatz.lists && viewItem =~ /^listItem/",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.list.edit",
-          "when": "view == arbeitsplatz.lists && viewItem == listParent",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.list.editItem",
-          "when": "view == arbeitsplatz.lists && viewItem =~ /^listItem/",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.list.delete",
-          "when": "view == arbeitsplatz.lists && viewItem == listParent",
-          "group": "2_delete@1"
-        },
-        {
-          "command": "arbeitsplatz.tag.rename",
-          "when": "view == arbeitsplatz.tags && viewItem == tagItem",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.tag.changeColor",
-          "when": "view == arbeitsplatz.tags && viewItem == tagItem",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "arbeitsplatz.tag.delete",
-          "when": "view == arbeitsplatz.tags && viewItem == tagItem",
+          "command": "tulcase.tag.delete",
+          "when": "view == tulcase.tags && viewItem == tagItem",
           "group": "2_delete@1"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "arbeitsplatz.todo.quickAdd",
+        "command": "tulcase.todo.quickAdd",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t"
       },
       {
-        "command": "arbeitsplatz.openDashboard",
+        "command": "tulcase.openDashboard",
         "key": "ctrl+shift+d",
         "mac": "cmd+shift+d"
       }
@@ -483,7 +274,9 @@
     "esbuild": "^0.24.0",
     "eslint": "^9.0.0",
     "prettier": "^3.2.0",
+    "sass": "^1.98.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.57.2",
     "vitest": "^2.0.0"
   }
 }
