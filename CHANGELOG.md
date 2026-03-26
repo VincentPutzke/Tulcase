@@ -5,6 +5,21 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.0.1] – 2026-03-26
+
+### Summary
+Internal refactoring release. Extracts a shared component library from duplicated view code. No user-facing changes.
+
+### Changed
+- Created `_shared.scss` — single source of truth for all common webview styles (variables, reset, layout, add-bar, search-bar, sections, tree-item classes, action buttons, empty states, adaptive container-query layout).
+- Refactored all 4 feature SCSS files (`note-list`, `link-list`, `todo-list`, `command-list`) to `@use 'shared'` with only feature-specific overrides.
+- Migrated all HTML templates from feature-prefixed classes (`note-*`, `link-*`, `todo-*`, `cmd-*`) to generic `tree-item-*` class names.
+- Added `.layout > .controls-pane + .tree-pane` adaptive layout structure to Todos and Commands (previously only in Links and Notes).
+- Created `BaseListViewProvider` abstract base class extracting shared `resolveWebviewView`, `refresh`, `_buildHtml`, and `getNonce`.
+- Refactored all 4 `WebviewViewProvider` classes to extend `BaseListViewProvider`, eliminating ~120 lines of duplicated boilerplate.
+
+---
+
 ## [1.0.0] – 2026-03-26
 
 ### Summary
