@@ -23,7 +23,7 @@ import { syncRecurringTodos } from './data/recurring-sync';
 import { DataFileWatcher } from './watchers/file-watcher';
 import { TodoListViewProvider } from './views/todo-list.view';
 import { TagTreeProvider } from './providers/tag-tree.provider';
-import { CommandTreeProvider } from './providers/command-tree.provider';
+import { CommandListViewProvider } from './views/command-list.view';
 import { LinkTreeProvider } from './providers/link-tree.provider';
 import { ListTreeProvider } from './providers/list-tree.provider';
 import { RecordCalendarViewProvider } from './views/record-calendar.view';
@@ -42,7 +42,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // 2. Initialize providers (tagTree first — todoList uses it for colour lookups)
     const tagTree     = new TagTreeProvider(settings);
     const todoList    = new TodoListViewProvider(settings, tagTree);
-    const commandTree = new CommandTreeProvider(settings);
+    const commandList = new CommandListViewProvider(settings, tagTree);
     const linkTree    = new LinkTreeProvider(settings);
     const listTree    = new ListTreeProvider(settings);
     // Records uses a webview calendar instead of a plain tree
@@ -56,7 +56,11 @@ export function activate(context: vscode.ExtensionContext): void {
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
         vscode.window.registerTreeDataProvider('arbeitsplatz.tags', tagTree),
-        vscode.window.registerTreeDataProvider('arbeitsplatz.commands', commandTree),
+        vscode.window.registerWebviewViewProvider(
+            CommandListViewProvider.viewType,
+            commandList,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
         vscode.window.registerTreeDataProvider('arbeitsplatz.links', linkTree),
         vscode.window.registerTreeDataProvider('arbeitsplatz.lists', listTree),
         vscode.window.registerWebviewViewProvider(
@@ -70,7 +74,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const refreshAll = () => {
         todoList.refresh();
         tagTree.refresh();
-        commandTree.refresh();
+        commandList.refresh();
         linkTree.refresh();
         listTree.refresh();
         recordCalendar.refresh();
@@ -80,7 +84,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // 5. Register commands
     registerTodoCommands(context, settings, todoList, tagTree);
     registerTagCommands(context, settings, tagTree, refreshAll);
-    registerCommandCommands(context, settings, commandTree, tagTree);
+    registerCommandCommands(context, settings, commandList, tagTree);
     registerLinkCommands(context, settings, linkTree);
     registerListCommands(context, settings, listTree, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
@@ -100,7 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const watcher = new DataFileWatcher(settings);
     watcher.onTodosChanged(() => { todoList.refresh(); statusBar.update(); });
     watcher.onTagsChanged(() => tagTree.refresh());
-    watcher.onCommandsChanged(() => commandTree.refresh());
+    watcher.onCommandsChanged(() => commandList.refresh());
     watcher.onLinksChanged(() => linkTree.refresh());
     watcher.onListsChanged(() => listTree.refresh());
     watcher.onRecordsChanged(() => recordCalendar.refresh());

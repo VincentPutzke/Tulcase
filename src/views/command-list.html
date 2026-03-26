@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<!-- ── Add buttons ──────────────────────────────────────── -->
+<div class="add-bar">
+  <button class="add-btn" id="btn-add">+ Add Command</button>
+  <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+</div>
+
+<!-- ── Search bar ───────────────────────────────────────── -->
+<div class="search-bar">
+  <span class="search-icon"></span>
+  <input
+    class="search-input"
+    id="search"
+    type="text"
+    placeholder="Search commands and tags..."
+    spellcheck="false"
+  >
+</div>
+
+<!-- ── Sections container ───────────────────────────────── -->
+<div id="sections"></div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── State ───────────────────────────────────────────────
+  let commands = [];       // CommandItem[]
+  let tagMap   = {};       // Record<string, TagDef>
+  let query    = '';       // current search text
+
+  /** Track which folders the user has collapsed. Key = folder name. */
+  const collapsedFolders = {};
+  /** Track which command code blocks are expanded. Key = item id. */
+  const expandedCode = {};
+
+  // ── DOM refs ────────────────────────────────────────────
+  const searchEl   = document.getElementById('search');
+  const sectionsEl = document.getElementById('sections');
+
+  // ── Utility helpers ─────────────────────────────────────
+
+  /** Escape HTML entities. */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── SVG icons (inline, stroke-based, currentColor) ─────
+
+  const ICONS = {
+    edit: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    copy: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    terminal: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 17l6-5-6-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    delete: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folder: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    emptyClipboard: '<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 17l6-5-6-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 19h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+
+  // ── Search / filter ─────────────────────────────────────
+
+  /** Test whether a command matches the current search query. */
+  function matchesQuery(cmd) {
+    if (!query) { return true; }
+    const q = query.toLowerCase();
+    if (cmd.label.toLowerCase().includes(q))   { return true; }
+    if (cmd.command.toLowerCase().includes(q))  { return true; }
+    if (cmd.tags.some(function(t) { return t.toLowerCase().includes(q); })) { return true; }
+    if (cmd.folder && cmd.folder.toLowerCase().includes(q)) { return true; }
+    return false;
+  }
+
+  // ── Grouping by folder ──────────────────────────────────
+
+  /** Group commands into { '': [...], 'folderA': [...], ... }. */
+  function groupByFolder(items) {
+    var groups = {};
+    for (var i = 0; i < items.length; i++) {
+      var folder = items[i].folder || '';
+      if (!groups[folder]) { groups[folder] = []; }
+      groups[folder].push(items[i]);
+    }
+    return groups;
+  }
+
+  /** Return sorted folder names, root ('') first. */
+  function sortedFolders(groups) {
+    var keys = Object.keys(groups).sort(function(a, b) {
+      if (a === '') { return -1; }
+      if (b === '') { return 1; }
+      return a.localeCompare(b);
+    });
+    return keys;
+  }
+
+  // ── Rendering ───────────────────────────────────────────
+
+  function render() {
+    var filtered = commands.filter(matchesQuery);
+    var groups   = groupByFolder(filtered);
+    var folders  = sortedFolders(groups);
+
+    var html = '';
+
+    for (var fi = 0; fi < folders.length; fi++) {
+      var folder = folders[fi];
+      var items  = groups[folder];
+      // Sort items alphabetically within folder
+      items.sort(function(a, b) { return a.label.localeCompare(b.label); });
+
+      if (folder === '') {
+        // Root-level commands — render without a section wrapper
+        for (var ri = 0; ri < items.length; ri++) {
+          html += renderItem(items[ri]);
+        }
+      } else {
+        html += renderFolder(folder, items);
+      }
+    }
+
+    if (filtered.length === 0 && commands.length > 0) {
+      html = '<div class="no-results">No commands match your search.</div>';
+    } else if (commands.length === 0) {
+      html = '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.emptyClipboard + '</div>'
+        + 'No commands yet. Click <strong>+ Add Command</strong> to get started!'
+        + '</div>';
+    }
+
+    sectionsEl.innerHTML = html;
+    bindEvents();
+  }
+
+  /** Render a collapsible folder section. */
+  function renderFolder(folder, items) {
+    var isCollapsed = !!collapsedFolders[folder];
+    var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
+    var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
+
+    var html = '<div class="section" data-folder="' + esc(folder) + '">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder) + '">';
+    html += '  <span class="' + chevronCls + '">&#9660;</span>';
+    html += '  <span class="section-icon">' + ICONS.folder + '</span>';
+    html += '  <span class="section-label">' + esc(folder) + '</span>';
+    html += '  <span class="section-badge">' + items.length + '</span>';
+    html += '</div>';
+    html += '<div class="' + bodyCls + '">';
+
+    for (var i = 0; i < items.length; i++) {
+      html += renderItem(items[i]);
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /** Render a single command item. */
+  function renderItem(item) {
+    var isExpanded = !!expandedCode[item.id];
+
+    var html = '<div class="cmd-item" data-id="' + esc(item.id) + '">';
+
+    // ── Top row: label + meta + actions ──
+    html += '<div class="cmd-row">';
+    html += '  <div class="cmd-content">';
+    html += '    <div class="cmd-label">' + esc(item.label) + '</div>';
+    html += '    <div class="cmd-meta">';
+
+    if (item.tags && item.tags.length > 0) {
+      html += '<span class="cmd-tags">';
+      for (var ti = 0; ti < item.tags.length; ti++) {
+        var tag   = item.tags[ti];
+        var def   = tagMap[tag];
+        var color = def ? def.color : '#8b8fa3';
+        html += '<span class="cmd-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+      }
+      html += '</span>';
+    }
+
+    html += '    </div>';  // .cmd-meta
+    html += '  </div>';    // .cmd-content
+
+    // ── Action buttons ──
+    html += '  <div class="cmd-actions">';
+    html += '    <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(item.id) + '" title="Edit">';
+    html += ICONS.edit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-copy" data-action="copy" data-id="' + esc(item.id) + '" title="Copy to clipboard">';
+    html += ICONS.copy;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-run" data-action="runInTerminal" data-id="' + esc(item.id) + '" title="Send to terminal">';
+    html += ICONS.terminal;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(item.id) + '" title="Delete">';
+    html += ICONS.delete;
+    html += '    </button>';
+    html += '  </div>';    // .cmd-actions
+    html += '</div>';      // .cmd-row
+
+    // ── Collapsible code block ──
+    var chevCls = isExpanded ? 'cmd-code-chevron' : 'cmd-code-chevron collapsed';
+    html += '<div class="cmd-code-toggle" data-code-toggle="' + esc(item.id) + '">';
+    html += '  <span class="' + chevCls + '">&#9660;</span>';
+    html += '  <span>' + (isExpanded ? 'Hide command' : 'Show command') + '</span>';
+    html += '</div>';
+
+    var codeCls = isExpanded ? 'cmd-code-block' : 'cmd-code-block collapsed';
+    html += '<div class="' + codeCls + '" data-code-block="' + esc(item.id) + '">';
+    html += esc(item.command);
+    html += '</div>';
+
+    html += '</div>'; // .cmd-item
+    return html;
+  }
+
+  // ── Event binding ───────────────────────────────────────
+
+  function bindEvents() {
+    // Folder toggle
+    document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var folder = el.getAttribute('data-toggle-folder');
+        collapsedFolders[folder] = !collapsedFolders[folder];
+        render();
+      });
+    });
+
+    // Code block toggle
+    document.querySelectorAll('[data-code-toggle]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var id = el.getAttribute('data-code-toggle');
+        expandedCode[id] = !expandedCode[id];
+        render();
+      });
+    });
+
+    // Action buttons
+    document.querySelectorAll('[data-action]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var action = el.getAttribute('data-action');
+        var id     = el.getAttribute('data-id');
+        vscode.postMessage({ type: action, id: id });
+      });
+    });
+  }
+
+  // ── Search input ────────────────────────────────────────
+  searchEl.addEventListener('input', function() {
+    query = searchEl.value.trim();
+    render();
+  });
+
+  // ── Add buttons ─────────────────────────────────────────
+  document.getElementById('btn-add').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addCommand' });
+  });
+  document.getElementById('btn-add-folder').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addFolder' });
+  });
+
+  // ── Message handling from extension host ────────────────
+  window.addEventListener('message', function(e) {
+    var msg = e.data;
+    if (msg.type === 'updateData') {
+      commands = msg.commands || [];
+      tagMap   = msg.tagMap   || {};
+      render();
+    }
+  });
+
+  // ── Request initial data ────────────────────────────────
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>
