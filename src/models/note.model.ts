@@ -21,29 +21,3 @@ export interface NoteStore {
     notes: NoteItem[];
     folders: NoteFolder[];
 }
-
-// ── Legacy types (for migration from v1 MiniList format) ─────────────────────
-
-/** @deprecated Old list item — used only for migration */
-export interface LegacyListItem {
-    id: string;
-    text: string;
-    done: boolean;
-    tags: string[];
-    createdAt: string;
-}
-
-/** @deprecated Old mini-list — used only for migration */
-export interface LegacyMiniList {
-    id: string;
-    label: string;
-    description: string;
-    tags: string[];
-    createdAt: string;
-    items: LegacyListItem[];
-}
-
-/** @deprecated Old store root — used only for migration */
-export interface LegacyListStore {
-    lists: LegacyMiniList[];
-}

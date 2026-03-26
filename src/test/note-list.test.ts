@@ -3,43 +3,10 @@ import type {
     NoteItem,
     NoteFolder,
     NoteStore,
-    LegacyListStore,
-    LegacyMiniList,
 } from '../models/note.model';
 
 // ── Unit-testable helpers extracted from note-list.view.ts ────────────────────
 // Pure functions re-implemented here for testing without VS Code dependencies.
-
-/** Convert legacy MiniList[] data to the new NoteItem[] format. */
-function migrateLegacy(legacy: LegacyListStore): NoteStore {
-    const notes: NoteItem[] = [];
-
-    for (const list of legacy.lists) {
-        const lines: string[] = [];
-
-        if (list.description) {
-            lines.push(list.description);
-            lines.push('');
-        }
-
-        for (const item of list.items) {
-            const prefix = item.done ? '- [x]' : '- [ ]';
-            lines.push(`${prefix} ${item.text}`);
-        }
-
-        notes.push({
-            id: list.id,
-            label: list.label,
-            content: lines.join('\n'),
-            tags: list.tags ?? [],
-            folder: '',
-            createdAt: list.createdAt,
-            updatedAt: list.createdAt,
-        });
-    }
-
-    return { notes, folders: [] };
-}
 
 /** Build children map: parentId → child folders. */
 function buildFolderTree(folders: NoteFolder[]): Record<string, NoteFolder[]> {
@@ -76,93 +43,6 @@ function normaliseBullet(line: string): string {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('NoteStore helpers', () => {
-    // ── Migration ─────────────────────────────────────────
-
-    describe('migrateLegacy', () => {
-        it('converts MiniList[] to NoteItem[] with markdown task syntax', () => {
-            const legacy: LegacyListStore = {
-                lists: [
-                    {
-                        id: 'ml_1',
-                        label: 'Shopping',
-                        description: 'Weekly groceries',
-                        tags: ['#home'],
-                        createdAt: '2025-01-01',
-                        items: [
-                            { id: 'li_1', text: 'Milk', done: false, tags: [], createdAt: '2025-01-01' },
-                            { id: 'li_2', text: 'Bread', done: true, tags: [], createdAt: '2025-01-01' },
-                        ],
-                    },
-                ],
-            };
-
-            const result = migrateLegacy(legacy);
-
-            expect(result.notes).toHaveLength(1);
-            expect(result.folders).toHaveLength(0);
-
-            const note = result.notes[0];
-            expect(note.id).toBe('ml_1');
-            expect(note.label).toBe('Shopping');
-            expect(note.tags).toEqual(['#home']);
-            expect(note.content).toContain('Weekly groceries');
-            expect(note.content).toContain('- [ ] Milk');
-            expect(note.content).toContain('- [x] Bread');
-        });
-
-        it('handles empty lists', () => {
-            const legacy: LegacyListStore = {
-                lists: [],
-            };
-
-            const result = migrateLegacy(legacy);
-            expect(result.notes).toHaveLength(0);
-            expect(result.folders).toHaveLength(0);
-        });
-
-        it('handles list without description', () => {
-            const legacy: LegacyListStore = {
-                lists: [
-                    {
-                        id: 'ml_2',
-                        label: 'Tasks',
-                        description: '',
-                        tags: [],
-                        createdAt: '2025-02-01',
-                        items: [
-                            { id: 'li_3', text: 'Do homework', done: false, tags: [], createdAt: '2025-02-01' },
-                        ],
-                    },
-                ],
-            };
-
-            const result = migrateLegacy(legacy);
-            const note = result.notes[0];
-            expect(note.content).toBe('- [ ] Do homework');
-            // No leading description + blank line
-            expect(note.content).not.toContain('\n\n');
-        });
-
-        it('preserves createdAt as both createdAt and updatedAt', () => {
-            const legacy: LegacyListStore = {
-                lists: [
-                    {
-                        id: 'ml_3',
-                        label: 'Test',
-                        description: '',
-                        tags: [],
-                        createdAt: '2025-03-15',
-                        items: [],
-                    },
-                ],
-            };
-
-            const result = migrateLegacy(legacy);
-            expect(result.notes[0].createdAt).toBe('2025-03-15');
-            expect(result.notes[0].updatedAt).toBe('2025-03-15');
-        });
-    });
-
     // ── Folder tree ───────────────────────────────────────
 
     describe('buildFolderTree', () => {
