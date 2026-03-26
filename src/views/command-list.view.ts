@@ -16,6 +16,13 @@ export class CommandListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.commands';
     protected readonly viewName = 'command-list';
 
+    // ── Public palette entry-points ───────────────────────────────────────────
+
+    /** Open the guided add-command dialog from the command palette. */
+    public addCommandFromPalette(): void {
+        void this._handleMessage({ type: 'addCommand' });
+    }
+
     // ── Message handling ───────────────────────────────────────────────────────
 
     protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
