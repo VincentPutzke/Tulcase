@@ -79,13 +79,13 @@
           "id": "tulcase.links",
           "name": "Links",
           "type": "webview"
-        },
-        {
-          "id": "tulcase.tags",
-          "name": "Tags"
         }
       ],
       "tulcase-panel": [
+        {
+          "id": "tulcase.tags",
+          "name": "Tags"
+        },
         {
           "id": "tulcase.records",
           "name": "Records",
