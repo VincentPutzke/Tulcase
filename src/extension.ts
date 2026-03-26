@@ -25,7 +25,10 @@ import { TodoListViewProvider } from './views/todo-list.view';
 import { TagTreeProvider } from './providers/tag-tree.provider';
 import { CommandListViewProvider } from './views/command-list.view';
 import { LinkTreeProvider } from './providers/link-tree.provider';
-import { ListTreeProvider } from './providers/list-tree.provider';
+import { NoteListViewProvider } from './views/note-list.view';
+import { NoteFileSystemProvider } from './data/note-fs';
+import { NoteTagDecorator } from './data/note-decorations';
+import { NoteFormattingProvider, NOTE_DOCUMENT_SELECTOR } from './data/note-format';
 import { RecordCalendarViewProvider } from './views/record-calendar.view';
 import { registerTodoCommands } from './commands/todo-commands';
 import { registerTagCommands } from './commands/tag-commands';
@@ -44,7 +47,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const todoList    = new TodoListViewProvider(settings, tagTree);
     const commandList = new CommandListViewProvider(settings, tagTree);
     const linkTree    = new LinkTreeProvider(settings);
-    const listTree    = new ListTreeProvider(settings);
+    const noteList    = new NoteListViewProvider(settings, tagTree);
+    const noteFs      = new NoteFileSystemProvider(settings);
+    const noteDecorator = new NoteTagDecorator(tagTree);
     // Records uses a webview calendar instead of a plain tree
     const recordCalendar = new RecordCalendarViewProvider(settings);
 
@@ -62,7 +67,17 @@ export function activate(context: vscode.ExtensionContext): void {
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
         vscode.window.registerTreeDataProvider('arbeitsplatz.links', linkTree),
-        vscode.window.registerTreeDataProvider('arbeitsplatz.lists', listTree),
+        vscode.workspace.registerFileSystemProvider(NoteFileSystemProvider.scheme, noteFs),
+        vscode.window.registerWebviewViewProvider(
+            NoteListViewProvider.viewType,
+            noteList,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
+        vscode.languages.registerDocumentFormattingEditProvider(
+            NOTE_DOCUMENT_SELECTOR,
+            new NoteFormattingProvider(),
+        ),
+        noteDecorator,
         vscode.window.registerWebviewViewProvider(
             RecordCalendarViewProvider.viewType,
             recordCalendar,
@@ -76,7 +91,7 @@ export function activate(context: vscode.ExtensionContext): void {
         tagTree.refresh();
         commandList.refresh();
         linkTree.refresh();
-        listTree.refresh();
+        noteList.refresh();
         recordCalendar.refresh();
         statusBar.update();
     };
@@ -86,7 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerTagCommands(context, settings, tagTree, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);
     registerLinkCommands(context, settings, linkTree);
-    registerListCommands(context, settings, listTree, tagTree);
+    registerListCommands(context, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
 
     context.subscriptions.push(
@@ -106,12 +121,36 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher.onTagsChanged(() => tagTree.refresh());
     watcher.onCommandsChanged(() => commandList.refresh());
     watcher.onLinksChanged(() => linkTree.refresh());
-    watcher.onListsChanged(() => listTree.refresh());
+    watcher.onListsChanged(() => { noteList.refresh(); noteDecorator.refreshAll(); });
     watcher.onRecordsChanged(() => recordCalendar.refresh());
+    watcher.onTagsChanged(() => noteDecorator.refreshAll());
     watcher.onRecurringChanged(() => todoList.refresh());
     context.subscriptions.push(watcher);
 
-    // 8. Run recurring sync on activation
+    // 8. Auto-save notes on tab close
+    context.subscriptions.push(
+        vscode.workspace.onWillSaveTextDocument(e => {
+            // Ensure aplist documents are always saved (no dirty prompt)
+            if (e.document.uri.scheme === NoteFileSystemProvider.scheme) {
+                e.waitUntil(Promise.resolve([]));
+            }
+        }),
+        vscode.window.tabGroups.onDidChangeTabs(e => {
+            // When a note tab is closed, auto-save its content
+            for (const tab of e.closed) {
+                if (
+                    tab.input instanceof vscode.TabInputText &&
+                    tab.input.uri.scheme === NoteFileSystemProvider.scheme
+                ) {
+                    // The FS provider's writeFile has already been called by VS Code
+                    // on dirty-close; just refresh the sidebar to update line counts.
+                    noteList.refresh();
+                }
+            }
+        }),
+    );
+
+    // 9. Run recurring sync on activation
     syncRecurringTodos(settings).then(() => {
         todoList.refresh();
         statusBar.update();

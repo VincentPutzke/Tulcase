@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<!-- ── Add buttons ──────────────────────────────────────── -->
+<div class="add-bar">
+  <button class="add-btn" id="btn-add">+ Add Note</button>
+  <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+</div>
+
+<!-- ── Search bar ───────────────────────────────────────── -->
+<div class="search-bar">
+  <span class="search-icon"></span>
+  <input
+    class="search-input"
+    id="search"
+    type="text"
+    placeholder="Search notes and tags..."
+    spellcheck="false"
+  >
+</div>
+
+<!-- ── Sections container ───────────────────────────────── -->
+<div id="sections"></div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  var vscode = acquireVsCodeApi();
+
+  // ── State ───────────────────────────────────────────────
+  var notes   = [];       // NoteItem[]
+  var folders = [];       // NoteFolder[]
+  var tagMap  = {};       // Record<string, TagDef>
+  var query   = '';       // current search text
+
+  /** Track which folders the user has collapsed/expanded. Key = folder id. */
+  var collapsedFolders = {};
+
+  // ── DOM refs ────────────────────────────────────────────
+  var searchEl   = document.getElementById('search');
+  var sectionsEl = document.getElementById('sections');
+
+  // ── Utility helpers ─────────────────────────────────────
+
+  /** Escape HTML entities. */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /** Count non-empty lines in a string. */
+  function lineCount(text) {
+    if (!text) { return 0; }
+    return text.split('\n').length;
+  }
+
+  // ── SVG icons (inline, stroke-based, currentColor) ─────
+
+  var ICONS = {
+    edit: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    delete: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folder: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    note: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="10 9 9 9 8 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    emptyNote: '<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folderEdit: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+
+  // ── Search / filter ─────────────────────────────────────
+
+  /** Test whether a note matches the current search query. */
+  function matchesQuery(note) {
+    if (!query) { return true; }
+    var q = query.toLowerCase();
+    if (note.label.toLowerCase().includes(q))   { return true; }
+    if (note.tags.some(function(t) { return t.toLowerCase().includes(q); })) { return true; }
+    if (note.content && note.content.toLowerCase().includes(q)) { return true; }
+    return false;
+  }
+
+  // ── Folder tree helpers (supports nesting) ──────────────
+
+  /** Build children map: parentId → child folders */
+  function buildFolderTree() {
+    var children = {};  // parentId → NoteFolder[]
+    for (var i = 0; i < folders.length; i++) {
+      var f = folders[i];
+      var pid = f.parent || '';
+      if (!children[pid]) { children[pid] = []; }
+      children[pid].push(f);
+    }
+    // Sort each group alphabetically
+    for (var key in children) {
+      children[key].sort(function(a, b) { return a.name.localeCompare(b.name); });
+    }
+    return children;
+  }
+
+  /** Get notes that belong to a specific folder. */
+  function notesInFolder(folderId) {
+    return notes.filter(function(n) {
+      return (n.folder || '') === folderId;
+    }).filter(matchesQuery);
+  }
+
+  // ── Rendering ───────────────────────────────────────────
+
+  function render() {
+    var folderTree = buildFolderTree();
+
+    var html = '';
+
+    // Render root-level notes (no folder)
+    var rootNotes = notesInFolder('');
+    rootNotes.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var ri = 0; ri < rootNotes.length; ri++) {
+      html += renderNote(rootNotes[ri]);
+    }
+
+    // Render root-level folders (and their nested content recursively)
+    var rootFolders = folderTree[''] || [];
+    for (var fi = 0; fi < rootFolders.length; fi++) {
+      html += renderFolderSection(rootFolders[fi], folderTree);
+    }
+
+    // Empty / no-results states
+    var totalVisible = rootNotes.length;
+    for (var ff = 0; ff < folders.length; ff++) {
+      totalVisible += notesInFolder(folders[ff].id).length;
+    }
+
+    if (totalVisible === 0 && notes.length > 0) {
+      html = '<div class="no-results">No notes match your search.</div>';
+    } else if (notes.length === 0 && folders.length === 0) {
+      html = '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.emptyNote + '</div>'
+        + 'No notes yet. Click <strong>+ Add Note</strong> to get started!'
+        + '</div>';
+    }
+
+    sectionsEl.innerHTML = html;
+    bindEvents();
+  }
+
+  /** Render a folder section (recursive — supports nested folders). */
+  function renderFolderSection(folder, folderTree) {
+    var isCollapsed = !!collapsedFolders[folder.id];
+    var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
+    var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
+
+    var childNotes = notesInFolder(folder.id);
+    childNotes.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    var childFolders = folderTree[folder.id] || [];
+    var itemCount = childNotes.length + childFolders.length;
+
+    // Skip entirely empty folders during search
+    if (query && itemCount === 0) { return ''; }
+
+    var html = '<div class="section" data-folder-id="' + esc(folder.id) + '">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '">';
+    html += '  <span class="' + chevronCls + '">&#9660;</span>';
+    html += '  <span class="section-icon">' + ICONS.folder + '</span>';
+    html += '  <span class="section-label">' + esc(folder.name) + '</span>';
+    html += '  <span class="section-badge">' + itemCount + '</span>';
+
+    // Folder action buttons
+    html += '  <span class="section-actions">';
+    html += '    <button class="action-btn btn-add" data-action="addNoteToFolder" data-id="' + esc(folder.id) + '" title="Add note to folder">';
+    html += ICONS.folderEdit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-edit" data-action="renameFolder" data-id="' + esc(folder.id) + '" title="Rename folder">';
+    html += ICONS.edit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-delete" data-action="deleteFolder" data-id="' + esc(folder.id) + '" title="Delete folder">';
+    html += ICONS.delete;
+    html += '    </button>';
+    html += '  </span>';
+
+    html += '</div>';
+    html += '<div class="' + bodyCls + '">';
+
+    // Child notes
+    for (var ni = 0; ni < childNotes.length; ni++) {
+      html += renderNote(childNotes[ni]);
+    }
+
+    // Child folders (recursive)
+    for (var ci = 0; ci < childFolders.length; ci++) {
+      html += renderFolderSection(childFolders[ci], folderTree);
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /** Render a single note item. */
+  function renderNote(note) {
+    var lines = lineCount(note.content);
+
+    var html = '<div class="note-item" data-id="' + esc(note.id) + '">';
+
+    html += '<div class="note-row" data-action="open" data-id="' + esc(note.id) + '">';
+    html += '  <span class="note-icon">' + ICONS.note + '</span>';
+    html += '  <div class="note-content">';
+    html += '    <div class="note-label">' + esc(note.label) + '</div>';
+    html += '    <div class="note-meta">';
+
+    // Tags
+    if (note.tags && note.tags.length > 0) {
+      html += '<span class="note-tags">';
+      for (var ti = 0; ti < note.tags.length; ti++) {
+        var tag   = note.tags[ti];
+        var def   = tagMap[tag];
+        var color = def ? def.color : '#8b8fa3';
+        html += '<span class="note-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+      }
+      html += '</span>';
+    }
+
+    // Line count
+    html += '<span class="note-lines">' + lines + ' line' + (lines !== 1 ? 's' : '') + '</span>';
+
+    html += '    </div>';  // .note-meta
+    html += '  </div>';    // .note-content
+
+    // Action buttons
+    html += '  <div class="note-actions">';
+    html += '    <button class="action-btn btn-edit" data-action="editMeta" data-id="' + esc(note.id) + '" title="Edit metadata">';
+    html += ICONS.edit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(note.id) + '" title="Delete">';
+    html += ICONS.delete;
+    html += '    </button>';
+    html += '  </div>';    // .note-actions
+
+    html += '</div>';      // .note-row
+    html += '</div>';      // .note-item
+
+    return html;
+  }
+
+  // ── Event binding ───────────────────────────────────────
+
+  function bindEvents() {
+    // Folder toggle (click on section header — but not on action buttons)
+    document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        // Don't toggle if an action button was clicked
+        if (e.target.closest('.action-btn')) { return; }
+        var id = el.getAttribute('data-toggle-folder');
+        collapsedFolders[id] = !collapsedFolders[id];
+        render();
+      });
+    });
+
+    // Note click → open
+    document.querySelectorAll('.note-row[data-action="open"]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.action-btn')) { return; }
+        var id = el.getAttribute('data-id');
+        vscode.postMessage({ type: 'open', id: id });
+      });
+    });
+
+    // Action buttons
+    document.querySelectorAll('[data-action]').forEach(function(el) {
+      if (el.classList.contains('note-row')) { return; } // skip the row itself
+      el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var action = el.getAttribute('data-action');
+        var id     = el.getAttribute('data-id');
+        vscode.postMessage({ type: action, id: id });
+      });
+    });
+  }
+
+  // ── Search input ────────────────────────────────────────
+  searchEl.addEventListener('input', function() {
+    query = searchEl.value.trim();
+    render();
+  });
+
+  // ── Add buttons ─────────────────────────────────────────
+  document.getElementById('btn-add').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addNote' });
+  });
+  document.getElementById('btn-add-folder').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addFolder' });
+  });
+
+  // ── Message handling from extension host ────────────────
+  window.addEventListener('message', function(e) {
+    var msg = e.data;
+    if (msg.type === 'updateData') {
+      notes   = msg.notes   || [];
+      folders = msg.folders || [];
+      tagMap  = msg.tagMap  || {};
+      render();
+    }
+  });
+
+  // ── Request initial data ────────────────────────────────
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

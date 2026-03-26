@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Arbeitsplatz",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -71,6 +71,11 @@
           "type": "webview"
         },
         {
+          "id": "arbeitsplatz.lists",
+          "name": "Notes",
+          "type": "webview"
+        },
+        {
           "id": "arbeitsplatz.links",
           "name": "Links"
         },
@@ -80,10 +85,6 @@
         }
       ],
       "arbeitsplatz-panel": [
-        {
-          "id": "arbeitsplatz.lists",
-          "name": "Lists"
-        },
         {
           "id": "arbeitsplatz.records",
           "name": "Records",
@@ -202,44 +203,10 @@
         "icon": "$(trash)"
       },
       {
-        "command": "arbeitsplatz.list.add",
-        "title": "Add List",
+        "command": "arbeitsplatz.note.add",
+        "title": "Add Note",
         "category": "Arbeitsplatz",
         "icon": "$(add)"
-      },
-      {
-        "command": "arbeitsplatz.list.addItem",
-        "title": "Add List Item",
-        "category": "Arbeitsplatz",
-        "icon": "$(add)"
-      },
-      {
-        "command": "arbeitsplatz.list.toggleItem",
-        "title": "Toggle List Item",
-        "category": "Arbeitsplatz",
-        "icon": "$(check)"
-      },
-      {
-        "command": "arbeitsplatz.list.editItem",
-        "title": "Edit List Item",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.list.edit",
-        "title": "Edit List",
-        "category": "Arbeitsplatz"
-      },
-      {
-        "command": "arbeitsplatz.list.delete",
-        "title": "Delete List",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "arbeitsplatz.list.deleteItem",
-        "title": "Delete List Item",
-        "category": "Arbeitsplatz",
-        "icon": "$(trash)"
       },
       {
         "command": "arbeitsplatz.record.add",
@@ -273,7 +240,7 @@
           "group": "navigation"
         },
         {
-          "command": "arbeitsplatz.list.add",
+          "command": "arbeitsplatz.note.add",
           "when": "view == arbeitsplatz.lists",
           "group": "navigation"
         },
@@ -322,36 +289,6 @@
         {
           "command": "arbeitsplatz.link.delete",
           "when": "view == arbeitsplatz.links && viewItem =~ /^link/",
-          "group": "2_delete@1"
-        },
-        {
-          "command": "arbeitsplatz.list.addItem",
-          "when": "view == arbeitsplatz.lists && viewItem == listParent",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.list.toggleItem",
-          "when": "view == arbeitsplatz.lists && viewItem =~ /^listItem/",
-          "group": "inline@1"
-        },
-        {
-          "command": "arbeitsplatz.list.deleteItem",
-          "when": "view == arbeitsplatz.lists && viewItem =~ /^listItem/",
-          "group": "inline@2"
-        },
-        {
-          "command": "arbeitsplatz.list.edit",
-          "when": "view == arbeitsplatz.lists && viewItem == listParent",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.list.editItem",
-          "when": "view == arbeitsplatz.lists && viewItem =~ /^listItem/",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "arbeitsplatz.list.delete",
-          "when": "view == arbeitsplatz.lists && viewItem == listParent",
           "group": "2_delete@1"
         },
         {

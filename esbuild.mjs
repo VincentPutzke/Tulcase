@@ -31,6 +31,7 @@ function buildWebviewAssets() {
         { name: 'record-calendar' },
         { name: 'todo-list' },
         { name: 'command-list' },
+        { name: 'note-list' },
     ];
 
     for (const wv of webviews) {
