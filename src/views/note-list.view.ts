@@ -20,8 +20,6 @@ import type {
     NoteItem,
     NoteFolder,
     NoteStore,
-    LegacyListStore,
-    LegacyMiniList,
 } from '../models/note.model';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
@@ -367,59 +365,19 @@ export class NoteListViewProvider implements vscode.WebviewViewProvider {
             this.settings.listsFile,
             { notes: [], folders: [] },
         );
-
         // New format: has `notes` array
         if (Array.isArray(raw.notes)) {
             return raw as unknown as NoteStore;
         }
 
-        // Legacy format: has `lists` array
-        if (Array.isArray(raw.lists)) {
-            const migrated = NoteListViewProvider.migrateLegacy(raw as unknown as LegacyListStore);
-            await store.write(this.settings.listsFile, migrated);
-            console.log('[Arbeitsplatz] Migrated lists.json from MiniList to NoteStore format.');
-            return migrated;
-        }
-
-        // Fallback: empty store
+        // Do not attempt to migrate or modify legacy files. If the file
+        // does not match the new shape, return an empty store so we never
+        // write or change the user's existing `lists.json`.
         return { notes: [], folders: [] };
     }
 
-    /**
-     * Convert legacy MiniList[] data to the new NoteItem[] format.
-     * Each list becomes a note; checklist items become markdown bullet points.
-     */
-    static migrateLegacy(legacy: LegacyListStore): NoteStore {
-        const notes: NoteItem[] = [];
-
-        for (const list of legacy.lists) {
-            const lines: string[] = [];
-
-            // Description → first paragraph
-            if (list.description) {
-                lines.push(list.description);
-                lines.push('');
-            }
-
-            // Convert checklist items to markdown task-list syntax
-            for (const item of list.items) {
-                const prefix = item.done ? '- [x]' : '- [ ]';
-                lines.push(`${prefix} ${item.text}`);
-            }
-
-            notes.push({
-                id: list.id,
-                label: list.label,
-                content: lines.join('\n'),
-                tags: list.tags ?? [],
-                folder: '',
-                createdAt: list.createdAt,
-                updatedAt: list.createdAt,
-            });
-        }
-
-        return { notes, folders: [] };
-    }
+    // Legacy migration removed: do not convert or write legacy `lists.json`.
+    // The Notes feature intentionally ignores older repository formats.
 
     // ── HTML builder ───────────────────────────────────────────────────────────
 
