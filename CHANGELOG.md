@@ -5,6 +5,40 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0] – 2026-03-26
+
+### Added
+- **Command Webview** — The Commands view is now a rich webview (replacing
+  the tree view), matching the TODO view's professional look and feel.
+- **Folder organisation** — Commands can be assigned to folders that render
+  as collapsible sections.  Create folders via the "+ Folder" button or
+  while editing a command.
+- **Collapsible code blocks** — Each command's shell text is hidden by
+  default behind a "Show command" toggle.  Keeps the list compact while
+  still allowing quick inspection.
+- **Inline action buttons** — Edit (pen), Copy (clipboard), Send to
+  Terminal (prompt), and Delete (trash) appear on hover for each command.
+- **Search** — Full-text search bar that filters by label, command text,
+  tags, and folder name.
+- **Tag support** — Commands can be tagged using the existing colour-coded
+  tag picker.  Tags display inline with coloured labels.
+- **Legacy data migration** — Transparently converts old
+  `Record<string, CommandEntry>` format to the new items-array format on
+  first load.  Backwards-compatible with plain-string entries.
+- **Tests** — 7 new unit tests covering migration, folder grouping, and
+  sorting helpers.
+
+### Changed
+- **Command data model** — Switched from `Record<string, CommandEntry>` to
+  `CommandItem[]` with `id`, `label`, `command`, `tags`, and `folder` fields.
+- **Command view type** — Changed from `TreeDataProvider` to
+  `WebviewViewProvider`.  All actions are handled via webview message
+  passing instead of tree context menus.
+- **package.json** — Commands view type set to `"webview"`.  Removed
+  tree-based context menus for command items.
+
+---
+
 ## [0.4.0] – 2026-03-25
 
 ### Added
