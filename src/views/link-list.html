@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<!--
+  Adaptive layout wrapper.
+  In a sidebar (narrow):  .controls above .tree, stacked vertically.
+  In a panel  (wide):     .controls on the right, .tree on the left.
+  Detection via CSS container queries (width threshold).
+-->
+<div class="layout" id="layout">
+
+  <!-- ── Group 2: Folder / link tree (fills remaining space) ── -->
+  <div class="tree-pane" id="tree-pane"></div>
+
+  <!-- ── Group 1: Controls (add buttons + search) ───────────── -->
+  <div class="controls-pane">
+    <div class="add-bar">
+      <button class="add-btn" id="btn-add">+ Add Link</button>
+      <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon"></span>
+      <input
+        class="search-input"
+        id="search"
+        type="text"
+        placeholder="Search links and tags..."
+        spellcheck="false"
+      >
+    </div>
+  </div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  var vscode = acquireVsCodeApi();
+
+  // ── State ───────────────────────────────────────────────
+  var root   = [];       // LinkNode[]
+  var tagMap = {};       // Record<string, TagDef>
+  var query  = '';       // current search text
+
+  /** Track which folders the user has collapsed/expanded. Key = node id. */
+  var collapsedFolders = {};
+
+  // ── DOM refs ────────────────────────────────────────────
+  var searchEl = document.getElementById('search');
+  var treeEl   = document.getElementById('tree-pane');
+
+  // ── Utility helpers ─────────────────────────────────────
+
+  /** Escape HTML entities. */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── SVG icons (inline, stroke-based, currentColor) ─────
+
+  var ICONS = {
+    globe: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M2 12h20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z" stroke="currentColor" stroke-width="1.5"/></svg>',
+    copy: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    edit: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    delete: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folder: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folderAdd: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    emptyLink: '<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M2 12h20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z" stroke="currentColor" stroke-width="1.5"/></svg>',
+  };
+
+  // ── Search / filter ─────────────────────────────────────
+
+  /** Test whether a link node matches the current search query. */
+  function matchesQuery(node) {
+    if (!query) { return true; }
+    var q = query.toLowerCase();
+    if (node.label.toLowerCase().includes(q)) { return true; }
+    if (node.url && node.url.toLowerCase().includes(q)) { return true; }
+    if (node.tags && node.tags.some(function(t) { return t.toLowerCase().includes(q); })) { return true; }
+    return false;
+  }
+
+  /**
+   * Test whether a folder (or any of its descendants) contains a matching node.
+   * Used during search to hide empty branches.
+   */
+  function folderHasMatch(node) {
+    if (!query) { return true; }
+    if (node.type === 'link') { return matchesQuery(node); }
+    if (node.children) {
+      for (var i = 0; i < node.children.length; i++) {
+        if (folderHasMatch(node.children[i])) { return true; }
+      }
+    }
+    return false;
+  }
+
+  // ── Count helpers ───────────────────────────────────────
+
+  /** Count direct children (folders + links) of a folder. */
+  function childCount(node) {
+    return node.children ? node.children.length : 0;
+  }
+
+  /** Count total link nodes in the entire tree. */
+  function totalLinks(nodes) {
+    var c = 0;
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].type === 'link') { c++; }
+      else if (nodes[i].children) { c += totalLinks(nodes[i].children); }
+    }
+    return c;
+  }
+
+  // ── Rendering ───────────────────────────────────────────
+
+  function render() {
+    var html = '';
+
+    // Separate root-level links from folders for ordered rendering
+    var rootLinks   = [];
+    var rootFolders = [];
+    for (var i = 0; i < root.length; i++) {
+      if (root[i].type === 'folder') { rootFolders.push(root[i]); }
+      else { rootLinks.push(root[i]); }
+    }
+
+    // Render root-level links first (filtered by search)
+    var visibleRootLinks = rootLinks.filter(matchesQuery);
+    visibleRootLinks.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var li = 0; li < visibleRootLinks.length; li++) {
+      html += renderLinkItem(visibleRootLinks[li]);
+    }
+
+    // Render root-level folders (and their nested content recursively)
+    rootFolders.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var fi = 0; fi < rootFolders.length; fi++) {
+      html += renderFolderSection(rootFolders[fi]);
+    }
+
+    // Empty / no-results states
+    var visibleTotal = visibleRootLinks.length;
+    for (var n = 0; n < root.length; n++) {
+      if (root[n].type === 'folder') { visibleTotal += countVisibleInFolder(root[n]); }
+    }
+
+    if (visibleTotal === 0 && totalLinks(root) > 0) {
+      html = '<div class="no-results">No links match your search.</div>';
+    } else if (root.length === 0) {
+      html = '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.emptyLink + '</div>'
+        + 'No links yet. Click <strong>+ Add Link</strong> to get started!'
+        + '</div>';
+    }
+
+    treeEl.innerHTML = html;
+    bindEvents();
+  }
+
+  /** Count visible (filtered) link nodes inside a folder recursively. */
+  function countVisibleInFolder(folder) {
+    var c = 0;
+    if (!folder.children) { return 0; }
+    for (var i = 0; i < folder.children.length; i++) {
+      var child = folder.children[i];
+      if (child.type === 'link' && matchesQuery(child)) { c++; }
+      else if (child.type === 'folder') { c += countVisibleInFolder(child); }
+    }
+    return c;
+  }
+
+  /** Render a folder section (recursive — supports nested folders). */
+  function renderFolderSection(folder) {
+    // During search, skip folders completely empty of matches
+    if (query && !folderHasMatch(folder)) { return ''; }
+
+    var isCollapsed = !!collapsedFolders[folder.id];
+    var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
+    var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
+
+    var count = childCount(folder);
+
+    var html = '<div class="section" data-folder-id="' + esc(folder.id) + '">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '">';
+    html += '  <span class="' + chevronCls + '">&#9660;</span>';
+    html += '  <span class="section-icon">' + ICONS.folder + '</span>';
+    html += '  <span class="section-label">' + esc(folder.label) + '</span>';
+    html += '  <span class="section-badge">' + count + '</span>';
+
+    // Folder action buttons
+    html += '  <span class="section-actions">';
+    html += '    <button class="action-btn btn-add" data-action="addLinkToFolder" data-id="' + esc(folder.id) + '" title="Add link to folder">';
+    html += ICONS.folderAdd;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-add" data-action="addFolderToFolder" data-id="' + esc(folder.id) + '" title="Add sub-folder">';
+    html += ICONS.folder;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-edit" data-action="renameFolder" data-id="' + esc(folder.id) + '" title="Rename folder">';
+    html += ICONS.edit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-delete" data-action="deleteFolder" data-id="' + esc(folder.id) + '" title="Delete folder">';
+    html += ICONS.delete;
+    html += '    </button>';
+    html += '  </span>';
+
+    html += '</div>';
+    html += '<div class="' + bodyCls + '">';
+
+    // Separate children into links and sub-folders
+    var childLinks   = [];
+    var childFolders = [];
+    if (folder.children) {
+      for (var i = 0; i < folder.children.length; i++) {
+        var c = folder.children[i];
+        if (c.type === 'folder') { childFolders.push(c); }
+        else { childLinks.push(c); }
+      }
+    }
+
+    // Render child links (filtered)
+    var visibleLinks = childLinks.filter(matchesQuery);
+    visibleLinks.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var li = 0; li < visibleLinks.length; li++) {
+      html += renderLinkItem(visibleLinks[li]);
+    }
+
+    // Render child folders (recursive)
+    childFolders.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var fi = 0; fi < childFolders.length; fi++) {
+      html += renderFolderSection(childFolders[fi]);
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  /** Render a single link item. */
+  function renderLinkItem(node) {
+    var html = '<div class="link-item" data-id="' + esc(node.id) + '">';
+
+    html += '<div class="link-row" data-action="open" data-id="' + esc(node.id) + '">';
+    html += '  <span class="link-icon">' + ICONS.globe + '</span>';
+    html += '  <div class="link-content">';
+    html += '    <div class="link-label">' + esc(node.label) + '</div>';
+    html += '    <div class="link-meta">';
+
+    // Tags
+    if (node.tags && node.tags.length > 0) {
+      html += '<span class="link-tags">';
+      for (var ti = 0; ti < node.tags.length; ti++) {
+        var tag   = node.tags[ti];
+        var def   = tagMap[tag];
+        var color = def ? def.color : '#8b8fa3';
+        html += '<span class="link-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+      }
+      html += '</span>';
+    }
+
+    // URL (truncated for display)
+    if (node.url) {
+      html += '<span class="link-url" title="' + esc(node.url) + '">' + esc(node.url) + '</span>';
+    }
+
+    html += '    </div>';  // .link-meta
+    html += '  </div>';    // .link-content
+
+    // Action buttons
+    html += '  <div class="link-actions">';
+    html += '    <button class="action-btn btn-copy" data-action="copyUrl" data-id="' + esc(node.id) + '" title="Copy URL">';
+    html += ICONS.copy;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(node.id) + '" title="Edit">';
+    html += ICONS.edit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(node.id) + '" title="Delete">';
+    html += ICONS.delete;
+    html += '    </button>';
+    html += '  </div>';    // .link-actions
+
+    html += '</div>';      // .link-row
+    html += '</div>';      // .link-item
+
+    return html;
+  }
+
+  // ── Event binding ───────────────────────────────────────
+
+  function bindEvents() {
+    // Folder toggle (click on section header — but not on action buttons)
+    document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.action-btn')) { return; }
+        var id = el.getAttribute('data-toggle-folder');
+        collapsedFolders[id] = !collapsedFolders[id];
+        render();
+      });
+    });
+
+    // Link click → open in browser
+    document.querySelectorAll('.link-row[data-action="open"]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.action-btn')) { return; }
+        var id = el.getAttribute('data-id');
+        vscode.postMessage({ type: 'open', id: id });
+      });
+    });
+
+    // Action buttons
+    document.querySelectorAll('[data-action]').forEach(function(el) {
+      if (el.classList.contains('link-row')) { return; } // skip the row itself
+      el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var action = el.getAttribute('data-action');
+        var id     = el.getAttribute('data-id');
+        vscode.postMessage({ type: action, id: id });
+      });
+    });
+  }
+
+  // ── Search input ────────────────────────────────────────
+  searchEl.addEventListener('input', function() {
+    query = searchEl.value.trim();
+    render();
+  });
+
+  // ── Add buttons ─────────────────────────────────────────
+  document.getElementById('btn-add').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addLink' });
+  });
+  document.getElementById('btn-add-folder').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addFolder' });
+  });
+
+  // ── Message handling from extension host ────────────────
+  window.addEventListener('message', function(e) {
+    var msg = e.data;
+    if (msg.type === 'updateData') {
+      root   = msg.root   || [];
+      tagMap = msg.tagMap  || {};
+      render();
+    }
+  });
+
+  // ── Request initial data ────────────────────────────────
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

@@ -32,6 +32,7 @@ function buildWebviewAssets() {
         { name: 'todo-list' },
         { name: 'command-list' },
         { name: 'note-list' },
+        { name: 'link-list' },
     ];
 
     for (const wv of webviews) {
