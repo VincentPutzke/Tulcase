@@ -89,6 +89,9 @@ export class TodoListViewProvider implements vscode.WebviewViewProvider {
             case 'edit':
                 if (msg.id) { await this._editTodo(msg.id); }
                 break;
+            case 'delete':
+                if (msg.id) { await this._deleteTodo(msg.id); }
+                break;
             case 'addTodo':
                 await this._addTodo();
                 break;
@@ -143,6 +146,21 @@ export class TodoListViewProvider implements vscode.WebviewViewProvider {
         const item = data.items.find(i => i.id === id);
         if (!item) { return; }
         item.date = addDays(item.date, 1);
+        await store.write(this.settings.todosFile, data);
+        await this._sendData();
+    }
+
+    private async _deleteTodo(id: string): Promise<void> {
+        const data = await store.read<TodoStore>(this.settings.todosFile, { items: [] });
+        const item = data.items.find(i => i.id === id);
+        if (!item) { return; }
+
+        const confirm = await vscode.window.showWarningMessage(
+            `Delete "${item.note}"?`, { modal: true }, 'Delete',
+        );
+        if (confirm !== 'Delete') { return; }
+
+        data.items = data.items.filter(i => i.id !== id);
         await store.write(this.settings.todosFile, data);
         await this._sendData();
     }
