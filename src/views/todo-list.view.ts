@@ -5,7 +5,7 @@ import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
 import { todayStr, tomorrowStr, addDays, formatDate } from '../data/time-utils';
 import { generateId } from '../utils/id';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { TodoItem, TodoStore } from '../models/todo.model';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
@@ -24,12 +24,12 @@ const store = new JsonStore();
  * Styles live in src/views/todo-list.scss (compiled to out/todo-list.css).
  */
 export class TodoListViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'arbeitsplatz.todos';
+    public static readonly viewType = 'tulcase.todos';
 
     private _view?: vscode.WebviewView;
 
     constructor(
-        private readonly settings: ArbeitsplatzSettings,
+        private readonly settings: TulcaseSettings,
         private readonly tagTree: TagTreeProvider,
     ) {}
 

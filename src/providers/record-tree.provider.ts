@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { minutesToHHMM } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { RecordDb, RecordEntry } from '../models/record.model';
 
 type RecordTreeNode = RecordYearItem | RecordMonthItem;
@@ -44,7 +44,7 @@ export class RecordTreeProvider implements vscode.TreeDataProvider<RecordTreeNod
     private _onDidChangeTreeData = new vscode.EventEmitter<RecordTreeNode | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    constructor(private settings: ArbeitsplatzSettings) {}
+    constructor(private settings: TulcaseSettings) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);

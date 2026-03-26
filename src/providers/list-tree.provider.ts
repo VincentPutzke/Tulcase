@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { ListStore, MiniList, ListItem } from '../models/list.model';
 
 type ListTreeNode = ListParentItem | ListChildItem;
@@ -39,7 +39,7 @@ export class ListTreeProvider implements vscode.TreeDataProvider<ListTreeNode> {
 
     private store = new JsonStore();
 
-    constructor(private settings: ArbeitsplatzSettings) {}
+    constructor(private settings: TulcaseSettings) {}
 
     refresh(): void {
         this._onDidChangeTreeData.fire(undefined);

@@ -60,7 +60,7 @@ export function activate(context: vscode.ExtensionContext): void {
             todoList,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
-        vscode.window.registerTreeDataProvider('arbeitsplatz.tags', tagTree),
+        vscode.window.registerTreeDataProvider('tulcase.tags', tagTree),
         vscode.window.registerWebviewViewProvider(
             CommandListViewProvider.viewType,
             commandList,
@@ -109,8 +109,8 @@ export function activate(context: vscode.ExtensionContext): void {
     registerRecordCommands(context, settings, recordCalendar);
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.refresh', refreshAll),
-        vscode.commands.registerCommand('arbeitsplatz.openDashboard', () => {
+        vscode.commands.registerCommand('tulcase.refresh', refreshAll),
+        vscode.commands.registerCommand('tulcase.openDashboard', () => {
             vscode.window.showInformationMessage('Dashboard webview coming in Phase 3!');
         }),
     );
@@ -162,7 +162,7 @@ export function activate(context: vscode.ExtensionContext): void {
         console.warn('Recurring sync failed:', err);
     });
 
-    console.log('Arbeitsplatz extension activated. Data directory:', settings.baseDir);
+    console.log('Tulcase extension activated. Data directory:', settings.baseDir);
 }
 
 export function deactivate(): void {

@@ -21,19 +21,19 @@ import { JsonStore } from '../data/json-store';
 import { findNode, removeNode } from '../data/link-tree';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { LinkNode, LinkStore } from '../models/link.model';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
 const store = new JsonStore();
 
 export class LinkListViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'arbeitsplatz.links';
+    public static readonly viewType = 'tulcase.links';
 
     private _view?: vscode.WebviewView;
 
     constructor(
-        private readonly settings: ArbeitsplatzSettings,
+        private readonly settings: TulcaseSettings,
         private readonly tagTree: TagTreeProvider,
     ) {}
 
@@ -59,7 +59,7 @@ export class LinkListViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    /** Public entry-point for the palette command `arbeitsplatz.link.add`. */
+    /** Public entry-point for the palette command `tulcase.link.add`. */
     addLinkFromPalette(): void {
         void this._addLink();
     }

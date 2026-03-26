@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { parseTimeToMinutes, todayStr, minutesToHHMM } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { RecordDb, RecordEntry } from '../models/record.model';
 import type { RecordCalendarViewProvider } from '../views/record-calendar.view';
 
@@ -16,12 +16,12 @@ const store = new JsonStore();
  */
 export function registerRecordCommands(
     context: vscode.ExtensionContext,
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     recordCalendar: RecordCalendarViewProvider,
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand(
-            'arbeitsplatz.record.add',
+            'tulcase.record.add',
             () => addRecord(settings, recordCalendar),
         ),
     );
@@ -32,7 +32,7 @@ export function registerRecordCommands(
  * The calendar view refreshes automatically after the write.
  */
 async function addRecord(
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     recordCalendar: RecordCalendarViewProvider,
 ): Promise<void> {
     const dateStr = await vscode.window.showInputBox({

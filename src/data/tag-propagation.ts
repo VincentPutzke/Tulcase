@@ -1,4 +1,4 @@
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import { JsonStore } from './json-store';
 import type { TodoStore } from '../models/todo.model';
 import type { RecurringStore } from '../models/recurring.model';
@@ -11,14 +11,14 @@ const store = new JsonStore();
 /**
  * Remove a tag from every entity that references it across all stores.
  */
-export async function stripTagFromAll(tagName: string, settings: ArbeitsplatzSettings): Promise<void> {
+export async function stripTagFromAll(tagName: string, settings: TulcaseSettings): Promise<void> {
     await applyToAllStores(runStrip, tagName, undefined, settings);
 }
 
 /**
  * Rename a tag across every entity store.
  */
-export async function renameTagInAll(oldName: string, newName: string, settings: ArbeitsplatzSettings): Promise<void> {
+export async function renameTagInAll(oldName: string, newName: string, settings: TulcaseSettings): Promise<void> {
     await applyToAllStores(runRename, oldName, newName, settings);
 }
 
@@ -38,7 +38,7 @@ async function applyToAllStores(
     fn: TagTransform,
     tagName: string,
     newName: string | undefined,
-    settings: ArbeitsplatzSettings
+    settings: TulcaseSettings
 ): Promise<void> {
     // Todos
     const todosData = await store.read<TodoStore>(settings.todosFile, { items: [] });

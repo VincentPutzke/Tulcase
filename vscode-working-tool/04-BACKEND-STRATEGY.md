@@ -29,25 +29,25 @@ Without protection, two concurrent writes will cause last-write-wins data loss.
 ## 2. Data Directory Location
 
 ### Current State
-Set via `ARBEITSPLATZ_BASE_DIR` env var, defaulting to the project root.
+Set via `TULCASE_BASE_DIR` env var, defaulting to the project root.
 
 ### Target State (Extension)
 A system-wide user-space directory that all clients share:
 
 | Platform | Default Path |
 |----------|-------------|
-| Windows  | `%APPDATA%\arbeitsplatz\` |
-| macOS    | `~/Library/Application Support/arbeitsplatz/` |
-| Linux    | `~/.local/share/arbeitsplatz/` |
+| Windows  | `%APPDATA%\tulcase\` |
+| macOS    | `~/Library/Application Support/tulcase/` |
+| Linux    | `~/.local/share/tulcase/` |
 
-Configurable via `arbeitsplatz.dataDirectory` in VS Code settings.
+Configurable via `tulcase.dataDirectory` in VS Code settings.
 
 ### Migration Path
 
 1. **Phase 1 (Prototype)**: The extension uses whatever directory the user points it at.
    If they point it at the existing project root, it shares data with the web app instantly.
 2. **Phase 2 (User-space)**: Default to the platform-specific user directory. Provide a
-   one-time migration command: `Arbeitsplatz: Migrate Data to User Directory` that
+   one-time migration command: `Tulcase: Migrate Data to User Directory` that
    copies `*_db/` + `notes/` to the new location.
 3. **Phase 3 (Python server config)**: Update the Python server to also default to the
    user-space directory (or read the same VS Code setting via a shared config file).
@@ -173,7 +173,7 @@ class DataFileWatcher implements vscode.Disposable {
     readonly onListsChanged = new vscode.EventEmitter<void>();
     readonly onRecordsChanged = new vscode.EventEmitter<void>();
 
-    constructor(private settings: ArbeitsplatzSettings) {
+    constructor(private settings: TulcaseSettings) {
         this.watchAll();
     }
 
@@ -204,15 +204,15 @@ To keep the Python server and VS Code extension in sync on the data directory, i
 a shared config file:
 
 ```
-~/.arbeitsplatz/config.json
+~/.tulcase/config.json
 {
-    "dataDirectory": "~/.arbeitsplatz",
+    "dataDirectory": "~/.tulcase",
     "version": "1.0.0"
 }
 ```
 
 Both clients read this file on startup. The VS Code extension writes it when the user
-changes the setting; the Python server reads it as a fallback when `ARBEITSPLATZ_BASE_DIR`
+changes the setting; the Python server reads it as a fallback when `TULCASE_BASE_DIR`
 is not set.
 
 ---

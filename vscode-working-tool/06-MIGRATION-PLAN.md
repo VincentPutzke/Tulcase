@@ -36,11 +36,11 @@ build/test/lint/debug toolchain working.
 | 0.5 | Set up Vitest for unit tests (non-VS Code) and `@vscode/test-electron` for integration | `npm test` works |
 | 0.6 | Create `extension.ts` with `activate()` / `deactivate()` stubs | Extension loads in dev host |
 | 0.7 | Create `config.ts` mirroring Python's `Settings` dataclass | Settings resolved on activation |
-| 0.8 | Add `arbeitsplatz.dataDirectory` configuration setting | Configurable via Settings UI |
+| 0.8 | Add `tulcase.dataDirectory` configuration setting | Configurable via Settings UI |
 
 ### Deliverable
 - Extension loads in Extension Development Host.
-- A single command ("Arbeitsplatz: Hello") appears in Command Palette.
+- A single command ("Tulcase: Hello") appears in Command Palette.
 - Build, lint, and test passes.
 
 ---
@@ -141,7 +141,7 @@ Complex views that require HTML rendering, plus overall UI polish.
 
 ```typescript
 // Shared pattern for all webview panels
-abstract class ArbeitsplatzWebview {
+abstract class TulcaseWebview {
     protected panel: vscode.WebviewPanel;
     protected disposables: vscode.Disposable[] = [];
 
@@ -237,7 +237,7 @@ Detailed line-count estimates for porting Python logic to TypeScript:
 Your workspace is on OneDrive. This introduces:
 - **Sync conflicts**: OneDrive may create `-conflict` copies of JSON files.
 - **Lock file issues**: `.lock` directories may not work reliably on cloud-synced storage.
-- **Recommendation**: Store the working data in a local path (e.g., `C:\Users\{user}\.arbeitsplatz`)
+- **Recommendation**: Store the working data in a local path (e.g., `C:\Users\{user}\.tulcase`)
   and let OneDrive sync the project source code only. Add data directories to `.gitignore` and
   OneDrive selective sync exclusions.
 

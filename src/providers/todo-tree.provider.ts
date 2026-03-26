@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { todayStr, tomorrowStr, formatDisplayDate, parseDate } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { TodoItem, TodoStore } from '../models/todo.model';
 import type { TagDef } from '../models/tag.model';
 import type { TagTreeProvider } from './tag-tree.provider';
@@ -54,7 +54,7 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoTreeNode> {
     private showDone = false;
 
     constructor(
-        private settings: ArbeitsplatzSettings,
+        private settings: TulcaseSettings,
         private tagTree?: TagTreeProvider,
     ) {}
 

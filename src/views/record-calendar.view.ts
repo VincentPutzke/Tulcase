@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { parseTimeToMinutes, minutesToHHMM } from '../data/time-utils';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { RecordDb } from '../models/record.model';
 
 const store = new JsonStore();
@@ -21,13 +21,13 @@ const store = new JsonStore();
  * Both are loaded from disk at runtime (out/ directory, next to extension.js).
  */
 export class RecordCalendarViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'arbeitsplatz.records';
+    public static readonly viewType = 'tulcase.records';
 
     private _currentYear : number;
     private _currentMonth: number;
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly settings: ArbeitsplatzSettings) {
+    constructor(private readonly settings: TulcaseSettings) {
         const now = new Date();
         this._currentYear  = now.getFullYear();
         this._currentMonth = now.getMonth() + 1;

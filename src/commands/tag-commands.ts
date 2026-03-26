@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { stripTagFromAll, renameTagInAll } from '../data/tag-propagation';
 import { DEFAULT_TAG_COLOR, DEFAULT_TAG_CATEGORY } from '../models/tag.model';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { TagStore } from '../models/tag.model';
 import type { TagTreeProvider, TagTreeItem } from '../providers/tag-tree.provider';
 
@@ -30,20 +30,20 @@ const TAG_COLORS = [
 
 export function registerTagCommands(
     context: vscode.ExtensionContext,
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     tagTree: TagTreeProvider,
     refreshAll: () => void
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.tag.add', () => addTag(settings, tagTree)),
-        vscode.commands.registerCommand('arbeitsplatz.tag.rename', (item: TagTreeItem) => renameTag(settings, tagTree, item, refreshAll)),
-        vscode.commands.registerCommand('arbeitsplatz.tag.changeColor', (item: TagTreeItem) => changeColor(settings, tagTree, item)),
-        vscode.commands.registerCommand('arbeitsplatz.tag.changeCategory', (item: TagTreeItem) => changeCategory(settings, tagTree, item)),
-        vscode.commands.registerCommand('arbeitsplatz.tag.delete', (item: TagTreeItem) => deleteTag(settings, tagTree, item, refreshAll)),
+        vscode.commands.registerCommand('tulcase.tag.add', () => addTag(settings, tagTree)),
+        vscode.commands.registerCommand('tulcase.tag.rename', (item: TagTreeItem) => renameTag(settings, tagTree, item, refreshAll)),
+        vscode.commands.registerCommand('tulcase.tag.changeColor', (item: TagTreeItem) => changeColor(settings, tagTree, item)),
+        vscode.commands.registerCommand('tulcase.tag.changeCategory', (item: TagTreeItem) => changeCategory(settings, tagTree, item)),
+        vscode.commands.registerCommand('tulcase.tag.delete', (item: TagTreeItem) => deleteTag(settings, tagTree, item, refreshAll)),
     );
 }
 
-async function addTag(settings: ArbeitsplatzSettings, tagTree: TagTreeProvider): Promise<void> {
+async function addTag(settings: TulcaseSettings, tagTree: TagTreeProvider): Promise<void> {
     const name = await vscode.window.showInputBox({ prompt: 'Tag name (e.g., #work)', placeHolder: '#mytag' });
     if (!name) { return; }
 
@@ -67,7 +67,7 @@ async function addTag(settings: ArbeitsplatzSettings, tagTree: TagTreeProvider):
 }
 
 async function renameTag(
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     tagTree: TagTreeProvider,
     item: TagTreeItem,
     refreshAll: () => void
@@ -95,7 +95,7 @@ async function renameTag(
     vscode.window.showInformationMessage(`Tag renamed: ${item.tagName} → ${tagName}`);
 }
 
-async function changeColor(settings: ArbeitsplatzSettings, tagTree: TagTreeProvider, item: TagTreeItem): Promise<void> {
+async function changeColor(settings: TulcaseSettings, tagTree: TagTreeProvider, item: TagTreeItem): Promise<void> {
     const colorChoice = await vscode.window.showQuickPick(
         TAG_COLORS.map(c => ({ label: `$(circle-filled) ${c.label}`, value: c.value, description: c.value })),
         { placeHolder: `Pick a new color for ${item.tagName}` }
@@ -111,7 +111,7 @@ async function changeColor(settings: ArbeitsplatzSettings, tagTree: TagTreeProvi
 }
 
 async function deleteTag(
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     tagTree: TagTreeProvider,
     item: TagTreeItem,
     refreshAll: () => void
@@ -135,7 +135,7 @@ async function deleteTag(
 }
 
 async function changeCategory(
-    settings: ArbeitsplatzSettings,
+    settings: TulcaseSettings,
     tagTree: TagTreeProvider,
     item: TagTreeItem,
 ): Promise<void> {
@@ -154,7 +154,7 @@ async function changeCategory(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Collect all distinct categories currently in use. */
-async function getExistingCategories(settings: ArbeitsplatzSettings): Promise<string[]> {
+async function getExistingCategories(settings: TulcaseSettings): Promise<string[]> {
     const data = await store.read<TagStore>(settings.tagsFile, { tags: {} });
     const cats = new Set<string>();
     for (const def of Object.values(data.tags)) {

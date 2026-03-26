@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { CommandListViewProvider } from '../views/command-list.view';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
@@ -11,14 +11,14 @@ import type { TagTreeProvider } from '../providers/tag-tree.provider';
  */
 export function registerCommandCommands(
     context: vscode.ExtensionContext,
-    _settings: ArbeitsplatzSettings,
+    _settings: TulcaseSettings,
     _commandList: CommandListViewProvider,
     _tagTree: TagTreeProvider,
 ): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('arbeitsplatz.command.add', () => {
+        vscode.commands.registerCommand('tulcase.command.add', () => {
             // Trigger add flow in the webview provider
-            vscode.commands.executeCommand('arbeitsplatz.commands.focus');
+            vscode.commands.executeCommand('tulcase.commands.focus');
         }),
     );
 }

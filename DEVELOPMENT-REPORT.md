@@ -1,8 +1,8 @@
-# Arbeitsplatz VS Code Extension — Development Report
+# Tulcase VS Code Extension — Development Report
 
 ## Summary
 
-The **vscode-tulcase** extension (display name: "Arbeitsplatz") has been scaffolded, implemented, built, and unit-tested. It replicates the core functionality of the existing Angular + Python web app as a native VS Code extension using tree views, commands, and direct JSON file I/O.
+The **vscode-tulcase** extension (display name: "Tulcase") has been scaffolded, implemented, built, and unit-tested. It replicates the core functionality of the existing Angular + Python web app as a native VS Code extension using tree views, commands, and direct JSON file I/O.
 
 ---
 
@@ -10,7 +10,7 @@ The **vscode-tulcase** extension (display name: "Arbeitsplatz") has been scaffol
 
 ### 1. Planning & Analysis
 - Read all 10 planning documents (`01-PROJECT-OVERVIEW` through `10-SUMMARY`)
-- Analyzed the existing Arbeitsplatz Python backend — config, services (todos, tags, links, commands, lists, records, recurring), and models
+- Analyzed the existing Tulcase Python backend — config, services (todos, tags, links, commands, lists, records, recurring), and models
 - Created a phased development plan
 
 ### 2. Scaffolding
@@ -44,7 +44,7 @@ All models ported from Python Pydantic to TypeScript interfaces:
 - `recurring-sync.ts` — Idempotent recurring todo generation (daily/weekly/monthly)
 
 ### 5. Infrastructure
-- `config.ts` — `ArbeitsplatzSettings` interface, `buildSettings()` with platform-specific defaults
+- `config.ts` — `TulcaseSettings` interface, `buildSettings()` with platform-specific defaults
 - `watchers/file-watcher.ts` — `DataFileWatcher` using `vscode.workspace.createFileSystemWatcher`, domain-specific event emitters, 100ms debounce, self-write filtering
 - `utils/id.ts` — `generateId(prefix)` → `prefix_timestamp_random`
 
@@ -106,21 +106,21 @@ npm test
 ```
 
 ### Launch in VS Code
-Press **F5** with the Tulcase folder active, or use the **"Run Extension"** debug configuration. This opens a new Extension Development Host window with the Arbeitsplatz sidebar visible.
+Press **F5** with the Tulcase folder active, or use the **"Run Extension"** debug configuration. This opens a new Extension Development Host window with the Tulcase sidebar visible.
 
 ### Data Directory
 By default, the extension stores data in:
-- **Windows**: `%APPDATA%\arbeitsplatz\`
-- **macOS**: `~/Library/Application Support/arbeitsplatz/`
-- **Linux**: `~/.local/share/arbeitsplatz/`
+- **Windows**: `%APPDATA%\tulcase\`
+- **macOS**: `~/Library/Application Support/tulcase/`
+- **Linux**: `~/.local/share/tulcase/`
 
-Override via setting: `arbeitsplatz.dataDirectory`
+Override via setting: `tulcase.dataDirectory`
 
 ---
 
 ## Open Questions for You
 
-1. **Data directory**: Should the extension default to the same directory as the existing Arbeitsplatz web app? Currently the Python backend uses `*_db/` folders relative to the project root. The extension uses a platform-specific user directory. Do you want them to share the same data?
+1. **Data directory**: Should the extension default to the same directory as the existing Tulcase web app? Currently the Python backend uses `*_db/` folders relative to the project root. The extension uses a platform-specific user directory. Do you want them to share the same data?
 
 2. **Tag color presets**: I defined 10 preset colors in the tag color picker. Do you want these to match the exact colors from the Angular frontend?
 
@@ -134,7 +134,7 @@ Override via setting: `arbeitsplatz.dataDirectory`
 
 7. **Publishing**: The `publisher` field is set to `"codewerk"`. Is this the correct VS Code Marketplace publisher name? Do you plan to publish publicly or use it privately?
 
-8. **Import from web app**: Should there be a one-time import command that reads data from the existing Arbeitsplatz web app's `*_db/` directories and copies it to the extension's data directory?
+8. **Import from web app**: Should there be a one-time import command that reads data from the existing Tulcase web app's `*_db/` directories and copies it to the extension's data directory?
 
 ---
 

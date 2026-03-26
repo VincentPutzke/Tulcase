@@ -1,6 +1,6 @@
 # 03 — VS Code Extension Architecture
 
-> Target architecture for the Arbeitsplatz VS Code extension. Describes the internal
+> Target architecture for the Tulcase VS Code extension. Describes the internal
 > structure, module boundaries, data flow, and technology choices.
 
 ---
@@ -31,7 +31,7 @@
                     ┌──────────────────┐               │
                     │  JSON Files      │               │
                     │  on Disk         │◄──────────────┘
-                    │  (~/.arbeitsplatz│   (webview postMessage
+                    │  (~/.tulcase│   (webview postMessage
                     │   or custom dir) │    → extension host
                     └──────────────────┘    → file write)
 ```
@@ -172,8 +172,8 @@ export function deactivate() {
 Mirrors `backend/app/config.py`:
 
 ```typescript
-interface ArbeitsplatzSettings {
-    baseDir: string;         // default: ~/.arbeitsplatz (or custom)
+interface TulcaseSettings {
+    baseDir: string;         // default: ~/.tulcase (or custom)
     todosFile: string;       // {baseDir}/todo_db/todos.json
     tagsFile: string;        // {baseDir}/tags_db/tags.json
     recurringFile: string;   // {baseDir}/todo_db/recurring.json
@@ -185,8 +185,8 @@ interface ArbeitsplatzSettings {
 }
 ```
 
-The `baseDir` is configurable via VS Code settings (`arbeitsplatz.dataDirectory`).
-Default: `~/.arbeitsplatz` on all platforms.
+The `baseDir` is configurable via VS Code settings (`tulcase.dataDirectory`).
+Default: `~/.tulcase` on all platforms.
 
 ### 4.3 `data/json-store.ts` — Storage
 
@@ -224,12 +224,12 @@ tree in the VS Code sidebar.
 
 | Provider | Tree View ID | Node Types |
 |---------:|:------------|:-----------|
-| `TodoTreeProvider` | `arbeitsplatz.todos` | DateGroup → TodoItem |
-| `CommandTreeProvider` | `arbeitsplatz.commands` | CommandItem (flat list) |
-| `LinkTreeProvider` | `arbeitsplatz.links` | LinkFolder → LinkItem (recursive) |
-| `ListTreeProvider` | `arbeitsplatz.lists` | MiniList → ListItem |
-| `TagTreeProvider` | `arbeitsplatz.tags` | CategoryGroup → Tag |
-| `RecordTreeProvider` | `arbeitsplatz.records` | Year → Month (navigation) |
+| `TodoTreeProvider` | `tulcase.todos` | DateGroup → TodoItem |
+| `CommandTreeProvider` | `tulcase.commands` | CommandItem (flat list) |
+| `LinkTreeProvider` | `tulcase.links` | LinkFolder → LinkItem (recursive) |
+| `ListTreeProvider` | `tulcase.lists` | MiniList → ListItem |
+| `TagTreeProvider` | `tulcase.tags` | CategoryGroup → Tag |
+| `RecordTreeProvider` | `tulcase.records` | Year → Month (navigation) |
 
 ### 4.6 Webview Panels
 
@@ -257,31 +257,31 @@ Webview (HTML)            Extension Host (TS)
 All user-facing actions are registered as VS Code commands:
 
 ```
-arbeitsplatz.todo.add
-arbeitsplatz.todo.markDone
-arbeitsplatz.todo.reschedule
-arbeitsplatz.todo.moveToNextDay
-arbeitsplatz.todo.delete
-arbeitsplatz.todo.edit
-arbeitsplatz.tag.add
-arbeitsplatz.tag.rename
-arbeitsplatz.tag.delete
-arbeitsplatz.command.add
-arbeitsplatz.command.copy
-arbeitsplatz.command.delete
-arbeitsplatz.link.addLink
-arbeitsplatz.link.addFolder
-arbeitsplatz.link.move
-arbeitsplatz.link.delete
-arbeitsplatz.list.add
-arbeitsplatz.list.addItem
-arbeitsplatz.list.toggleItem
-arbeitsplatz.list.delete
-arbeitsplatz.record.add
-arbeitsplatz.record.navigateMonth
-arbeitsplatz.openDashboard
-arbeitsplatz.openSettings
-arbeitsplatz.refresh
+tulcase.todo.add
+tulcase.todo.markDone
+tulcase.todo.reschedule
+tulcase.todo.moveToNextDay
+tulcase.todo.delete
+tulcase.todo.edit
+tulcase.tag.add
+tulcase.tag.rename
+tulcase.tag.delete
+tulcase.command.add
+tulcase.command.copy
+tulcase.command.delete
+tulcase.link.addLink
+tulcase.link.addFolder
+tulcase.link.move
+tulcase.link.delete
+tulcase.list.add
+tulcase.list.addItem
+tulcase.list.toggleItem
+tulcase.list.delete
+tulcase.record.add
+tulcase.record.navigateMonth
+tulcase.openDashboard
+tulcase.openSettings
+tulcase.refresh
 ```
 
 ---
@@ -293,53 +293,53 @@ arbeitsplatz.refresh
   "contributes": {
     "viewsContainers": {
       "activitybar": [{
-        "id": "arbeitsplatz",
-        "title": "Arbeitsplatz",
+        "id": "tulcase",
+        "title": "Tulcase",
         "icon": "media/icon.svg"
       }]
     },
     "views": {
-      "arbeitsplatz": [
-        { "id": "arbeitsplatz.todos",    "name": "TODOs" },
-        { "id": "arbeitsplatz.commands", "name": "Commands" },
-        { "id": "arbeitsplatz.links",    "name": "Links" },
-        { "id": "arbeitsplatz.lists",    "name": "Lists" },
-        { "id": "arbeitsplatz.tags",     "name": "Tags" },
-        { "id": "arbeitsplatz.records",  "name": "Records" }
+      "tulcase": [
+        { "id": "tulcase.todos",    "name": "TODOs" },
+        { "id": "tulcase.commands", "name": "Commands" },
+        { "id": "tulcase.links",    "name": "Links" },
+        { "id": "tulcase.lists",    "name": "Lists" },
+        { "id": "tulcase.tags",     "name": "Tags" },
+        { "id": "tulcase.records",  "name": "Records" }
       ]
     },
     "commands": [
-      { "command": "arbeitsplatz.todo.add",       "title": "Add Todo",        "icon": "$(add)",   "category": "Arbeitsplatz" },
-      { "command": "arbeitsplatz.todo.markDone",   "title": "Mark Done",       "icon": "$(check)", "category": "Arbeitsplatz" },
-      { "command": "arbeitsplatz.command.add",     "title": "Add Command",     "icon": "$(add)",   "category": "Arbeitsplatz" },
-      { "command": "arbeitsplatz.command.copy",    "title": "Copy Command",    "icon": "$(copy)",  "category": "Arbeitsplatz" },
-      { "command": "arbeitsplatz.link.addLink",    "title": "Add Bookmark",    "icon": "$(add)",   "category": "Arbeitsplatz" },
-      { "command": "arbeitsplatz.openDashboard",   "title": "Open Dashboard",  "icon": "$(home)",  "category": "Arbeitsplatz" },
-      { "command": "arbeitsplatz.refresh",         "title": "Refresh All",     "icon": "$(refresh)","category": "Arbeitsplatz" }
+      { "command": "tulcase.todo.add",       "title": "Add Todo",        "icon": "$(add)",   "category": "Tulcase" },
+      { "command": "tulcase.todo.markDone",   "title": "Mark Done",       "icon": "$(check)", "category": "Tulcase" },
+      { "command": "tulcase.command.add",     "title": "Add Command",     "icon": "$(add)",   "category": "Tulcase" },
+      { "command": "tulcase.command.copy",    "title": "Copy Command",    "icon": "$(copy)",  "category": "Tulcase" },
+      { "command": "tulcase.link.addLink",    "title": "Add Bookmark",    "icon": "$(add)",   "category": "Tulcase" },
+      { "command": "tulcase.openDashboard",   "title": "Open Dashboard",  "icon": "$(home)",  "category": "Tulcase" },
+      { "command": "tulcase.refresh",         "title": "Refresh All",     "icon": "$(refresh)","category": "Tulcase" }
     ],
     "menus": {
       "view/title": [
-        { "command": "arbeitsplatz.todo.add",     "when": "view == arbeitsplatz.todos",    "group": "navigation" },
-        { "command": "arbeitsplatz.command.add",   "when": "view == arbeitsplatz.commands", "group": "navigation" },
-        { "command": "arbeitsplatz.link.addLink",  "when": "view == arbeitsplatz.links",    "group": "navigation" }
+        { "command": "tulcase.todo.add",     "when": "view == tulcase.todos",    "group": "navigation" },
+        { "command": "tulcase.command.add",   "when": "view == tulcase.commands", "group": "navigation" },
+        { "command": "tulcase.link.addLink",  "when": "view == tulcase.links",    "group": "navigation" }
       ],
       "view/item/context": [
-        { "command": "arbeitsplatz.todo.markDone",      "when": "viewItem == todoItem",     "group": "inline" },
-        { "command": "arbeitsplatz.todo.moveToNextDay",  "when": "viewItem == todoItem",     "group": "1_actions" },
-        { "command": "arbeitsplatz.todo.delete",         "when": "viewItem == todoItem",     "group": "2_danger" },
-        { "command": "arbeitsplatz.command.copy",        "when": "viewItem == commandItem",  "group": "inline" },
-        { "command": "arbeitsplatz.command.delete",      "when": "viewItem == commandItem",  "group": "2_danger" }
+        { "command": "tulcase.todo.markDone",      "when": "viewItem == todoItem",     "group": "inline" },
+        { "command": "tulcase.todo.moveToNextDay",  "when": "viewItem == todoItem",     "group": "1_actions" },
+        { "command": "tulcase.todo.delete",         "when": "viewItem == todoItem",     "group": "2_danger" },
+        { "command": "tulcase.command.copy",        "when": "viewItem == commandItem",  "group": "inline" },
+        { "command": "tulcase.command.delete",      "when": "viewItem == commandItem",  "group": "2_danger" }
       ]
     },
     "configuration": {
-      "title": "Arbeitsplatz",
+      "title": "Tulcase",
       "properties": {
-        "arbeitsplatz.dataDirectory": {
+        "tulcase.dataDirectory": {
           "type": "string",
           "default": "",
-          "description": "Path to the Arbeitsplatz data directory. Leave empty for default (~/.arbeitsplatz)."
+          "description": "Path to the Tulcase data directory. Leave empty for default (~/.tulcase)."
         },
-        "arbeitsplatz.showStatusBarItem": {
+        "tulcase.showStatusBarItem": {
           "type": "boolean",
           "default": true,
           "description": "Show open todo count in the status bar."
@@ -347,9 +347,9 @@ arbeitsplatz.refresh
       }
     },
     "keybindings": [
-      { "command": "arbeitsplatz.todo.add",        "key": "ctrl+shift+t", "mac": "cmd+shift+t" },
-      { "command": "arbeitsplatz.command.add",     "key": "ctrl+shift+c", "mac": "cmd+shift+c" },
-      { "command": "arbeitsplatz.openDashboard",   "key": "ctrl+shift+d", "mac": "cmd+shift+d" }
+      { "command": "tulcase.todo.add",        "key": "ctrl+shift+t", "mac": "cmd+shift+t" },
+      { "command": "tulcase.command.add",     "key": "ctrl+shift+c", "mac": "cmd+shift+c" },
+      { "command": "tulcase.openDashboard",   "key": "ctrl+shift+d", "mac": "cmd+shift+d" }
     ]
   }
 }
@@ -410,18 +410,18 @@ arbeitsplatz.refresh
 
 ```typescript
 "activationEvents": [
-    "onView:arbeitsplatz.todos",
-    "onView:arbeitsplatz.commands",
-    "onView:arbeitsplatz.links",
-    "onView:arbeitsplatz.lists",
-    "onView:arbeitsplatz.tags",
-    "onView:arbeitsplatz.records",
-    "onCommand:arbeitsplatz.todo.add",
-    "onCommand:arbeitsplatz.openDashboard"
+    "onView:tulcase.todos",
+    "onView:tulcase.commands",
+    "onView:tulcase.links",
+    "onView:tulcase.lists",
+    "onView:tulcase.tags",
+    "onView:tulcase.records",
+    "onCommand:tulcase.todo.add",
+    "onCommand:tulcase.openDashboard"
 ]
 ```
 
-The extension activates lazily — only when a user opens the Arbeitsplatz sidebar or
+The extension activates lazily — only when a user opens the Tulcase sidebar or
 invokes a command. This keeps VS Code startup fast.
 
 ---

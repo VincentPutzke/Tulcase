@@ -10,7 +10,7 @@
 
 import * as vscode from 'vscode';
 import { JsonStore } from './json-store';
-import type { ArbeitsplatzSettings } from '../config';
+import type { TulcaseSettings } from '../config';
 import type { NoteStore, NoteItem } from '../models/note.model';
 
 const store = new JsonStore();
@@ -21,7 +21,7 @@ export class NoteFileSystemProvider implements vscode.FileSystemProvider {
     private _emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
     readonly onDidChangeFile = this._emitter.event;
 
-    constructor(private readonly settings: ArbeitsplatzSettings) {}
+    constructor(private readonly settings: TulcaseSettings) {}
 
     // ── URI helpers ───────────────────────────────────────────────────────────
 

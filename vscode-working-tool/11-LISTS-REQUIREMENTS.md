@@ -11,8 +11,8 @@ code-editor experience in the main editor area.
 ## 1. Sidebar — Note Explorer (WebviewViewProvider)
 
 ### 1.1 Location & Registration
-- [ ] Move `arbeitsplatz.lists` from `arbeitsplatz-panel` (bottom panel) to
-  `arbeitsplatz` (activity-bar sidebar), placed **below Commands**
+- [ ] Move `tulcase.lists` from `tulcase-panel` (bottom panel) to
+  `tulcase` (activity-bar sidebar), placed **below Commands**
 - [ ] Change view type from plain tree to `"type": "webview"`
 - [ ] Register as `WebviewViewProvider` (same pattern as TODOs / Commands)
 
@@ -161,32 +161,32 @@ interface NoteStore {
 
 | Command ID                         | Title              | Where       |
 |------------------------------------|--------------------|-------------|
-| `arbeitsplatz.note.add`            | Add Note           | Sidebar btn |
-| `arbeitsplatz.note.addFolder`      | Add Folder         | Sidebar btn |
-| `arbeitsplatz.note.open`           | Open Note          | Sidebar click / palette |
-| `arbeitsplatz.note.editMeta`       | Edit Note Metadata | Sidebar btn |
-| `arbeitsplatz.note.delete`         | Delete Note        | Sidebar btn |
-| `arbeitsplatz.note.renameFolder`   | Rename Folder      | Sidebar btn |
-| `arbeitsplatz.note.deleteFolder`   | Delete Folder      | Sidebar btn |
+| `tulcase.note.add`            | Add Note           | Sidebar btn |
+| `tulcase.note.addFolder`      | Add Folder         | Sidebar btn |
+| `tulcase.note.open`           | Open Note          | Sidebar click / palette |
+| `tulcase.note.editMeta`       | Edit Note Metadata | Sidebar btn |
+| `tulcase.note.delete`         | Delete Note        | Sidebar btn |
+| `tulcase.note.renameFolder`   | Rename Folder      | Sidebar btn |
+| `tulcase.note.deleteFolder`   | Delete Folder      | Sidebar btn |
 
 ### 4.2 Removed Commands
-- All old `arbeitsplatz.list.*` commands (add, addItem, toggleItem, edit,
+- All old `tulcase.list.*` commands (add, addItem, toggleItem, edit,
   editItem, delete, deleteItem) — replaced by the new note commands
 
 ### 4.3 Menu Contributions
-- [ ] Remove all `arbeitsplatz.list.*` context menu entries from `view/item/context`
-- [ ] Remove `arbeitsplatz.list.add` from `view/title`
+- [ ] Remove all `tulcase.list.*` context menu entries from `view/item/context`
+- [ ] Remove `tulcase.list.add` from `view/title`
 - [ ] No tree context menus needed (sidebar is a webview with its own buttons)
 
 ---
 
 ## 5. Package.json Changes
 
-- [ ] Move `arbeitsplatz.lists` view from `arbeitsplatz-panel` to `arbeitsplatz`
-  (after `arbeitsplatz.commands`, before `arbeitsplatz.links`)
+- [ ] Move `tulcase.lists` view from `tulcase-panel` to `tulcase`
+  (after `tulcase.commands`, before `tulcase.links`)
 - [ ] Set `"type": "webview"` on the lists view
-- [ ] Register new `arbeitsplatz.note.*` commands
-- [ ] Remove old `arbeitsplatz.list.*` commands
+- [ ] Register new `tulcase.note.*` commands
+- [ ] Remove old `tulcase.list.*` commands
 - [ ] Remove old list-related `view/item/context` and `view/title` menu entries
 - [ ] Bump version to `0.6.0`
 
@@ -195,7 +195,7 @@ interface NoteStore {
 ## 6. Extension Activation Changes
 
 - [ ] Replace `ListTreeProvider` import with `NoteListViewProvider`
-- [ ] Replace `registerTreeDataProvider('arbeitsplatz.lists', ...)` with
+- [ ] Replace `registerTreeDataProvider('tulcase.lists', ...)` with
   `registerWebviewViewProvider(NoteListViewProvider.viewType, ...)`
 - [ ] Register the `aplist:` FileSystemProvider
 - [ ] Register the tag decoration provider for `aplist` documents
