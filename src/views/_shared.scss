@@ -66,13 +66,18 @@ body {
   }
 
   .controls-pane {
+    display        : flex;
+    flex-direction : column;
+    gap            : 10px;
     order      : 2;           // controls on the right
     flex       : 0 0 220px;   // fixed width
     max-width  : 260px;
     border-left: 1px solid $grid-line;
     padding-left: 12px;
-    .add-bar {
-      margin-bottom: 12px;
+
+    .add-bar,
+    .search-bar {
+      margin-bottom: 0;
     }
   }
 
@@ -144,7 +149,7 @@ body {
   top            : 0;
   z-index        : 10;
   background     : $view-bg;
-  padding-bottom : 4px;
+  padding-bottom : 0px;
 }
 
 .search-icon {

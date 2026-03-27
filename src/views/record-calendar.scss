@@ -159,10 +159,10 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
   .add-bar {
     grid-column    : 2;
     grid-row       : 1;
-    flex-direction : column;
+    // flex-direction : column;
     border-left    : 1px solid $grid-line;
     padding-left   : 12px;
-    margin-bottom  : 0;
+    // margin-bottom  : 10px;
   }
 
   // Entries pane: fills the right column below the add-bar and scrolls.
