@@ -37,11 +37,10 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
 //   override so a wide open sidebar stays in column mode.
 //
 // Landscape — 2-column grid, always active:
-//   col 1 (1fr):   cal-pane — fills full height; the calendar canvas scales
-//                   to the available space instead of scrolling
+//   col 1 (1fr):   cal-pane — fills full height, calendar does NOT overflow
 //   col 2 (220px): add-bar (top) + entries-pane (bottom, scrolls)
 //   Calendar cells drop aspect-ratio and share available height equally via
-//   grid-auto-rows:1fr so the grid always fits inside the panel.
+//   grid-auto-rows:1fr so the grid never exceeds the panel height.
 
 // Base defaults (portrait / sidebar).
 .add-bar      { flex-shrink : 0; }
