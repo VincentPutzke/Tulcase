@@ -46,7 +46,7 @@
   let tags  = [];   // { name: string, color: string, category: string }[]
   let query = '';   // current search text
 
-  /** Track which category sections the user has collapsed. Key = category name. */
+  /** Track which category sections the user has toggled open. Missing entries stay collapsed by default. */
   const collapsedCategories = {};
 
   // ── DOM refs ────────────────────────────────────────────
@@ -125,7 +125,7 @@
   }
 
   function renderCategory(category, items) {
-    var collapsed  = !!collapsedCategories[category];
+    var collapsed  = collapsedCategories[category] !== false;
     var bodyHeight = collapsed ? 'max-height:0;' : '';
 
     // Sort items alphabetically within category
@@ -172,7 +172,7 @@
     sectionsEl.querySelectorAll('[data-toggle]').forEach(function(el) {
       el.addEventListener('click', function() {
         var cat = el.getAttribute('data-toggle');
-        collapsedCategories[cat] = !collapsedCategories[cat];
+        collapsedCategories[cat] = collapsedCategories[cat] !== false ? false : true;
         render();
       });
     });
