@@ -44,6 +44,8 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
 
 // Base defaults (portrait / sidebar).
 .add-bar      { flex-shrink : 0; }
+// cal-pane height is driven by its content (calendar has an explicit min() height,
+// see portrait @container block below) — overflow:hidden clips any rounding dust.
 .cal-pane     { flex-shrink : 0; overflow : hidden; }
 .entries-pane { flex : 1 1 0; min-height : 0; overflow-y : auto; }
 
@@ -53,6 +55,36 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
 @container view-panel (orientation: portrait) {
   .layout {
     flex-direction : column;
+  }
+
+  // The calendar must never push its rows outside the visible panel.
+  //
+  // Without an explicit height the grid's height is driven by
+  //   aspect-ratio: 1  →  height = 6 rows × (panelWidth / 7)
+  // which silently overflows when the panel is shorter than wide.
+  //
+  // We cap the calendar with the SMALLER of:
+  //   a) its natural square height  — calc((available-width) × 6/7)
+  //   b) the space that actually exists below the other fixed elements
+  //      — calc(100cqh − 190px)
+  //      190 px ≈ body-padding(16) + add-bar(46) + month-nav(42)
+  //             + day-headers(18) + wrapper-margin(4) + month-summary(43)
+  //             + a small safety buffer
+  //
+  // grid-auto-rows:1fr then divides that height equally among the 6 rows,
+  // so all days are always visible.  aspect-ratio:auto lets cells conform
+  // to the row height instead of forcing squares when height is the
+  // limiting dimension.
+  .calendar {
+    height         : min(
+      calc((100cqw - 20px) * 6 / 7),
+      calc(100cqh - 190px)
+    );
+    grid-auto-rows : 1fr;
+  }
+
+  .day {
+    aspect-ratio : auto;
   }
 }
 
