@@ -14,16 +14,17 @@
 
 <div class="layout">
 
-<!-- ── Controls pane ────────────────────────────────────── -->
-<div class="controls-pane">
-  <div class="add-bar">
-    <button class="add-btn" id="btn-add">+ Log Time</button>
-    <button class="add-btn add-btn-secondary" id="btn-add-other">+ Another Day</button>
-  </div>
+<!-- ── Add bar ───────────────────────────────────────────────
+     Narrow (sidebar): sits above the calendar, full width.
+     Wide (panel):     moves to the top of the detail column
+     (right side), above the entries list.                  -->
+<div class="add-bar">
+  <button class="add-btn" id="btn-add">+ Log Time</button>
+  <button class="add-btn add-btn-secondary" id="btn-add-other">+ Another Day</button>
 </div>
 
-<!-- ── Tree pane ────────────────────────────────────────── -->
-<div class="tree-pane" id="main-content">
+<!-- ── Calendar pane ──────────────────────────────────────── -->
+<div class="cal-pane">
 
   <!-- Month navigation -->
   <div class="month-nav">
@@ -32,19 +33,19 @@
     <button class="nav-btn" id="next">&#8250;</button>
   </div>
 
-  <!-- Calendar wrapper (headers + grid) -->
+  <!-- Calendar wrapper (day-headers + grid) -->
   <div class="cal-wrapper">
     <div class="day-headers" id="day-headers"></div>
     <div class="calendar" id="calendar"></div>
   </div>
 
-  <!-- Month summary -->
+  <!-- Month summary stats -->
   <div class="month-summary" id="month-summary"></div>
 
-  <!-- Day entries section -->
-  <div id="entries-section"></div>
-
 </div>
+
+<!-- ── Entries pane ────────────────────────────────────────── -->
+<div class="entries-pane" id="entries-section"></div>
 
 </div><!-- /.layout -->
 
