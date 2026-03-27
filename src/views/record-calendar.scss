@@ -92,7 +92,23 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
 @container view-panel (orientation: landscape) {
   .layout {
     display               : grid;
-    grid-template-columns : 1fr 220px;
+    // Column 1 (cal-pane): width is derived from the container HEIGHT — the
+    // smaller dimension in landscape — so the 7×6 calendar cells stay square.
+    //
+    //   available-grid-height = 100cqh − 120px
+    //     120px ≈ body-padding(16) + month-nav(42) + day-headers(22) + month-summary(40)
+    //
+    //   cal-pane-width = available-grid-height × 7/6
+    //     (7 columns, 6 rows → width / height = 7/6 for square cells)
+    //
+    //   clamped:
+    //     min 180px — always usable even in very short panels
+    //     max calc(100cqw − 232px) — leaves ≥ 200px for the entries column
+    //       (232px = 12px gap + 20px body-padding + 200px min-entries-content)
+    //
+    // Column 2 (entries-pane): 1fr — fills ALL remaining space.
+    // In wide panels this gives the notes section generous room to breathe.
+    grid-template-columns : clamp(180px, calc((100cqh - 120px) * 7 / 6), calc(100cqw - 232px)) 1fr;
     grid-template-rows    : auto 1fr;   // row 1: add-bar height; row 2: entries
     gap                   : 0 12px;
   }
