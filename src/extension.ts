@@ -105,14 +105,11 @@ export function activate(context: vscode.ExtensionContext): void {
     registerTagCommands(context, settings, tagTree, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);
     registerLinkCommands(context, settings, linkList);
-    registerListCommands(context, noteList, tagTree);
+    registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
-        vscode.commands.registerCommand('tulcase.openDashboard', () => {
-            vscode.window.showInformationMessage('Dashboard webview coming in Phase 3!');
-        }),
     );
 
     // 6. Status bar

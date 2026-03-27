@@ -12,6 +12,13 @@ export class TodoListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.todos';
     protected readonly viewName = 'todo-list';
 
+    // ── Public palette entry-points ───────────────────────────────────────────
+
+    /** Open the guided add-todo dialog from the command palette. */
+    public addTodoFromPalette(): void {
+        void this._handleMessage({ type: 'addTodo' });
+    }
+
     // ── Stats (used by StatusBar) ─────────────────────────────────────────────
 
     /** Get summary counts for the status bar. */

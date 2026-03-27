@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -106,12 +106,6 @@
         "category": "Tulcase"
       },
       {
-        "command": "tulcase.todo.toggleShowDone",
-        "title": "Toggle Show Done",
-        "category": "Tulcase",
-        "icon": "$(eye)"
-      },
-      {
         "command": "tulcase.tag.add",
         "title": "Add Tag",
         "category": "Tulcase",
@@ -151,22 +145,10 @@
         "icon": "$(copy)"
       },
       {
-        "command": "tulcase.command.runInTerminal",
-        "title": "Run in Terminal",
+        "command": "tulcase.command.insert",
+        "title": "Insert Command in Terminal",
         "category": "Tulcase",
         "icon": "$(terminal)"
-      },
-      {
-        "command": "tulcase.command.edit",
-        "title": "Edit Command",
-        "category": "Tulcase",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "tulcase.command.delete",
-        "title": "Delete Command",
-        "category": "Tulcase",
-        "icon": "$(trash)"
       },
       {
         "command": "tulcase.link.add",
@@ -175,10 +157,28 @@
         "icon": "$(add)"
       },
       {
+        "command": "tulcase.link.open",
+        "title": "Open Link",
+        "category": "Tulcase",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "tulcase.link.grab",
+        "title": "Grab Link URL",
+        "category": "Tulcase",
+        "icon": "$(clippy)"
+      },
+      {
         "command": "tulcase.note.add",
         "title": "Add Note",
         "category": "Tulcase",
         "icon": "$(add)"
+      },
+      {
+        "command": "tulcase.note.open",
+        "title": "Open Note",
+        "category": "Tulcase",
+        "icon": "$(go-to-file)"
       },
       {
         "command": "tulcase.record.add",
@@ -192,12 +192,12 @@
         "category": "Tulcase",
         "icon": "$(refresh)"
       },
-      {
-        "command": "tulcase.openDashboard",
-        "title": "Open Dashboard",
-        "category": "Tulcase",
-        "icon": "$(home)"
-      }
+      { "command": "tulcase.todos.focus",    "title": "Focus TODOs View",    "category": "Tulcase" },
+      { "command": "tulcase.commands.focus", "title": "Focus Commands View", "category": "Tulcase" },
+      { "command": "tulcase.lists.focus",    "title": "Focus Notes View",    "category": "Tulcase" },
+      { "command": "tulcase.links.focus",    "title": "Focus Links View",    "category": "Tulcase" },
+      { "command": "tulcase.tags.focus",     "title": "Focus Tags View",     "category": "Tulcase" },
+      { "command": "tulcase.records.focus",  "title": "Focus Records View",  "category": "Tulcase" }
     ],
     "menus": {
       "view/title": [
@@ -243,6 +243,22 @@
           "when": "view == tulcase.tags && viewItem == tagItem",
           "group": "2_delete@1"
         }
+      ],
+      "commandPalette": [
+        { "command": "tulcase.todo.quickAdd", "when": "false" },
+        { "command": "tulcase.note.add", "when": "false" },
+        { "command": "tulcase.link.add", "when": "false" },
+        { "command": "tulcase.refresh", "when": "false" },
+        { "command": "tulcase.tag.rename", "when": "false" },
+        { "command": "tulcase.tag.changeColor", "when": "false" },
+        { "command": "tulcase.tag.changeCategory", "when": "false" },
+        { "command": "tulcase.tag.delete", "when": "false" },
+        { "command": "tulcase.todos.focus", "when": "false" },
+        { "command": "tulcase.commands.focus", "when": "false" },
+        { "command": "tulcase.lists.focus", "when": "false" },
+        { "command": "tulcase.links.focus", "when": "false" },
+        { "command": "tulcase.tags.focus", "when": "false" },
+        { "command": "tulcase.records.focus", "when": "false" }
       ]
     },
     "keybindings": [
@@ -250,11 +266,6 @@
         "command": "tulcase.todo.quickAdd",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t"
-      },
-      {
-        "command": "tulcase.openDashboard",
-        "key": "ctrl+shift+d",
-        "mac": "cmd+shift+d"
       }
     ]
   },

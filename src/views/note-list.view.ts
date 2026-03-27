@@ -26,6 +26,13 @@ export class NoteListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.lists';
     protected readonly viewName = 'note-list';
 
+    // ── Public palette entry-points ───────────────────────────────────────────
+
+    /** Open the guided add-note dialog from the command palette / view title button. */
+    public addNoteFromPalette(): void {
+        void this._handleMessage({ type: 'addNote' });
+    }
+
     // ── Message handling ───────────────────────────────────────────────────────
 
     protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {

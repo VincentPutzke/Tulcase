@@ -5,6 +5,56 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] – 2026-03-27
+
+### Summary
+Adds the **Insert Command in Terminal** command and definitively removes all six
+view-focus entries from the command palette.
+
+### Added
+- `tulcase.command.insert` — searchable tree-picker selects a saved command and
+  inserts its text into the active (or a new) integrated terminal without
+  executing it, so the user can review before pressing Enter.
+
+### Fixed
+- All six VS Code auto-generated view-focus commands (`tulcase.todos.focus`,
+  `tulcase.commands.focus`, `tulcase.lists.focus`, `tulcase.links.focus`,
+  `tulcase.tags.focus`, `tulcase.records.focus`) are now explicitly declared in
+  `contributes.commands` and suppressed from the palette via
+  `commandPalette when:false`. Previously the `when:false` filter only applied
+  to commands listed in `contributes.commands`; auto-generated focus commands
+  escaped that filter.
+- Removed residual `executeCommand('xxx.focus')` panel-focus side-effects that
+  were still present in the add-command and add-note handlers (cleaned up in
+  v1.1.0 but verified clean here).
+
+---
+
+## [1.1.0] – 2026-03-26
+
+### Summary
+Feature release: overhaul of the VS Code command palette integration. Only meaningful, user-facing operations are now exposed as palette commands. A reusable tree-picker component was introduced to enable searchable, folder-grouped selection for commands, notes, and links.
+
+### Added
+- `src/data/tree-picker.ts` — reusable `showTreePicker<T>()` function that renders a searchable VS Code QuickPick with items grouped under folder separator headers. Supports `matchOnDescription` so users can search by URL, command text, tag list, etc.
+- `tulcase.command.copy` command — shows a tree-picker of all saved commands (grouped by folder); copies the selected command text to the clipboard.
+- `tulcase.note.open` command — shows a tree-picker of all notes (grouped by folder); opens the selected note in the main editor as a Markdown document.
+- `tulcase.link.open` command — shows a tree-picker of all bookmarks (grouped by folder tree path); opens the selected URL in the default browser.
+- Public `addTodoFromPalette()`, `addCommandFromPalette()`, `addNoteFromPalette()` methods on view providers so palette commands can trigger add dialogs without duplicating logic.
+
+### Changed
+- Command palette now only shows 7 intentional commands: **Add Todo**, **Add Command**, **Copy Command**, **Add Tag**, **Open Note**, **Open Link**, **Log Time**.
+- `tulcase.todo.quickAdd` (Ctrl+Shift+T) remains registered for its keybinding but is hidden from the palette.
+- `tulcase.note.add`, `tulcase.link.add`, `tulcase.refresh`, and all tag context-menu commands are hidden from the palette via `commandPalette` menu entries (`when: false`).
+- Removed `ctrl+shift+d` keybinding for the now-deleted `tulcase.openDashboard` stub.
+
+### Removed
+- `tulcase.todo.toggleShowDone` — was a no-op; done items collapse in the webview UI.
+- `tulcase.command.runInTerminal`, `tulcase.command.edit`, `tulcase.command.delete` — webview-internal actions; not appropriate in the command palette.
+- `tulcase.openDashboard` — placeholder stub removed entirely.
+
+---
+
 ## [1.0.1] – 2026-03-26
 
 ### Summary
