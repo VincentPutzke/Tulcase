@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
