@@ -17,18 +17,18 @@ Patch release of the Tulcase VS Code extension from `develop` → `main`.
 ### 1. Code & Metadata
 - [x] Merge `feature/calendar-fit` → `develop`
 - [x] Bump `version` in `package.json` to `1.3.7`
-- [ ] Commit version bump to `develop`
+- [x] Commit version bump to `develop`
 
 ### 2. Tests & Quality
-- [ ] Run unit tests: `npm test`
-- [ ] Build: `npm run compile`
+- [x] Run unit tests: `npm test` — 131/131 passed
+- [x] Build: `npm run compile` — clean
 
 ### 3. Build & Package
-- [ ] Package: `vsce package` → generates `vscode-tulcase-1.3.7.vsix`
+- [x] Package: `vsce package` → `vscode-tulcase-1.3.7.vsix` (70.35 KB, 21 files)
 
 ### 4. Finalize Release
-- [ ] Merge `develop` → `main` (`git checkout main && git merge --no-ff develop`)
-- [ ] Tag: `git tag v1.3.7` on `main`
+- [x] Merge `develop` → `main` (`git checkout main && git merge --no-ff develop`)
+- [x] Tag: `git tag v1.3.7` on `main`
 
 ## Commands
 
