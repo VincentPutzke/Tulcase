@@ -7,6 +7,7 @@
 $grid-line   : var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 $card-bg     : var(--vscode-editor-inactiveSelectionBackground, rgba(128, 128, 128, 0.08));
 $card-border : var(--vscode-widget-border, rgba(128, 128, 128, 0.22));
+$view-bg     : var(--vscode-sideBar-background, var(--vscode-editor-background));
 $green       : var(--vscode-charts-green, #4ec9b0);
 $blue        : var(--vscode-charts-blue, #75beff);
 $btn-bg      : var(--vscode-button-background, #0e639c);
@@ -26,7 +27,7 @@ body {
   font-family    : var(--vscode-font-family);
   font-size      : var(--vscode-font-size, 13px);
   color          : var(--vscode-foreground);
-  background     : var(--vscode-panel-background, var(--vscode-editor-background));
+  background     : $view-bg;
   padding        : 10px 12px;
   height         : 100vh;
   overflow       : hidden;

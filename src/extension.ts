@@ -118,7 +118,7 @@ export function activate(context: vscode.ExtensionContext): void {
     );
 
     // 6. Status bar
-    const statusBar = new StatusBar(todoList);
+    const statusBar = new StatusBar(todoList, settings);
     context.subscriptions.push(statusBar);
 
     // 7. File watcher for cross-instance sync
