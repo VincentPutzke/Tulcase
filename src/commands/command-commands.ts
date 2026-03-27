@@ -11,11 +11,11 @@ const store = new JsonStore();
 /**
  * Register palette-level command handlers for the Commands feature.
  *
- * `tulcase.command.add`  — triggers the guided add-command dialog in the
- *                          Commands webview panel (label → text → tags → folder).
- * `tulcase.command.copy` — shows a searchable tree-picker of all commands
- *                          grouped by folder; copies the command text to the
- *                          clipboard on selection.
+ * `tulcase.command.add`    — triggers the guided add-command dialog in the
+ *                            Commands webview panel (label → text → tags → folder).
+ * `tulcase.command.copy`   — searchable tree-picker → copies command text to clipboard.
+ * `tulcase.command.insert` — searchable tree-picker → inserts command text into the
+ *                            active (or a new) integrated terminal, ready to run.
  *
  * All inline actions in the Commands panel (edit, run-in-terminal, delete)
  * are handled by CommandListViewProvider via webview message passing.
@@ -32,6 +32,9 @@ export function registerCommandCommands(
         }),
         vscode.commands.registerCommand('tulcase.command.copy', () =>
             copyCommandFromPicker(settings),
+        ),
+        vscode.commands.registerCommand('tulcase.command.insert', () =>
+            insertCommandInTerminal(settings),
         ),
     );
 }
@@ -61,5 +64,40 @@ async function copyCommandFromPicker(settings: TulcaseSettings): Promise<void> {
 
     await vscode.env.clipboard.writeText(selected.command);
     vscode.window.showInformationMessage(`Copied: ${selected.label}`);
+}
+
+// ── Insert Command ─────────────────────────────────────────────────────────────
+
+async function insertCommandInTerminal(settings: TulcaseSettings): Promise<void> {
+    const data = await store.read<CommandStore>(settings.commandsFile, { items: [] });
+
+    const items = data.items.map(cmd => ({
+        label:       cmd.label,
+        description: cmd.command.length > 70
+            ? cmd.command.slice(0, 70) + '…'
+            : cmd.command,
+        group:       cmd.folder || undefined,
+        data:        cmd,
+    }));
+
+    const selected = await showTreePicker({
+        title:        'Insert Command in Terminal',
+        placeholder:  'Type to filter — select a command to insert into the terminal',
+        items,
+        emptyMessage: 'No commands found. Add one via the Commands view.',
+    });
+
+    if (!selected) { return; }
+
+    // Reuse the active terminal if one is open; otherwise create a dedicated one.
+    const terminal = vscode.window.activeTerminal
+        ?? vscode.window.createTerminal('Tulcase');
+
+    // Show terminal but keep focus in the editor (preserveFocus = true).
+    terminal.show(true);
+
+    // Insert the command text without a trailing newline so the user can
+    // review and press Enter themselves before the command actually runs.
+    terminal.sendText(selected.command, false);
 }
 

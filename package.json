@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -145,6 +145,12 @@
         "icon": "$(copy)"
       },
       {
+        "command": "tulcase.command.insert",
+        "title": "Insert Command in Terminal",
+        "category": "Tulcase",
+        "icon": "$(terminal)"
+      },
+      {
         "command": "tulcase.link.add",
         "title": "Add Link",
         "category": "Tulcase",
@@ -185,7 +191,13 @@
         "title": "Refresh All",
         "category": "Tulcase",
         "icon": "$(refresh)"
-      }
+      },
+      { "command": "tulcase.todos.focus",    "title": "Focus TODOs View",    "category": "Tulcase" },
+      { "command": "tulcase.commands.focus", "title": "Focus Commands View", "category": "Tulcase" },
+      { "command": "tulcase.lists.focus",    "title": "Focus Notes View",    "category": "Tulcase" },
+      { "command": "tulcase.links.focus",    "title": "Focus Links View",    "category": "Tulcase" },
+      { "command": "tulcase.tags.focus",     "title": "Focus Tags View",     "category": "Tulcase" },
+      { "command": "tulcase.records.focus",  "title": "Focus Records View",  "category": "Tulcase" }
     ],
     "menus": {
       "view/title": [

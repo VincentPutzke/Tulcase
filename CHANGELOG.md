@@ -5,6 +5,31 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] – 2026-03-27
+
+### Summary
+Adds the **Insert Command in Terminal** command and definitively removes all six
+view-focus entries from the command palette.
+
+### Added
+- `tulcase.command.insert` — searchable tree-picker selects a saved command and
+  inserts its text into the active (or a new) integrated terminal without
+  executing it, so the user can review before pressing Enter.
+
+### Fixed
+- All six VS Code auto-generated view-focus commands (`tulcase.todos.focus`,
+  `tulcase.commands.focus`, `tulcase.lists.focus`, `tulcase.links.focus`,
+  `tulcase.tags.focus`, `tulcase.records.focus`) are now explicitly declared in
+  `contributes.commands` and suppressed from the palette via
+  `commandPalette when:false`. Previously the `when:false` filter only applied
+  to commands listed in `contributes.commands`; auto-generated focus commands
+  escaped that filter.
+- Removed residual `executeCommand('xxx.focus')` panel-focus side-effects that
+  were still present in the add-command and add-note handlers (cleaned up in
+  v1.1.0 but verified clean here).
+
+---
+
 ## [1.1.0] – 2026-03-26
 
 ### Summary
