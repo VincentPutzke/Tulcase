@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-add">+ Add Tag</button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="search"
+      type="text"
+      placeholder="Search tags and categories…"
+      spellcheck="false"
+    >
+  </div>
+</div>
+
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane" id="sections"></div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── State ───────────────────────────────────────────────
+  let tags  = [];   // { name: string, color: string, category: string }[]
+  let query = '';   // current search text
+
+  /** Track which category sections the user has collapsed. Key = category name. */
+  const collapsedCategories = {};
+
+  // ── DOM refs ────────────────────────────────────────────
+  const searchEl   = document.getElementById('search');
+  const sectionsEl = document.getElementById('sections');
+
+  // ── Utility ─────────────────────────────────────────────
+
+  /** Escape HTML entities. */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── SVG icons (inline, stroke-based, currentColor) ─────
+
+  const ICONS = {
+    edit: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    palette: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.22-.27-.35-.62-.35-.99 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.96-4.48-9-10-9z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="11.5" r="1.5" fill="currentColor"/><circle cx="9.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="14.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="17.5" cy="11.5" r="1.5" fill="currentColor"/></svg>',
+    folder: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    delete: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    tagEmpty: '<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="7" y1="7" x2="7.01" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+
+  // ── Search / filter ─────────────────────────────────────
+
+  /** Test whether a tag matches the current search query. */
+  function matchesQuery(tag) {
+    if (!query) { return true; }
+    const q = query.toLowerCase();
+    return tag.name.toLowerCase().includes(q) || tag.category.toLowerCase().includes(q);
+  }
+
+  // ── Grouping by category ────────────────────────────────
+
+  /** Group tags into { 'general': [...], 'workflow': [...], ... }. */
+  function groupByCategory(items) {
+    var groups = {};
+    for (var i = 0; i < items.length; i++) {
+      var cat = items[i].category;
+      if (!groups[cat]) { groups[cat] = []; }
+      groups[cat].push(items[i]);
+    }
+    return groups;
+  }
+
+  /** Return sorted category names. */
+  function sortedCategories(groups) {
+    return Object.keys(groups).sort(function(a, b) { return a.localeCompare(b); });
+  }
+
+  // ── Rendering ───────────────────────────────────────────
+
+  function render() {
+    var filtered = tags.filter(matchesQuery);
+    var groups   = groupByCategory(filtered);
+    var cats     = sortedCategories(groups);
+    var html     = '';
+
+    if (filtered.length === 0 && tags.length === 0) {
+      html = '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.tagEmpty + '</div>'
+        + 'No tags yet. Click <strong>+ Add Tag</strong> to get started!'
+        + '</div>';
+    } else if (filtered.length === 0) {
+      html = '<div class="no-results">No tags match your search.</div>';
+    } else {
+      for (var ci = 0; ci < cats.length; ci++) {
+        html += renderCategory(cats[ci], groups[cats[ci]]);
+      }
+    }
+
+    sectionsEl.innerHTML = html;
+    attachHandlers();
+  }
+
+  function renderCategory(category, items) {
+    var collapsed  = !!collapsedCategories[category];
+    var bodyHeight = collapsed ? 'max-height:0;' : '';
+
+    // Sort items alphabetically within category
+    var sorted = items.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+    var html = '<div class="section">'
+      + '<div class="section-header" data-toggle="' + esc(category) + '">'
+      + '  <span class="section-chevron' + (collapsed ? ' collapsed' : '') + '">▾</span>'
+      + '  <span class="section-icon">' + ICONS.folder + '</span>'
+      + '  <span class="section-label">' + esc(category) + '</span>'
+      + '  <span class="section-badge">' + sorted.length + '</span>'
+      + '</div>'
+      + '<div class="section-body" style="' + bodyHeight + '">';
+
+    for (var i = 0; i < sorted.length; i++) {
+      html += renderTag(sorted[i]);
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderTag(tag) {
+    return '<div class="tree-item">'
+      + '<div class="tree-item-row">'
+      + '  <span class="tag-dot" style="background:' + esc(tag.color) + ';"></span>'
+      + '  <div class="tree-item-content">'
+      + '    <span class="tree-item-label">' + esc(tag.name) + '</span>'
+      + '  </div>'
+      + '  <div class="tree-item-actions">'
+      + '    <button class="action-btn btn-edit"   title="Rename"          data-action="rename"         data-id="' + esc(tag.name) + '">' + ICONS.edit    + '</button>'
+      + '    <button class="action-btn btn-copy"   title="Change colour"   data-action="changeColor"    data-id="' + esc(tag.name) + '">' + ICONS.palette + '</button>'
+      + '    <button class="action-btn btn-add"    title="Change category" data-action="changeCategory" data-id="' + esc(tag.name) + '">' + ICONS.folder  + '</button>'
+      + '    <button class="action-btn btn-delete" title="Delete"          data-action="delete"         data-id="' + esc(tag.name) + '">' + ICONS.delete  + '</button>'
+      + '  </div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // ── Event delegation ─────────────────────────────────────
+
+  function attachHandlers() {
+    // Collapse / expand category section headers
+    sectionsEl.querySelectorAll('[data-toggle]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var cat = el.getAttribute('data-toggle');
+        collapsedCategories[cat] = !collapsedCategories[cat];
+        render();
+      });
+    });
+
+    // Action buttons (rename, changeColor, changeCategory, delete)
+    sectionsEl.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // don't bubble to section-header toggle
+        vscode.postMessage({
+          type: btn.getAttribute('data-action'),
+          id:   btn.getAttribute('data-id'),
+        });
+      });
+    });
+  }
+
+  // ── Incoming messages ────────────────────────────────────
+
+  window.addEventListener('message', function(event) {
+    var msg = event.data;
+    if (msg.type === 'updateData') {
+      tags = msg.tags || [];
+      render();
+    }
+  });
+
+  // ── Add button ───────────────────────────────────────────
+
+  document.getElementById('btn-add').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addTag' });
+  });
+
+  // ── Search ───────────────────────────────────────────────
+
+  searchEl.addEventListener('input', function() {
+    query = searchEl.value.trim();
+    render();
+  });
+
+  // ── Bootstrap ────────────────────────────────────────────
+
+  vscode.postMessage({ type: 'requestData' });
+
+})();
+</script>
+
+</body>
+</html>
