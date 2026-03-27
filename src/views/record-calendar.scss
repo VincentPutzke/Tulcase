@@ -23,52 +23,101 @@ $blue        : var(--vscode-charts-blue, #75beff);
 $btn-bg      : var(--vscode-button-background, #0e639c);
 $btn-fg      : var(--vscode-button-foreground, #fff);
 
-// ── Records layout — override shared adaptive behaviour ───────────────────────
+// ── Records layout: portrait (sidebar) vs landscape (bottom panel) ───────────
 //
-// Shared sets .layout to flex-column by default and flex-row at ≥500 px, moving
-// the controls-pane to the right.  Records uses its own three-region structure
-// and therefore wires up its own container-query overrides.
+// VS Code sidebar views are portrait (height > width).
+// VS Code bottom-panel views are landscape (width > height).
+// CSS Container Query `orientation` detects this without any pixel threshold,
+// so the wide grid layout is exclusive to the bottom panel and always active
+// there, while the sidebar always gets the single-column stack.
+//
+// Portrait — single column, add-bar always above the calendar:
+//   add-bar → cal-pane → entries-pane
+//   A portrait @container rule resets the shared min-width:500px flex-row
+//   override so a wide open sidebar stays in column mode.
+//
+// Landscape — 2-column grid, always active:
+//   col 1 (1fr):   cal-pane — fills full height, calendar does NOT overflow
+//   col 2 (220px): add-bar (top) + entries-pane (bottom, scrolls)
+//   Calendar cells drop aspect-ratio and share available height equally via
+//   grid-auto-rows:1fr so the grid never exceeds the panel height.
 
-// Base (narrow / sidebar): column stack — add-bar pinned at the top.
-.add-bar    { flex-shrink: 0; }
-.cal-pane   { flex-shrink: 0; }
-.entries-pane {
-  flex       : 1 1 0;
-  overflow-y : auto;
-  min-height : 0;
+// Base defaults (portrait / sidebar).
+.add-bar      { flex-shrink : 0; }
+.cal-pane     { flex-shrink : 0; overflow : hidden; }
+.entries-pane { flex : 1 1 0; min-height : 0; overflow-y : auto; }
+
+// ── Portrait — keep column layout at all widths ───────────────────────────────
+// Overrides the shared @container min-width:500px rule that would otherwise
+// switch .layout to flex-direction:row when the sidebar is wider than 500 px.
+@container view-panel (orientation: portrait) {
+  .layout {
+    flex-direction : column;
+  }
 }
 
-// Wide (≥500 px) — 2-column grid.
-// • Column 1 (flexible): calendar pane, spans both grid rows.
-// • Column 2 (fixed 220 px): add-bar on top, entries below.
-@container view-panel (min-width: 500px) {
+// ── Landscape — 2-column grid for the bottom panel ────────────────────────────
+@container view-panel (orientation: landscape) {
   .layout {
-    // Override shared's flex-direction:row — use a grid instead so the
-    // calendar can span the full height while the right column has two rows.
     display               : grid;
     grid-template-columns : 1fr 220px;
-    grid-template-rows    : auto 1fr;
+    grid-template-rows    : auto 1fr;   // row 1: add-bar height; row 2: entries
     gap                   : 0 12px;
   }
 
-  // Calendar: occupies the entire left column (both rows).
+  // Calendar: left column, spans both grid rows — occupies full panel height.
   .cal-pane {
-    grid-column : 1;
-    grid-row    : 1 / 3;
-    overflow-y  : auto;
+    grid-column    : 1;
+    grid-row       : 1 / 3;
+    display        : flex;
+    flex-direction : column;
+    overflow       : hidden;    // hard boundary — nothing escapes the panel
+    min-height     : 0;
   }
 
-  // Add bar: top of the right column; buttons are stacked vertically.
+  // Cal-wrapper grows to fill the space between the month-nav and the summary.
+  .cal-wrapper {
+    flex           : 1 1 0;
+    min-height     : 0;
+    overflow       : hidden;
+    display        : flex;
+    flex-direction : column;
+  }
+
+  // Day-header strip is fixed height inside the wrapper.
+  .day-headers {
+    flex-shrink : 0;
+  }
+
+  // Calendar grid fills the wrapper; rows share available height equally.
+  // grid-auto-rows:1fr distributes height instead of letting aspect-ratio drive it.
+  .calendar {
+    flex           : 1 1 0;
+    min-height     : 0;
+    grid-auto-rows : 1fr;
+  }
+
+  // Drop aspect-ratio so cells conform to the equal-height rows.
+  .day {
+    aspect-ratio : auto;
+  }
+
+  // Month summary pinned below the calendar at fixed height.
+  .month-summary {
+    flex-shrink : 0;
+  }
+
+  // Add-bar: top of the right column; buttons stack vertically.
   .add-bar {
-    grid-column       : 2;
-    grid-row          : 1;
-    flex-direction    : column;   // stack Log Time / Another Day
-    border-left       : 1px solid $grid-line;
-    padding-left      : 12px;
-    margin-bottom     : 10px;
+    grid-column    : 2;
+    grid-row       : 1;
+    flex-direction : column;
+    border-left    : 1px solid $grid-line;
+    padding-left   : 12px;
+    margin-bottom  : 0;
   }
 
-  // Entries pane: fills the remaining right column height and scrolls.
+  // Entries pane: fills the right column below the add-bar and scrolls.
   .entries-pane {
     grid-column  : 2;
     grid-row     : 2;
