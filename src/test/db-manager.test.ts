@@ -114,13 +114,13 @@ describe('db-manager', () => {
         expect(parsed._tulcase).toBe('db-export-v1');
         expect(parsed.name).toBe(DEFAULT_DB);
         expect(parsed.exportedAt).toBeTruthy();
-        expect(parsed.files).toHaveProperty(path.join('todo_db', 'todos.json'));
+        expect(parsed.files).toHaveProperty('todo_db/todos.json');
     });
 
     it('export includes records subdirectory files', async () => {
         const payload = await exportDatabase(settings, DEFAULT_DB);
         const parsed = JSON.parse(payload);
-        const recKey = path.join('records_db', '2026', '03.json');
+        const recKey = 'records_db/2026/03.json';
         expect(parsed.files).toHaveProperty(recKey);
         const rec = JSON.parse(parsed.files[recKey]);
         expect(rec.year).toBe(2026);

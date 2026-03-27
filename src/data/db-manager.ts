@@ -93,7 +93,9 @@ async function collectFiles(root: string): Promise<Record<string, string>> {
     for (const rel of CORE_FILES) {
         const content = await safeRead(path.join(root, rel));
         if (content !== undefined) {
-            files[rel] = content;
+            // Normalise to forward slashes so the bundle is cross-platform
+            // (Windows path.join produces backslashes which break on Linux).
+            files[rel.split(path.sep).join('/')] = content;
         }
     }
 
@@ -101,17 +103,26 @@ async function collectFiles(root: string): Promise<Record<string, string>> {
     for (const rel of await walkDir(recDir)) {
         const content = await safeRead(path.join(recDir, rel));
         if (content !== undefined) {
-            files[path.join(RECORDS_DIR, rel)] = content;
+            const key = path.join(RECORDS_DIR, rel).split(path.sep).join('/');
+            files[key] = content;
         }
     }
 
     return files;
 }
 
-/** Write a map of `relativePath → content` into a target directory. */
+/** Write a map of `relativePath → content` into a target directory.
+ *
+ * Keys may use either `/` (new bundles, normalised on export) or `\` (bundles
+ * exported on Windows before this fix).  We split on both so cross-platform
+ * imports always reconstruct the correct directory tree.
+ */
 async function writeFiles(root: string, files: Record<string, string>): Promise<void> {
     for (const [rel, content] of Object.entries(files)) {
-        const target = path.join(root, rel);
+        // Split on both `/` and `\` to handle legacy Windows-exported bundles
+        // as well as the new forward-slash-normalised keys.
+        const segments = rel.split(/[\/\\]/);
+        const target = path.join(root, ...segments);
         await fs.mkdir(path.dirname(target), { recursive: true });
         await fs.writeFile(target, content, 'utf-8');
     }
