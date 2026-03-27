@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "1.0.0",
+  "version": "1.3.7",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -84,7 +84,8 @@
       "tulcase-panel": [
         {
           "id": "tulcase.tags",
-          "name": "Tags"
+          "name": "Tags",
+          "type": "webview"
         },
         {
           "id": "tulcase.records",
@@ -106,38 +107,12 @@
         "category": "Tulcase"
       },
       {
-        "command": "tulcase.todo.toggleShowDone",
-        "title": "Toggle Show Done",
-        "category": "Tulcase",
-        "icon": "$(eye)"
-      },
-      {
         "command": "tulcase.tag.add",
         "title": "Add Tag",
         "category": "Tulcase",
         "icon": "$(add)"
       },
-      {
-        "command": "tulcase.tag.rename",
-        "title": "Rename Tag",
-        "category": "Tulcase"
-      },
-      {
-        "command": "tulcase.tag.changeColor",
-        "title": "Change Tag Color",
-        "category": "Tulcase"
-      },
-      {
-        "command": "tulcase.tag.changeCategory",
-        "title": "Change Tag Category",
-        "category": "Tulcase"
-      },
-      {
-        "command": "tulcase.tag.delete",
-        "title": "Delete Tag",
-        "category": "Tulcase",
-        "icon": "$(trash)"
-      },
+
       {
         "command": "tulcase.command.add",
         "title": "Add Command",
@@ -151,22 +126,10 @@
         "icon": "$(copy)"
       },
       {
-        "command": "tulcase.command.runInTerminal",
-        "title": "Run in Terminal",
+        "command": "tulcase.command.insert",
+        "title": "Insert Command in Terminal",
         "category": "Tulcase",
         "icon": "$(terminal)"
-      },
-      {
-        "command": "tulcase.command.edit",
-        "title": "Edit Command",
-        "category": "Tulcase",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "tulcase.command.delete",
-        "title": "Delete Command",
-        "category": "Tulcase",
-        "icon": "$(trash)"
       },
       {
         "command": "tulcase.link.add",
@@ -175,10 +138,28 @@
         "icon": "$(add)"
       },
       {
+        "command": "tulcase.link.open",
+        "title": "Open Link",
+        "category": "Tulcase",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "tulcase.link.grab",
+        "title": "Grab Link URL",
+        "category": "Tulcase",
+        "icon": "$(clippy)"
+      },
+      {
         "command": "tulcase.note.add",
         "title": "Add Note",
         "category": "Tulcase",
         "icon": "$(add)"
+      },
+      {
+        "command": "tulcase.note.open",
+        "title": "Open Note",
+        "category": "Tulcase",
+        "icon": "$(go-to-file)"
       },
       {
         "command": "tulcase.record.add",
@@ -187,16 +168,39 @@
         "icon": "$(add)"
       },
       {
+        "command": "tulcase.record.addOther",
+        "title": "Log Time (Another Day)",
+        "category": "Tulcase"
+      },
+      {
         "command": "tulcase.refresh",
         "title": "Refresh All",
         "category": "Tulcase",
         "icon": "$(refresh)"
       },
       {
-        "command": "tulcase.openDashboard",
-        "title": "Open Dashboard",
+        "command": "tulcase.db.export",
+        "title": "Export Database",
         "category": "Tulcase",
-        "icon": "$(home)"
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "tulcase.db.import",
+        "title": "Import Database",
+        "category": "Tulcase",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "tulcase.db.switch",
+        "title": "Switch Database",
+        "category": "Tulcase",
+        "icon": "$(database)"
+      },
+      {
+        "command": "tulcase.db.update",
+        "title": "Update Database",
+        "category": "Tulcase",
+        "icon": "$(sync)"
       }
     ],
     "menus": {
@@ -222,27 +226,12 @@
           "group": "navigation"
         }
       ],
-      "view/item/context": [
-        {
-          "command": "tulcase.tag.rename",
-          "when": "view == tulcase.tags && viewItem == tagItem",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "tulcase.tag.changeColor",
-          "when": "view == tulcase.tags && viewItem == tagItem",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "tulcase.tag.changeCategory",
-          "when": "view == tulcase.tags && viewItem == tagItem",
-          "group": "1_modify@3"
-        },
-        {
-          "command": "tulcase.tag.delete",
-          "when": "view == tulcase.tags && viewItem == tagItem",
-          "group": "2_delete@1"
-        }
+
+      "commandPalette": [
+        { "command": "tulcase.todo.quickAdd", "when": "false" },
+        { "command": "tulcase.note.add", "when": "false" },
+        { "command": "tulcase.link.add", "when": "false" },
+        { "command": "tulcase.refresh", "when": "false" }
       ]
     },
     "keybindings": [
@@ -250,11 +239,6 @@
         "command": "tulcase.todo.quickAdd",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t"
-      },
-      {
-        "command": "tulcase.openDashboard",
-        "key": "ctrl+shift+d",
-        "mac": "cmd+shift+d"
       }
     ]
   },

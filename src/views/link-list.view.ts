@@ -15,49 +15,18 @@
  */
 
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { findNode, removeNode } from '../data/link-tree';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
-import type { TulcaseSettings } from '../config';
 import type { LinkNode, LinkStore } from '../models/link.model';
-import type { TagTreeProvider } from '../providers/tag-tree.provider';
+import { BaseListViewProvider } from './base-list.view';
 
 const store = new JsonStore();
 
-export class LinkListViewProvider implements vscode.WebviewViewProvider {
+export class LinkListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.links';
-
-    private _view?: vscode.WebviewView;
-
-    constructor(
-        private readonly settings: TulcaseSettings,
-        private readonly tagTree: TagTreeProvider,
-    ) {}
-
-    // ── WebviewViewProvider ────────────────────────────────────────────────────
-
-    resolveWebviewView(
-        webviewView: vscode.WebviewView,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
-    ): void {
-        this._view = webviewView;
-
-        webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html    = this._buildHtml();
-
-        webviewView.webview.onDidReceiveMessage(msg => this._handleMessage(msg));
-    }
-
-    /** Called from extension when the file watcher detects a change. */
-    refresh(): void {
-        if (this._view?.visible) {
-            void this._sendData();
-        }
-    }
+    protected readonly viewName = 'link-list';
 
     /** Public entry-point for the palette command `tulcase.link.add`. */
     addLinkFromPalette(): void {
@@ -66,7 +35,7 @@ export class LinkListViewProvider implements vscode.WebviewViewProvider {
 
     // ── Message handling ───────────────────────────────────────────────────────
 
-    private async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
+    protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
@@ -107,7 +76,7 @@ export class LinkListViewProvider implements vscode.WebviewViewProvider {
     // ── Data push ─────────────────────────────────────────────────────────────
 
     /** Load links + tags and push to the webview. */
-    private async _sendData(): Promise<void> {
+    protected async _sendData(): Promise<void> {
         if (!this._view) { return; }
 
         const data   = await this._readStore();
@@ -295,34 +264,4 @@ export class LinkListViewProvider implements vscode.WebviewViewProvider {
     private async _readStore(): Promise<LinkStore> {
         return store.read<LinkStore>(this.settings.linksFile, { root: [] });
     }
-
-    // ── HTML builder ───────────────────────────────────────────────────────────
-
-    private _buildHtml(): string {
-        const nonce  = getNonce();
-        const outDir = path.join(__dirname);
-
-        const htmlTemplate = fs.readFileSync(
-            path.join(outDir, 'link-list.html'), 'utf-8',
-        );
-        const css = fs.readFileSync(
-            path.join(outDir, 'link-list.css'), 'utf-8',
-        );
-
-        return htmlTemplate
-            .replace(/\{\{NONCE\}\}/g, nonce)
-            .replace('{{STYLE}}', css);
-    }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-/** Cryptographically random nonce for Content-Security-Policy. */
-function getNonce(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let nonce = '';
-    for (let i = 0; i < 32; i++) {
-        nonce += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return nonce;
 }

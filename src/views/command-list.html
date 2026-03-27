@@ -12,26 +12,30 @@
 </head>
 <body>
 
-<!-- ── Add buttons ──────────────────────────────────────── -->
-<div class="add-bar">
-  <button class="add-btn" id="btn-add">+ Add Command</button>
-  <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-add">+ Add Command</button>
+    <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="search"
+      type="text"
+      placeholder="Search commands and tags..."
+      spellcheck="false"
+    >
+  </div>
 </div>
 
-<!-- ── Search bar ───────────────────────────────────────── -->
-<div class="search-bar">
-  <span class="search-icon"></span>
-  <input
-    class="search-input"
-    id="search"
-    type="text"
-    placeholder="Search commands and tags..."
-    spellcheck="false"
-  >
-</div>
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane" id="sections"></div>
 
-<!-- ── Sections container ───────────────────────────────── -->
-<div id="sections"></div>
+</div>
 
 <script nonce="{{NONCE}}">
 (function () {
@@ -174,30 +178,30 @@
   function renderItem(item) {
     var isExpanded = !!expandedCode[item.id];
 
-    var html = '<div class="cmd-item" data-id="' + esc(item.id) + '">';
+    var html = '<div class="tree-item" data-id="' + esc(item.id) + '">';
 
     // ── Top row: label + meta + actions ──
-    html += '<div class="cmd-row">';
-    html += '  <div class="cmd-content">';
-    html += '    <div class="cmd-label">' + esc(item.label) + '</div>';
-    html += '    <div class="cmd-meta">';
+    html += '<div class="tree-item-row">';
+    html += '  <div class="tree-item-content">';
+    html += '    <div class="tree-item-label">' + esc(item.label) + '</div>';
+    html += '    <div class="tree-item-meta">';
 
     if (item.tags && item.tags.length > 0) {
-      html += '<span class="cmd-tags">';
+      html += '<span class="tree-item-tags">';
       for (var ti = 0; ti < item.tags.length; ti++) {
         var tag   = item.tags[ti];
         var def   = tagMap[tag];
         var color = def ? def.color : '#8b8fa3';
-        html += '<span class="cmd-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+        html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
       }
       html += '</span>';
     }
 
-    html += '    </div>';  // .cmd-meta
-    html += '  </div>';    // .cmd-content
+    html += '    </div>';  // .tree-item-meta
+    html += '  </div>';    // .tree-item-content
 
     // ── Action buttons ──
-    html += '  <div class="cmd-actions">';
+    html += '  <div class="tree-item-actions">';
     html += '    <button class="action-btn btn-edit" data-action="edit" data-id="' + esc(item.id) + '" title="Edit">';
     html += ICONS.edit;
     html += '    </button>';
@@ -210,8 +214,8 @@
     html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(item.id) + '" title="Delete">';
     html += ICONS.delete;
     html += '    </button>';
-    html += '  </div>';    // .cmd-actions
-    html += '</div>';      // .cmd-row
+    html += '  </div>';    // .tree-item-actions
+    html += '</div>';      // .tree-item-row
 
     // ── Collapsible code block ──
     var chevCls = isExpanded ? 'cmd-code-chevron' : 'cmd-code-chevron collapsed';
@@ -225,7 +229,7 @@
     html += esc(item.command);
     html += '</div>';
 
-    html += '</div>'; // .cmd-item
+    html += '</div>'; // .tree-item
     return html;
   }
 

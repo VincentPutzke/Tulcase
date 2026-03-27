@@ -5,6 +5,122 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] – 2026-03-27
+
+### Summary
+Feature release: **Directory-based Database Management**.  Each database is now
+a named sub-folder under `{rootDir}/data/{name}/`, and switching databases simply
+changes which folder the extension reads from — no copying or snapshotting
+required.  Four new palette commands let users export, import, switch, and sync
+databases across workspaces via the clipboard.
+
+### Added
+- `src/config.ts` — new fields `rootDir`, `activeDb` on `TulcaseSettings`;
+  `switchSettingsTo()` mutates settings in-place; `ensureInitialized()` handles
+  first-run setup and legacy flat-layout migration; `ensureDatabase()` seeds
+  empty database directories; `readActiveDb()` / `writeActiveDb()` persist the
+  active database name.
+- `src/data/db-manager.ts` — `listDatabases`, `createDatabase`,
+  `exportDatabase`, `importDatabase` for the new directory-based layout.
+- `src/commands/db-commands.ts` — four palette commands:
+  - **Export Database** (`tulcase.db.export`) — pick any database → clipboard.
+  - **Import Database** (`tulcase.db.import`) — clipboard → new database,
+    with optional immediate switch.
+  - **Switch Database** (`tulcase.db.switch`) — pick or create a database and
+    switch to it instantly (no confirmation needed).
+  - **Update Database** (`tulcase.db.update`) — clipboard → overwrite the
+    database with the same name (cross-workspace sync).
+- `src/test/db-manager.test.ts` — 16 unit tests covering db-manager operations,
+  config init, migration, buildSettings, switchSettingsTo, and round-trips.
+
+### Changed
+- `src/extension.ts` — calls `ensureInitialized()` on activation; wires
+  `registerDbCommands`.
+- `package.json` — declared 4 new commands with icons; bumped to `1.3.0`.
+- Data directory layout changed from flat (`{rootDir}/todo_db/…`) to
+  `{rootDir}/data/{dbName}/todo_db/…`.  A "default" database is created
+  automatically on first launch, and legacy data is migrated into it.
+
+---
+
+## [1.2.1] – 2026-03-27
+
+### Summary
+Remove the manual focus-command suppression logic from the manifest — reverted
+the explicit focus command declarations so VS Code's defaults are used again.
+
+### Changed
+- Reverted explicit `tulcase.*.focus` `contributes.commands` declarations and
+  `commandPalette` suppression entries from `package.json`.
+
+### Notes
+- This branch implements the revert and was merged to `develop` as `v1.2.1`.
+
+## [1.2.0] – 2026-03-27
+
+### Summary
+Adds the **Insert Command in Terminal** command and definitively removes all six
+view-focus entries from the command palette.
+
+### Added
+- `tulcase.command.insert` — searchable tree-picker selects a saved command and
+  inserts its text into the active (or a new) integrated terminal without
+  executing it, so the user can review before pressing Enter.
+
+### Fixed
+- All six VS Code auto-generated view-focus commands (`tulcase.todos.focus`,
+  `tulcase.commands.focus`, `tulcase.lists.focus`, `tulcase.links.focus`,
+  `tulcase.tags.focus`, `tulcase.records.focus`) are now explicitly declared in
+  `contributes.commands` and suppressed from the palette via
+  `commandPalette when:false`. Previously the `when:false` filter only applied
+  to commands listed in `contributes.commands`; auto-generated focus commands
+  escaped that filter.
+- Removed residual `executeCommand('xxx.focus')` panel-focus side-effects that
+  were still present in the add-command and add-note handlers (cleaned up in
+  v1.1.0 but verified clean here).
+
+---
+
+## [1.1.0] – 2026-03-26
+
+### Summary
+Feature release: overhaul of the VS Code command palette integration. Only meaningful, user-facing operations are now exposed as palette commands. A reusable tree-picker component was introduced to enable searchable, folder-grouped selection for commands, notes, and links.
+
+### Added
+- `src/data/tree-picker.ts` — reusable `showTreePicker<T>()` function that renders a searchable VS Code QuickPick with items grouped under folder separator headers. Supports `matchOnDescription` so users can search by URL, command text, tag list, etc.
+- `tulcase.command.copy` command — shows a tree-picker of all saved commands (grouped by folder); copies the selected command text to the clipboard.
+- `tulcase.note.open` command — shows a tree-picker of all notes (grouped by folder); opens the selected note in the main editor as a Markdown document.
+- `tulcase.link.open` command — shows a tree-picker of all bookmarks (grouped by folder tree path); opens the selected URL in the default browser.
+- Public `addTodoFromPalette()`, `addCommandFromPalette()`, `addNoteFromPalette()` methods on view providers so palette commands can trigger add dialogs without duplicating logic.
+
+### Changed
+- Command palette now only shows 7 intentional commands: **Add Todo**, **Add Command**, **Copy Command**, **Add Tag**, **Open Note**, **Open Link**, **Log Time**.
+- `tulcase.todo.quickAdd` (Ctrl+Shift+T) remains registered for its keybinding but is hidden from the palette.
+- `tulcase.note.add`, `tulcase.link.add`, `tulcase.refresh`, and all tag context-menu commands are hidden from the palette via `commandPalette` menu entries (`when: false`).
+- Removed `ctrl+shift+d` keybinding for the now-deleted `tulcase.openDashboard` stub.
+
+### Removed
+- `tulcase.todo.toggleShowDone` — was a no-op; done items collapse in the webview UI.
+- `tulcase.command.runInTerminal`, `tulcase.command.edit`, `tulcase.command.delete` — webview-internal actions; not appropriate in the command palette.
+- `tulcase.openDashboard` — placeholder stub removed entirely.
+
+---
+
+## [1.0.1] – 2026-03-26
+
+### Summary
+Internal refactoring release. Extracts a shared component library from duplicated view code. No user-facing changes.
+
+### Changed
+- Created `_shared.scss` — single source of truth for all common webview styles (variables, reset, layout, add-bar, search-bar, sections, tree-item classes, action buttons, empty states, adaptive container-query layout).
+- Refactored all 4 feature SCSS files (`note-list`, `link-list`, `todo-list`, `command-list`) to `@use 'shared'` with only feature-specific overrides.
+- Migrated all HTML templates from feature-prefixed classes (`note-*`, `link-*`, `todo-*`, `cmd-*`) to generic `tree-item-*` class names.
+- Added `.layout > .controls-pane + .tree-pane` adaptive layout structure to Todos and Commands (previously only in Links and Notes).
+- Created `BaseListViewProvider` abstract base class extracting shared `resolveWebviewView`, `refresh`, `_buildHtml`, and `getNonce`.
+- Refactored all 4 `WebviewViewProvider` classes to extend `BaseListViewProvider`, eliminating ~120 lines of duplicated boilerplate.
+
+---
+
 ## [1.0.0] – 2026-03-26
 
 ### Summary

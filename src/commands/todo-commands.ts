@@ -9,9 +9,13 @@ import type { TagTreeProvider as _TagTreeProvider } from '../providers/tag-tree.
 const store = new JsonStore();
 
 /**
- * Register TODO commands that are invoked from the command palette / keybindings.
- * Webview-internal actions (markDone, postpone, etc.) are handled directly
- * by the TodoListViewProvider via message passing.
+ * Register TODO commands for the command palette / keybindings.
+ *
+ * `tulcase.todo.add`      — guided note → date → tags dialog (works from palette).
+ * `tulcase.todo.quickAdd` — single-line quick-add (Ctrl+Shift+T); hidden from palette.
+ *
+ * Webview-internal actions (markDone, postpone, delete, etc.) are handled by
+ * TodoListViewProvider via webview message passing and are not registered here.
  */
 export function registerTodoCommands(
     context: vscode.ExtensionContext,
@@ -21,14 +25,11 @@ export function registerTodoCommands(
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.todo.add', () => {
-            // Delegate to the webview provider (opens input dialogs + updates data)
-            todoList.refresh();
+            todoList.addTodoFromPalette();
         }),
-        vscode.commands.registerCommand('tulcase.todo.quickAdd', () => quickAddTodo(settings, todoList)),
-        vscode.commands.registerCommand('tulcase.todo.toggleShowDone', () => {
-            // In the webview, done section is collapsible in the UI directly — this is a noop now
-            vscode.window.showInformationMessage('Use the Done section toggle inside the TODO view.');
-        }),
+        vscode.commands.registerCommand('tulcase.todo.quickAdd', () =>
+            quickAddTodo(settings, todoList),
+        ),
     );
 }
 
