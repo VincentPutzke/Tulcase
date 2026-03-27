@@ -5,6 +5,19 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.1] – 2026-03-27
+
+### Summary
+Remove the manual focus-command suppression logic from the manifest — reverted
+the explicit focus command declarations so VS Code's defaults are used again.
+
+### Changed
+- Reverted explicit `tulcase.*.focus` `contributes.commands` declarations and
+  `commandPalette` suppression entries from `package.json`.
+
+### Notes
+- This branch implements the revert and was merged to `develop` as `v1.2.1`.
+
 ## [1.2.0] – 2026-03-27
 
 ### Summary
