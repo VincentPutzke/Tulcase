@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { buildSettings } from './config';
+import { buildSettings, ensureInitialized } from './config';
 import { syncRecurringTodos } from './data/recurring-sync';
 
 // Suppress benign Node.js deprecation / experimental warnings that appear in
@@ -23,6 +23,7 @@ import { syncRecurringTodos } from './data/recurring-sync';
 import { DataFileWatcher } from './watchers/file-watcher';
 import { TodoListViewProvider } from './views/todo-list.view';
 import { TagTreeProvider } from './providers/tag-tree.provider';
+import { TagListViewProvider } from './views/tag-list.view';
 import { CommandListViewProvider } from './views/command-list.view';
 import { LinkListViewProvider } from './views/link-list.view';
 import { NoteListViewProvider } from './views/note-list.view';
@@ -36,14 +37,19 @@ import { registerCommandCommands } from './commands/command-commands';
 import { registerLinkCommands } from './commands/link-commands';
 import { registerListCommands } from './commands/list-commands';
 import { registerRecordCommands } from './commands/record-commands';
+import { registerDbCommands } from './commands/db-commands';
 import { StatusBar } from './views/status-bar';
 
 export function activate(context: vscode.ExtensionContext): void {
-    // 1. Resolve settings
+    // 1. Initialise database layout + resolve settings
     const settings = buildSettings();
+    ensureInitialized(settings.rootDir);
+    // Re-derive paths in case migration changed the active db
+    Object.assign(settings, buildSettings(settings.rootDir));
 
     // 2. Initialize providers (tagTree first — todoList uses it for colour lookups)
     const tagTree     = new TagTreeProvider(settings);
+    const tagList     = new TagListViewProvider(settings, tagTree);
     const todoList    = new TodoListViewProvider(settings, tagTree);
     const commandList = new CommandListViewProvider(settings, tagTree);
     const linkList    = new LinkListViewProvider(settings, tagTree);
@@ -60,7 +66,11 @@ export function activate(context: vscode.ExtensionContext): void {
             todoList,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
-        vscode.window.registerTreeDataProvider('tulcase.tags', tagTree),
+        vscode.window.registerWebviewViewProvider(
+            TagListViewProvider.viewType,
+            tagList,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
         vscode.window.registerWebviewViewProvider(
             CommandListViewProvider.viewType,
             commandList,
@@ -93,6 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const refreshAll = () => {
         todoList.refresh();
         tagTree.refresh();
+        tagList.refresh();
         commandList.refresh();
         linkList.refresh();
         noteList.refresh();
@@ -102,24 +113,25 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // 5. Register commands
     registerTodoCommands(context, settings, todoList, tagTree);
-    registerTagCommands(context, settings, tagTree, refreshAll);
+    registerTagCommands(context, settings, tagList, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);
     registerLinkCommands(context, settings, linkList);
     registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
+    registerDbCommands(context, settings, refreshAll);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
     );
 
     // 6. Status bar
-    const statusBar = new StatusBar(todoList);
+    const statusBar = new StatusBar(todoList, settings);
     context.subscriptions.push(statusBar);
 
     // 7. File watcher for cross-instance sync
     const watcher = new DataFileWatcher(settings);
     watcher.onTodosChanged(() => { todoList.refresh(); statusBar.update(); });
-    watcher.onTagsChanged(() => tagTree.refresh());
+    watcher.onTagsChanged(() => { tagTree.refresh(); tagList.refresh(); });
     watcher.onCommandsChanged(() => commandList.refresh());
     watcher.onLinksChanged(() => linkList.refresh());
     watcher.onListsChanged(() => { noteList.refresh(); noteDecorator.refreshAll(); });

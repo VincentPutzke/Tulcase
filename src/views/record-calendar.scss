@@ -1,78 +1,179 @@
-// ── CSS custom properties (VS Code theme tokens) ─────────────────────────────
-// All colours are read from the active VS Code theme at runtime.
-// This file uses no Sass-specific features beyond nesting and variables so it
-// stays readable as plain CSS if the build step is ever removed.
+// ── Record Calendar Styles ────────────────────────────────────────────────────
+// Imports the shared foundation (body, reset, .layout, .add-bar, .add-btn,
+// .section-header, .tree-item, .action-btn, .empty-state, …) and applies
+// records-specific layout + calendar component styles on top.
+//
+// Layout regions (three direct children of .layout):
+//   .add-bar       — Log Time / Another Day buttons.
+//   .cal-pane      — Month navigation, calendar grid, month summary.
+//   .entries-pane  — Selected-day entries (rendered by JS).
+//
+// Narrow (sidebar) mode — column stack: add-bar → cal-pane → entries-pane.
+// Wide (panel) mode     — 2-column grid: cal-pane fills the left side;
+//                         add-bar + entries-pane stack in the right column.
+@use 'shared';
 
-// Colour shorthand helpers (no import needed – these are inline mixins)
+// Re-export a few colour variables from shared for local use.
 $grid-line   : var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 $card-bg     : var(--vscode-editor-inactiveSelectionBackground, rgba(128, 128, 128, 0.08));
 $card-border : var(--vscode-widget-border, rgba(128, 128, 128, 0.22));
+$view-bg     : var(--vscode-sideBar-background, var(--vscode-editor-background));
 $green       : var(--vscode-charts-green, #4ec9b0);
 $blue        : var(--vscode-charts-blue, #75beff);
 $btn-bg      : var(--vscode-button-background, #0e639c);
 $btn-fg      : var(--vscode-button-foreground, #fff);
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
-*,
-*::before,
-*::after {
-  box-sizing : border-box;
-  margin     : 0;
-  padding    : 0;
+// ── Records layout: portrait (sidebar) vs landscape (bottom panel) ───────────
+//
+// VS Code sidebar views are portrait (height > width).
+// VS Code bottom-panel views are landscape (width > height).
+// CSS Container Query `orientation` detects this without any pixel threshold,
+// so the wide grid layout is exclusive to the bottom panel and always active
+// there, while the sidebar always gets the single-column stack.
+//
+// Portrait — single column, add-bar always above the calendar:
+//   add-bar → cal-pane → entries-pane
+//   A portrait @container rule resets the shared min-width:500px flex-row
+//   override so a wide open sidebar stays in column mode.
+//
+// Landscape — 2-column grid, always active:
+//   col 1 (1fr):   cal-pane — fills full height, calendar does NOT overflow
+//   col 2 (220px): add-bar (top) + entries-pane (bottom, scrolls)
+//   Calendar cells drop aspect-ratio and share available height equally via
+//   grid-auto-rows:1fr so the grid never exceeds the panel height.
+
+// Base defaults (portrait / sidebar).
+.add-bar      { flex-shrink : 0; }
+// cal-pane height is driven by its content (calendar has an explicit min() height,
+// see portrait @container block below) — overflow:hidden clips any rounding dust.
+.cal-pane     { flex-shrink : 0; overflow : hidden; }
+.entries-pane { flex : 1 1 0; min-height : 0; overflow-y : auto; }
+
+// ── Portrait — keep column layout at all widths ───────────────────────────────
+// Overrides the shared @container min-width:500px rule that would otherwise
+// switch .layout to flex-direction:row when the sidebar is wider than 500 px.
+@container view-panel (orientation: portrait) {
+  .layout {
+    flex-direction : column;
+  }
+
+  // The calendar must never push its rows outside the visible panel.
+  //
+  // Without an explicit height the grid's height is driven by
+  //   aspect-ratio: 1  →  height = 6 rows × (panelWidth / 7)
+  // which silently overflows when the panel is shorter than wide.
+  //
+  // We cap the calendar with the SMALLER of:
+  //   a) its natural square height  — calc((available-width) × 6/7)
+  //   b) the space that actually exists below the other fixed elements
+  //      — calc(100cqh − 190px)
+  //      190 px ≈ body-padding(16) + add-bar(46) + month-nav(42)
+  //             + day-headers(18) + wrapper-margin(4) + month-summary(43)
+  //             + a small safety buffer
+  //
+  // grid-auto-rows:1fr then divides that height equally among the 6 rows,
+  // so all days are always visible.  aspect-ratio:auto lets cells conform
+  // to the row height instead of forcing squares when height is the
+  // limiting dimension.
+  .calendar {
+    height         : min(
+      calc((100cqw - 20px) * 6 / 7),
+      calc(100cqh - 190px)
+    );
+    grid-auto-rows : 1fr;
+  }
+
+  .day {
+    aspect-ratio : auto;
+  }
 }
 
-// ── Root layout ───────────────────────────────────────────────────────────────
-body {
-  font-family    : var(--vscode-font-family);
-  font-size      : var(--vscode-font-size, 13px);
-  color          : var(--vscode-foreground);
-  background     : var(--vscode-panel-background, var(--vscode-editor-background));
-  padding        : 10px 12px;
-  height         : 100vh;
-  overflow       : hidden;
-  display        : flex;
-  flex-direction : column;
-}
+// ── Landscape — 2-column grid for the bottom panel ────────────────────────────
+@container view-panel (orientation: landscape) {
+  .layout {
+    display               : grid;
+    // Column 1 (cal-pane): width is derived from the container HEIGHT — the
+    // smaller dimension in landscape — so the 7×6 calendar cells stay square.
+    //
+    //   available-grid-height = 100cqh − 120px
+    //     120px ≈ body-padding(16) + month-nav(42) + day-headers(22) + month-summary(40)
+    //
+    //   cal-pane-width = available-grid-height × 7/6
+    //     (7 columns, 6 rows → width / height = 7/6 for square cells)
+    //
+    //   clamped:
+    //     min 180px — always usable even in very short panels
+    //     max calc(100cqw − 232px) — leaves ≥ 200px for the entries column
+    //       (232px = 12px gap + 20px body-padding + 200px min-entries-content)
+    //
+    // Column 2 (entries-pane): 1fr — fills ALL remaining space.
+    // In wide panels this gives the notes section generous room to breathe.
+    grid-template-columns : clamp(180px, calc((100cqh - 120px) * 7 / 6), calc(100cqw - 232px)) 1fr;
+    grid-template-rows    : auto 1fr;   // row 1: add-bar height; row 2: entries
+    gap                   : 0 12px;
+  }
 
-// ── Two-column layout ─────────────────────────────────────────────────────────
-// flex row; both columns share the remaining body height.
-// min-height: 0 on every flex/grid child is mandatory — without it, flex items
-// will not shrink below their intrinsic content height.
-.layout {
-  display    : flex;
-  flex       : 1;
-  min-height : 0;
-}
+  // Calendar: left column, spans both grid rows — occupies full panel height.
+  .cal-pane {
+    grid-column    : 1;
+    grid-row       : 1 / 3;
+    display        : flex;
+    flex-direction : column;
+    overflow       : hidden;    // hard boundary — nothing escapes the panel
+    min-height     : 0;
+  }
 
-// ── Calendar column ───────────────────────────────────────────────────────────
-.cal-col {
-  flex           : 1;
-  min-width      : 0;
-  min-height     : 0;
-  display        : flex;
-  flex-direction : column;
-  padding-right  : 14px;
-  overflow       : hidden;
-}
+  // Cal-wrapper grows to fill the space between the month-nav and the summary.
+  .cal-wrapper {
+    flex           : 1 1 0;
+    min-height     : 0;
+    overflow       : hidden;
+    display        : flex;
+    flex-direction : column;
+  }
 
-// ── Vertical divider ──────────────────────────────────────────────────────────
-.col-divider {
-  width       : 1px;
-  align-self  : stretch;
-  background  : $grid-line;
-  flex-shrink : 0;
-  margin      : 2px 0;
-}
+  // Day-header strip is fixed height inside the wrapper.
+  .day-headers {
+    flex-shrink : 0;
+  }
 
-// ── Detail column ─────────────────────────────────────────────────────────────
-.detail-col {
-  width          : 220px;
-  flex-shrink    : 0;
-  min-height     : 0;
-  display        : flex;
-  flex-direction : column;
-  padding-left   : 14px;
-  overflow       : hidden;
+  // Calendar grid fills the wrapper; rows share available height equally.
+  // grid-auto-rows:1fr distributes height instead of letting aspect-ratio drive it.
+  .calendar {
+    flex           : 1 1 0;
+    min-height     : 0;
+    grid-auto-rows : 1fr;
+  }
+
+  // Drop aspect-ratio so cells conform to the equal-height rows.
+  .day {
+    aspect-ratio : auto;
+  }
+
+  // Month summary pinned below the calendar at fixed height.
+  .month-summary {
+    flex-shrink : 0;
+  }
+
+  // Add-bar: top of the right column; buttons stack vertically.
+  .add-bar {
+    grid-column    : 2;
+    grid-row       : 1;
+    // flex-direction : column;
+    border-left    : 1px solid $grid-line;
+    padding-left   : 12px;
+    // margin-bottom  : 10px;
+  }
+
+  // Entries pane: fills the right column below the add-bar and scrolls.
+  .entries-pane {
+    grid-column  : 2;
+    grid-row     : 2;
+    overflow-y   : auto;
+    min-height   : 0;
+    border-left  : 1px solid $grid-line;
+    padding-left : 12px;
+  }
 }
 
 // ── Month navigation bar ──────────────────────────────────────────────────────
@@ -117,17 +218,17 @@ body {
   text-transform : uppercase;
 }
 
-// ── Day-of-week header row ─────────────────────────────────────────────────────
-// Separated from the grid so it has its own fixed height and a visible bottom
-// separator.  JS keeps its column widths in sync with the grid via --cell.
+// ── Calendar wrapper ──────────────────────────────────────────────────────────
+.cal-wrapper {
+  margin-bottom : 4px;
+}
+
+// ── Day-of-week header row ────────────────────────────────────────────────────
 .day-headers {
-  display         : grid;
-  grid-template-columns : repeat(7, var(--cell, 36px));
-  justify-content : space-between;
-  flex-shrink     : 0;
-  padding-bottom  : 4px;
-  margin-bottom   : 4px;
-  border-bottom   : 2px solid $grid-line;  // ← horizontal section separator
+  display               : grid;
+  grid-template-columns : repeat(7, 1fr);
+  gap                   : 1px;
+  margin-bottom         : 2px;
 }
 
 .day-hdr {
@@ -136,183 +237,92 @@ body {
   font-weight    : 700;
   letter-spacing : 0.07em;
   color          : var(--vscode-descriptionForeground);
-  background     : $card-bg;
-  border-radius  : 3px;
   padding        : 3px 0;
 }
 
 // ── Calendar grid ─────────────────────────────────────────────────────────────
-// --cell is set by JS (ResizeObserver) to the largest square that fits.
-// justify-content / align-content: space-between → remaining space distributes
-// as gaps, so the visual "space between boxes scales with window size".
+// `gap: 1px` + opaque cell backgrounds reveals the container's background
+// colour as grid lines between every cell.
 .calendar {
-  --cell            : 36px;   // initial value; overridden by JS immediately
-  display           : grid;
-  grid-template-columns : repeat(7, var(--cell));
-  grid-template-rows    : repeat(6, var(--cell));
-  justify-content   : space-between;  // horizontal spacing grows with panel width
-  align-content     : space-between;  // vertical spacing grows with panel height
-  flex              : 1;
-  min-height        : 0;
+  display               : grid;
+  grid-template-columns : repeat(7, 1fr);
+  gap                   : 1px;
+  background            : $grid-line;
+  border                : 1px solid $grid-line;
+  border-radius         : 5px;
+  overflow              : hidden;
 }
 
 // ── Day cell ──────────────────────────────────────────────────────────────────
 .day {
-  // Width & height come entirely from the grid's --cell variable.
-  // No aspect-ratio needed – the grid enforces square rows.
-  border-radius   : 5px;
+  background      : $view-bg;
+  aspect-ratio    : 1;
   display         : flex;
   flex-direction  : column;
   align-items     : center;
   justify-content : center;
   cursor          : pointer;
-  border          : 1px solid $card-border;
-  // Table-line effect: a shared outline on every cell creates a visible grid
-  outline         : 1px solid $grid-line;
-  outline-offset  : -1px;
-  transition      : transform 0.1s, border-color 0.1s, box-shadow 0.1s;
+  transition      : background 0.12s, box-shadow 0.12s;
   user-select     : none;
-  overflow        : hidden;
-
-  &:hover {
-    transform    : scale(1.08);
-    border-color : var(--vscode-focusBorder) !important;
-    outline      : none;
-    box-shadow   : 0 3px 8px rgba(0, 0, 0, 0.3);
-    z-index      : 1;
-    position     : relative;
-  }
+  position        : relative;
 
   &.empty {
-    visibility     : hidden;
     pointer-events : none;
   }
 
-  // ── Intensity levels — theme-adaptive colour ramp ────────────────────────
-  // l0: no work      → distinct input-background tint
-  // l1: ≤ 2 h        → 22 % green
-  // l2: ≤ 5 h        → 50 % green
-  // l3: ≤ 8 h        → 78 % green + white text
-  // l4: > 8 h        → full green + bold
-  &.l0 { background : var(--vscode-input-background, rgba(128, 128, 128, 0.08)); }
-  &.l1 { background : color-mix(in srgb, #{$green} 22%, var(--vscode-editor-background)); }
-  &.l2 { background : color-mix(in srgb, #{$green} 50%, var(--vscode-editor-background)); }
-  &.l3 {
-    background : color-mix(in srgb, #{$green} 78%, var(--vscode-editor-background));
-    color      : $btn-fg;
-  }
-  &.l4 {
-    background   : $green;
-    color        : $btn-fg;
-    font-weight  : 700;
-    border-color : color-mix(in srgb, #{$green} 70%, #000000) !important;
+  // Binary colour — day has at least one entry (40 % saturation for visibility)
+  &.has-entry {
+    background : color-mix(in srgb, #{$green} 40%, var(--vscode-editor-background));
   }
 
-  // Today: blue ring
+  // Today: blue inset frame
   &.today {
-    border-color : $blue !important;
-    border-width : 2px !important;
+    box-shadow : inset 0 0 0 2px #{$blue};
   }
 
-  // Selected: primary-colour ring + glow
+  // Selected: primary inset frame (overrides today)
   &.selected {
-    border-color : $btn-bg !important;
-    border-width : 2px !important;
-    box-shadow   : 0 0 0 2px $btn-bg;
-    outline      : none;
+    box-shadow : inset 0 0 0 2px #{$btn-bg};
+  }
+
+  // Hover: subtle focus border (only when not already today / selected)
+  &:not(.empty):hover:not(.today):not(.selected) {
+    box-shadow : inset 0 0 0 1px var(--vscode-focusBorder);
+  }
+
+  // Hover background for all non-empty cells
+  &:not(.empty):hover {
+    background : var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
   }
 }
 
 .day-num   { font-size: 11px; font-weight: 500; line-height: 1; }
 .day-hours { font-size: 9px;  opacity: 0.85;    line-height: 1; margin-top: 2px; }
 
-// ── Detail header card ────────────────────────────────────────────────────────
-.detail-header {
-  background    : $card-bg;
-  border        : 1px solid $card-border;
-  border-radius : 6px;
-  padding       : 8px 10px;
-  margin-bottom : 10px;
-  flex-shrink   : 0;
-}
-
-.detail-month {
-  font-size   : 13px;
-  font-weight : 700;
-  color       : var(--vscode-foreground);
-}
-
-.detail-stats {
+// ── Month summary stats ───────────────────────────────────────────────────────
+.month-summary {
+  display     : flex;
+  flex-wrap   : wrap;
+  align-items : center;
+  gap         : 4px 8px;
+  padding     : 6px 8px;
+  margin      : 4px 0 8px;
   font-size   : 11px;
   color       : var(--vscode-descriptionForeground);
-  margin-top  : 4px;
-  line-height : 1.6;
+  border-top  : 1px solid $grid-line;
 }
 
-// ── Selected-day label ────────────────────────────────────────────────────────
-.detail-day-label {
-  display        : inline-block;
-  font-size      : 11px;
-  font-weight    : 700;
-  color          : $btn-fg;
-  background     : $blue;
-  border-radius  : 4px;
-  padding        : 2px 8px;
-  margin-bottom  : 6px;
-  letter-spacing : 0.04em;
-  flex-shrink    : 0;
-
-  &:empty { display: none; }
+.summary-sep {
+  opacity : 0.4;
 }
 
-// ── Entry list ────────────────────────────────────────────────────────────────
-// Horizontal separator above the entries list (2nd detail section)
-.entries-section {
-  display        : flex;
-  flex-direction : column;
-  flex           : 1;
-  min-height     : 0;
-  padding-top    : 8px;
-  border-top     : 2px solid $grid-line;  // ← horizontal section separator in detail
+// ── Empty-state icon (calendar placeholder) ───────────────────────────────────
+.empty-state-icon {
+  margin-bottom : 8px;
+  opacity       : 0.4;
 }
 
-.entries {
-  display        : flex;
-  flex-direction : column;
-  gap            : 5px;
-  overflow-y     : auto;
-  flex           : 1;
-  min-height     : 0;
-  padding-top    : 2px;
-}
-
-.entry {
-  background    : $card-bg;
-  border-radius : 5px;
-  padding       : 6px 9px;
-  border-left   : 3px solid $blue;
-  border-top    : 1px solid $card-border;
-  border-right  : 1px solid $card-border;
-  border-bottom : 1px solid $card-border;
-}
-
-.entry-time {
-  font-size   : 11px;
-  font-weight : 700;
-  color       : $blue;
-}
-
-.entry-notes {
-  font-size  : 11px;
-  margin-top : 3px;
-  word-break : break-word;
-  color      : var(--vscode-foreground);
-  opacity    : 0.9;
-}
-
-.hint {
-  font-size  : 11px;
-  color      : var(--vscode-descriptionForeground);
-  font-style : italic;
-  padding    : 4px 2px;
+// ── Highlighted time label in tree-items ──────────────────────────────────────
+.tree-item-label {
+  color : $blue;
 }

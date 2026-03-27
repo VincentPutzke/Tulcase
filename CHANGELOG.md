@@ -5,6 +5,44 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] – 2026-03-27
+
+### Summary
+Feature release: **Directory-based Database Management**.  Each database is now
+a named sub-folder under `{rootDir}/data/{name}/`, and switching databases simply
+changes which folder the extension reads from — no copying or snapshotting
+required.  Four new palette commands let users export, import, switch, and sync
+databases across workspaces via the clipboard.
+
+### Added
+- `src/config.ts` — new fields `rootDir`, `activeDb` on `TulcaseSettings`;
+  `switchSettingsTo()` mutates settings in-place; `ensureInitialized()` handles
+  first-run setup and legacy flat-layout migration; `ensureDatabase()` seeds
+  empty database directories; `readActiveDb()` / `writeActiveDb()` persist the
+  active database name.
+- `src/data/db-manager.ts` — `listDatabases`, `createDatabase`,
+  `exportDatabase`, `importDatabase` for the new directory-based layout.
+- `src/commands/db-commands.ts` — four palette commands:
+  - **Export Database** (`tulcase.db.export`) — pick any database → clipboard.
+  - **Import Database** (`tulcase.db.import`) — clipboard → new database,
+    with optional immediate switch.
+  - **Switch Database** (`tulcase.db.switch`) — pick or create a database and
+    switch to it instantly (no confirmation needed).
+  - **Update Database** (`tulcase.db.update`) — clipboard → overwrite the
+    database with the same name (cross-workspace sync).
+- `src/test/db-manager.test.ts` — 16 unit tests covering db-manager operations,
+  config init, migration, buildSettings, switchSettingsTo, and round-trips.
+
+### Changed
+- `src/extension.ts` — calls `ensureInitialized()` on activation; wires
+  `registerDbCommands`.
+- `package.json` — declared 4 new commands with icons; bumped to `1.3.0`.
+- Data directory layout changed from flat (`{rootDir}/todo_db/…`) to
+  `{rootDir}/data/{dbName}/todo_db/…`.  A "default" database is created
+  automatically on first launch, and legacy data is migrated into it.
+
+---
+
 ## [1.2.1] – 2026-03-27
 
 ### Summary

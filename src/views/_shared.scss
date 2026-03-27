@@ -8,6 +8,7 @@
 $grid-line   : var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 $card-bg     : var(--vscode-editor-inactiveSelectionBackground, rgba(128, 128, 128, 0.08));
 $card-border : var(--vscode-widget-border, rgba(128, 128, 128, 0.22));
+$view-bg     : var(--vscode-sideBar-background, var(--vscode-editor-background));
 $green       : var(--vscode-charts-green, #4ec9b0);
 $red         : var(--vscode-charts-red, #f14c4c);
 $yellow      : var(--vscode-charts-yellow, #cca700);
@@ -34,11 +35,11 @@ body {
   font-family    : var(--vscode-font-family);
   font-size      : var(--vscode-font-size, 13px);
   color          : var(--vscode-foreground);
-  background     : var(--vscode-panel-background, var(--vscode-editor-background));
+  background     : $view-bg;
   padding        : 8px 10px;
   height         : 100vh;
   overflow       : hidden;
-  container-type : inline-size;
+  container-type : size;
   container-name : view-panel;
 }
 
@@ -65,11 +66,19 @@ body {
   }
 
   .controls-pane {
+    display        : flex;
+    flex-direction : column;
+    gap            : 10px;
     order      : 2;           // controls on the right
     flex       : 0 0 220px;   // fixed width
     max-width  : 260px;
     border-left: 1px solid $grid-line;
     padding-left: 12px;
+
+    .add-bar,
+    .search-bar {
+      margin-bottom: 0;
+    }
   }
 
   .tree-pane {
@@ -139,8 +148,8 @@ body {
   position       : sticky;
   top            : 0;
   z-index        : 10;
-  background     : var(--vscode-panel-background, var(--vscode-editor-background));
-  padding-bottom : 4px;
+  background     : $view-bg;
+  padding-bottom : 0px;
 }
 
 .search-icon {
