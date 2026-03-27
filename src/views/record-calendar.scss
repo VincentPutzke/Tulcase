@@ -37,11 +37,11 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
 //   override so a wide open sidebar stays in column mode.
 //
 // Landscape — 2-column grid, always active:
-//   col 1 (1fr):   cal-pane — fills full height; the calendar wrapper scrolls
-//                   internally when the month grid no longer fits
+//   col 1 (1fr):   cal-pane — fills full height; the calendar canvas scales
+//                   to the available space instead of scrolling
 //   col 2 (220px): add-bar (top) + entries-pane (bottom, scrolls)
 //   Calendar cells drop aspect-ratio and share available height equally via
-//   grid-auto-rows:1fr so the grid never exceeds the panel height.
+//   grid-auto-rows:1fr so the grid always fits inside the panel.
 
 // Base defaults (portrait / sidebar).
 .add-bar      { flex-shrink : 0; }
@@ -80,8 +80,7 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
   .cal-wrapper {
     flex           : 1 1 0;
     min-height     : 0;
-    overflow-y     : auto;
-    overflow-x     : hidden;
+    overflow       : hidden;
     display        : flex;
     flex-direction : column;
   }
@@ -96,7 +95,7 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
   .calendar {
     flex           : 1 1 0;
     min-height     : 0;
-    grid-auto-rows : minmax(72px, 1fr);
+    grid-auto-rows : 1fr;
   }
 
   // Drop aspect-ratio so cells conform to the equal-height rows.
