@@ -36,6 +36,7 @@ import { registerCommandCommands } from './commands/command-commands';
 import { registerLinkCommands } from './commands/link-commands';
 import { registerListCommands } from './commands/list-commands';
 import { registerRecordCommands } from './commands/record-commands';
+import { registerDbCommands } from './commands/db-commands';
 import { StatusBar } from './views/status-bar';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -107,6 +108,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerLinkCommands(context, settings, linkList);
     registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
+    registerDbCommands(context, settings, refreshAll);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),

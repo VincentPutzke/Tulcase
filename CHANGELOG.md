@@ -5,6 +5,37 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] – 2026-03-27
+
+### Summary
+Feature release: adds **Database Management** — four new palette commands that
+let users save, restore, export, and import named database snapshots, enabling
+multi-database workflows within a single workspace and portable data transport
+between workspaces.
+
+### Added
+- `src/data/db-manager.ts` — data layer for named database snapshots stored
+  under `{baseDir}/_databases/{name}/`. Provides `listDatabases`,
+  `snapshotTo`, `restoreFrom`, `exportDatabase`, and `importDatabase`.
+- `src/commands/db-commands.ts` — four palette commands:
+  - **Export Database** (`tulcase.db.export`) — serialises a saved snapshot to
+    the clipboard as a portable JSON bundle.
+  - **Import Database** (`tulcase.db.import`) — reads a JSON bundle from the
+    clipboard and persists it as a new named snapshot, with optional immediate
+    switch.
+  - **Switch Database** (`tulcase.db.switch`) — restores a saved snapshot over
+    the live data (with modal confirmation).
+  - **Update Database** (`tulcase.db.update`) — snapshots the current live data
+    into an existing or new named slot.
+- `src/test/db-manager.test.ts` — 10 unit tests covering snapshot, restore,
+  export/import round-trip, format validation, and error handling.
+
+### Changed
+- `src/extension.ts` — wired `registerDbCommands` into the activation flow.
+- `package.json` — declared the four new commands with icons.
+
+---
+
 ## [1.2.1] – 2026-03-27
 
 ### Summary
