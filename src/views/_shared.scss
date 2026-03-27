@@ -71,6 +71,9 @@ body {
     max-width  : 260px;
     border-left: 1px solid $grid-line;
     padding-left: 12px;
+    .add-bar {
+      margin-bottom: 12px;
+    }
   }
 
   .tree-pane {
