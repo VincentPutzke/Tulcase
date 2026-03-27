@@ -2,7 +2,7 @@
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
   "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -191,6 +191,30 @@
         "title": "Refresh All",
         "category": "Tulcase",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "tulcase.db.export",
+        "title": "Export Database",
+        "category": "Tulcase",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "tulcase.db.import",
+        "title": "Import Database",
+        "category": "Tulcase",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "tulcase.db.switch",
+        "title": "Switch Database",
+        "category": "Tulcase",
+        "icon": "$(database)"
+      },
+      {
+        "command": "tulcase.db.update",
+        "title": "Update Database",
+        "category": "Tulcase",
+        "icon": "$(sync)"
       }
     ],
     "menus": {

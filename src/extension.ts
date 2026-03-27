@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { buildSettings } from './config';
+import { buildSettings, ensureInitialized } from './config';
 import { syncRecurringTodos } from './data/recurring-sync';
 
 // Suppress benign Node.js deprecation / experimental warnings that appear in
@@ -36,11 +36,15 @@ import { registerCommandCommands } from './commands/command-commands';
 import { registerLinkCommands } from './commands/link-commands';
 import { registerListCommands } from './commands/list-commands';
 import { registerRecordCommands } from './commands/record-commands';
+import { registerDbCommands } from './commands/db-commands';
 import { StatusBar } from './views/status-bar';
 
 export function activate(context: vscode.ExtensionContext): void {
-    // 1. Resolve settings
+    // 1. Initialise database layout + resolve settings
     const settings = buildSettings();
+    ensureInitialized(settings.rootDir);
+    // Re-derive paths in case migration changed the active db
+    Object.assign(settings, buildSettings(settings.rootDir));
 
     // 2. Initialize providers (tagTree first — todoList uses it for colour lookups)
     const tagTree     = new TagTreeProvider(settings);
@@ -107,6 +111,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerLinkCommands(context, settings, linkList);
     registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
+    registerDbCommands(context, settings, refreshAll);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
