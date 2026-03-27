@@ -25,8 +25,6 @@ export function registerTodoCommands(
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.todo.add', () => {
-            // Focus the Todos panel, then open the guided add dialog.
-            vscode.commands.executeCommand('tulcase.todos.focus');
             todoList.addTodoFromPalette();
         }),
         vscode.commands.registerCommand('tulcase.todo.quickAdd', () =>

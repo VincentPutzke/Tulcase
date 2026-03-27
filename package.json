@@ -157,6 +157,12 @@
         "icon": "$(link-external)"
       },
       {
+        "command": "tulcase.link.grab",
+        "title": "Grab Link URL",
+        "category": "Tulcase",
+        "icon": "$(clippy)"
+      },
+      {
         "command": "tulcase.note.add",
         "title": "Add Note",
         "category": "Tulcase",
@@ -234,7 +240,13 @@
         { "command": "tulcase.tag.rename", "when": "false" },
         { "command": "tulcase.tag.changeColor", "when": "false" },
         { "command": "tulcase.tag.changeCategory", "when": "false" },
-        { "command": "tulcase.tag.delete", "when": "false" }
+        { "command": "tulcase.tag.delete", "when": "false" },
+        { "command": "tulcase.todos.focus", "when": "false" },
+        { "command": "tulcase.commands.focus", "when": "false" },
+        { "command": "tulcase.lists.focus", "when": "false" },
+        { "command": "tulcase.links.focus", "when": "false" },
+        { "command": "tulcase.tags.focus", "when": "false" },
+        { "command": "tulcase.records.focus", "when": "false" }
       ]
     },
     "keybindings": [

@@ -26,8 +26,6 @@ export function registerListCommands(
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.note.add', () => {
-            // Focus the Notes panel and open the guided add-note dialog.
-            vscode.commands.executeCommand('tulcase.lists.focus');
             noteList.addNoteFromPalette();
         }),
         vscode.commands.registerCommand('tulcase.note.open', () =>

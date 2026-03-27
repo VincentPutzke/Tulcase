@@ -28,8 +28,6 @@ export function registerCommandCommands(
 ): void {
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.command.add', () => {
-            // Focus the Commands panel and open the guided add dialog.
-            vscode.commands.executeCommand('tulcase.commands.focus');
             commandList.addCommandFromPalette();
         }),
         vscode.commands.registerCommand('tulcase.command.copy', () =>
