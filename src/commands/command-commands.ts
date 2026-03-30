@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { showTreePicker } from '../data/tree-picker';
-import { resolveCommand } from '../utils/placeholder';
+import { resolveCommand } from '../utils/placeholder-resolve';
 import type { TulcaseSettings } from '../config';
 import type { CommandItem, CommandStore } from '../models/command.model';
 import type { CommandListViewProvider } from '../views/command-list.view';

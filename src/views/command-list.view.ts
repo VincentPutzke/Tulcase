@@ -5,8 +5,8 @@ import { generateId } from '../utils/id';
 import {
     parsePlaceholders,
     prunePlaceholders,
-    resolveCommand,
 } from '../utils/placeholder';
+import { resolveCommand } from '../utils/placeholder-resolve';
 import type {
     CommandItem,
     CommandStore,
