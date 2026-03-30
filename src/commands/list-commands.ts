@@ -2,7 +2,6 @@
  * Palette command registration for the Notes feature.
  *
  * `tulcase.note.add`  — triggers the guided add-note dialog in the Notes panel.
- *                       Also wired to the view/title "+" button.
  * `tulcase.note.open` — shows a searchable tree-picker of all notes grouped
  *                       by folder; opens the selected note in the main editor.
  */

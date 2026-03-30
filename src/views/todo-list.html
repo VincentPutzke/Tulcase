@@ -197,6 +197,7 @@
     if (isDone)    { classes.push('done'); }
 
     let html = '<div class="' + classes.join(' ') + '" data-id="' + esc(item.id) + '">';
+    html += '<div class="tree-item-row">';
 
     // ── Content (left, 2 lines) ──
     html += '<div class="tree-item-content">';
@@ -251,6 +252,7 @@
     }
 
     html += '</div>'; // .tree-item-actions
+    html += '</div>'; // .tree-item-row
     html += '</div>'; // .tree-item
 
     return html;

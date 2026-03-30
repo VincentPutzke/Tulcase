@@ -206,11 +206,6 @@
     "menus": {
       "view/title": [
         {
-          "command": "tulcase.note.add",
-          "when": "view == tulcase.lists",
-          "group": "navigation"
-        },
-        {
           "command": "tulcase.tag.add",
           "when": "view == tulcase.tags",
           "group": "navigation"
