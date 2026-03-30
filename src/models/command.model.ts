@@ -1,3 +1,9 @@
+/** Per-placeholder metadata stored alongside a command. */
+export interface PlaceholderDef {
+    /** Default values the user can pick from. Empty array = free-text only. */
+    defaults: string[];
+}
+
 /** A single command/snippet entry (new array-based format). */
 export interface CommandItem {
     id: string;
@@ -6,6 +12,11 @@ export interface CommandItem {
     tags: string[];
     /** Folder path for tree organisation. Empty string = root level. */
     folder: string;
+    /**
+     * Optional map of placeholder name → default-value list.
+     * A placeholder appears in the command text as `<$name$>`.
+     */
+    placeholders?: Record<string, PlaceholderDef>;
 }
 
 /** Root shape of commands.json (v2 — items array). */

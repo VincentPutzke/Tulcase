@@ -2,11 +2,17 @@ import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
+import {
+    parsePlaceholders,
+    prunePlaceholders,
+    resolveCommand,
+} from '../utils/placeholder';
 import type {
     CommandItem,
     CommandStore,
     LegacyCommandStore,
     LegacyCommandEntry,
+    PlaceholderDef,
 } from '../models/command.model';
 import { BaseListViewProvider } from './base-list.view';
 
@@ -74,7 +80,10 @@ export class CommandListViewProvider extends BaseListViewProvider {
         const item = data.items.find(i => i.id === id);
         if (!item) { return; }
 
-        await vscode.env.clipboard.writeText(item.command);
+        const resolved = await resolveCommand(item);
+        if (resolved === undefined) { return; }
+
+        await vscode.env.clipboard.writeText(resolved);
         vscode.window.showInformationMessage(`Copied: ${item.label}`);
     }
 
@@ -83,12 +92,15 @@ export class CommandListViewProvider extends BaseListViewProvider {
         const item = data.items.find(i => i.id === id);
         if (!item) { return; }
 
+        const resolved = await resolveCommand(item);
+        if (resolved === undefined) { return; }
+
         let terminal = vscode.window.activeTerminal;
         if (!terminal) {
             terminal = vscode.window.createTerminal('Tulcase');
         }
         terminal.show();
-        terminal.sendText(item.command);
+        terminal.sendText(resolved);
     }
 
     private async _editCommand(id: string): Promise<void> {
@@ -96,13 +108,29 @@ export class CommandListViewProvider extends BaseListViewProvider {
         const item = data.items.find(i => i.id === id);
         if (!item) { return; }
 
-        const field = await vscode.window.showQuickPick([
+        const hasPlaceholders = parsePlaceholders(item.command).length > 0;
+
+        const picks: vscode.QuickPickItem[] = [
             { label: 'Label',   description: item.label },
             { label: 'Command', description: item.command.substring(0, 60) },
             { label: 'Tags',    description: item.tags.join(', ') },
             { label: 'Folder',  description: item.folder || '(root)' },
-            { label: 'Delete',  description: 'Remove this command' },
-        ], { placeHolder: 'What to edit?' });
+        ];
+
+        // Only show "Placeholders" when the command contains placeholder tokens
+        if (hasPlaceholders) {
+            const names = parsePlaceholders(item.command);
+            picks.push({
+                label: 'Placeholders',
+                description: names.map(n => `<$${n}$>`).join(', '),
+            });
+        }
+
+        picks.push({ label: 'Delete', description: 'Remove this command' });
+
+        const field = await vscode.window.showQuickPick(picks, {
+            placeHolder: 'What to edit?',
+        });
 
         if (!field) { return; }
 
@@ -117,7 +145,11 @@ export class CommandListViewProvider extends BaseListViewProvider {
                 prompt: 'New command text',
                 value: item.command,
             });
-            if (v !== undefined) { item.command = v; }
+            if (v !== undefined) {
+                item.command = v;
+                // Prune stale placeholder keys after command text change
+                item.placeholders = prunePlaceholders(v, item.placeholders);
+            }
         } else if (field.label === 'Tags') {
             const picked = await pickTags(this.tagTree, item.tags);
             if (picked) { item.tags = picked; }
@@ -125,6 +157,27 @@ export class CommandListViewProvider extends BaseListViewProvider {
             const existing = this._getExistingFolders(data);
             const folderPick = await this._pickFolder(existing, item.folder);
             if (folderPick !== undefined) { item.folder = folderPick; }
+        } else if (field.label === 'Placeholders') {
+            const names = parsePlaceholders(item.command);
+            const placeholders = item.placeholders ?? {};
+
+            for (const name of names) {
+                const current = placeholders[name]?.defaults ?? [];
+                const input = await vscode.window.showInputBox({
+                    prompt: `Default values for <$${name}$> (comma-separated, leave empty for free text)`,
+                    value: current.join(', '),
+                    placeHolder: 'e.g. main, develop, feature/*',
+                });
+                if (input === undefined) { return; } // cancelled
+                const defaults = input
+                    ? input.split(',').map(s => s.trim()).filter(Boolean)
+                    : [];
+                placeholders[name] = { defaults };
+            }
+
+            item.placeholders = Object.keys(placeholders).length > 0
+                ? placeholders
+                : undefined;
         } else if (field.label === 'Delete') {
             const confirm = await vscode.window.showWarningMessage(
                 `Delete "${item.label}"?`, { modal: true }, 'Delete',
@@ -161,24 +214,51 @@ export class CommandListViewProvider extends BaseListViewProvider {
         if (!label) { return; }
 
         const command = await vscode.window.showInputBox({
-            prompt: 'Command text (shell command)',
-            placeHolder: 'git submodule update --init --recursive',
+            prompt: 'Command text (shell command) — use <$name$> for placeholders',
+            placeHolder: 'git checkout <$branch$> && npm install',
         });
         if (command === undefined) { return; }
 
+        // ── Placeholder defaults ───────────────────────────────────────────
+        const names = parsePlaceholders(command);
+        let placeholders: Record<string, PlaceholderDef> | undefined;
+
+        if (names.length > 0) {
+            const map: Record<string, PlaceholderDef> = {};
+
+            for (const name of names) {
+                const input = await vscode.window.showInputBox({
+                    prompt: `Default values for <$${name}$> (comma-separated, leave empty for free text)`,
+                    placeHolder: 'e.g. main, develop, feature/*',
+                });
+                if (input === undefined) { return; } // cancelled
+                const defaults = input
+                    ? input.split(',').map(s => s.trim()).filter(Boolean)
+                    : [];
+                map[name] = { defaults };
+            }
+
+            placeholders = Object.keys(map).length > 0 ? map : undefined;
+        }
+
+        // ── Tags & folder ──────────────────────────────────────────────────
         const tags = await pickTags(this.tagTree) ?? [];
 
         const data     = await this._readstore();
         const existing = this._getExistingFolders(data);
         const folder   = await this._pickFolder(existing, '') ?? '';
 
-        data.items.push({
+        const item: CommandItem = {
             id: generateId('cmd'),
             label,
             command,
             tags,
             folder,
-        });
+        };
+
+        if (placeholders) { item.placeholders = placeholders; }
+
+        data.items.push(item);
 
         await store.write(this.settings.commandsFile, data);
         await this._sendData();
