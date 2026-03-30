@@ -5,6 +5,21 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.9] – 2026-03-30
+
+### Summary
+Patch release: restore the canonical TODO row layout and remove the stale Notes title action.
+
+### Fixed
+- `src/views/todo-list.html` — TODO items now render their content and action buttons inside the shared `.tree-item-row` container again, so edit/postpone/done actions stay right-aligned like the other list views.
+- `src/views/todo-list.scss` — overrides the shared row cursor for TODO items so the row does not imply click-to-open behavior.
+
+### Changed
+- `package.json` — removed the obsolete `tulcase.note.add` title-bar action from the Notes view and bumped the extension version to `1.3.9`.
+- `src/commands/list-commands.ts` — updated the command registration comment to match the current UI.
+
+---
+
 ## [1.3.0] – 2026-03-27
 
 ### Summary
