@@ -71,6 +71,7 @@ The repository includes a plain GitHub documentation set in `docs/`.
 - `docs/workflows-and-hacks.md`
 - `docs/architecture.md`
 - `docs/roadmap.md`
+- `docs/releasing.md`
 
 ## Release Status
 
@@ -116,8 +117,21 @@ Open the Tulcase workspace in VS Code and press `F5` to launch an Extension Deve
 - `src/` extension source code
 - `out/` bundled output
 - `media/` icons and static assets
-- `docs/` GitHub Pages documentation
+- `docs/` repository documentation
 - `vscode-working-tool/` planning and migration notes
+
+### Release Automation
+
+Tulcase includes upstream GitHub Actions automation for:
+
+- CI test and build validation on pushes and pull requests
+- manual release dispatch from GitHub Actions
+- automatic semantic version bumping during the release workflow
+- automatic tag creation
+- automatic GitHub Release publishing
+- automatic `.vsix` upload as a release asset
+
+See `docs/releasing.md` for the operational release flow.
 
 
 ## Documentation Intent
