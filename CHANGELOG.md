@@ -5,6 +5,31 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] – 2026-03-30
+
+### Summary
+Feature release: **command placeholders**. Commands can now contain `<$name$>` tokens that are resolved interactively when copying or sending to the terminal.
+
+### Added
+- **Placeholder syntax** — use `<$name$>` inside any command text to mark dynamic segments (e.g. `git checkout <$branch$>`).
+- **Default-value entry** — when adding or editing a command, each detected placeholder prompts for an optional comma-separated list of default values.
+- **Interactive resolution** — on Copy or Send-to-Terminal, each placeholder shows a QuickPick (if defaults exist) or an InputBox (free text). A "Custom…" option is always available.
+- **Edit → Placeholders** — a new edit-menu entry lets you update default values for existing placeholders.
+- **Stale-key pruning** — when the command text is edited, placeholder metadata for removed tokens is cleaned up automatically.
+- **Visual indicator** — commands with placeholders show a small badge in the webview listing.
+- `src/utils/placeholder.ts` — pure parsing/replacement utilities (`parsePlaceholders`, `applyPlaceholders`, `prunePlaceholders`).
+- `src/utils/placeholder-resolve.ts` — VS Code–dependent `resolveCommand` helper.
+- `docs/command-placeholders-plan.md` — feature plan document.
+- 17 new unit tests for placeholder parsing, application, and pruning.
+
+### Changed
+- `CommandItem` model gains an optional `placeholders` field (`Record<string, PlaceholderDef>`).
+- `command-list.view.ts` — add-command, copy, terminal, and edit flows now support placeholder resolution.
+- `command-commands.ts` — palette copy & insert commands resolve placeholders before acting.
+- `command-list.html` / `command-list.scss` — placeholder badge indicator in webview UI.
+
+---
+
 ## [1.3.12] – 2026-03-30
 
 ### Summary
