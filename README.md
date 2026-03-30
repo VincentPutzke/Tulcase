@@ -20,7 +20,7 @@ It is designed as a practical local-first companion:
 - file-based so your data stays inspectable and portable
 - integrated with VS Code instead of fighting it
 
-## A VS Code Extension First
+## A VS Code Extension
 
 Tulcase is not a separate web app wrapped around your workflow.
 
@@ -78,17 +78,6 @@ Current release line: `1.3.x`
 
 See `CHANGELOG.md` for release history.
 
-## Documentation Intent
-
-The README is the fast overview.
-
-The Pages site is the deeper reference for:
-
-- onboarding
-- workflows
-- architecture
-- practical usage patterns
-- future ideas worth building
 
 ## For Developers
 
@@ -129,3 +118,16 @@ Open the Tulcase workspace in VS Code and press `F5` to launch an Extension Deve
 - `media/` icons and static assets
 - `docs/` GitHub Pages documentation
 - `vscode-working-tool/` planning and migration notes
+
+
+## Documentation Intent
+
+The README is the fast overview.
+
+The Pages site is the deeper reference for:
+
+- onboarding
+- workflows
+- architecture
+- practical usage patterns
+- future ideas worth building
