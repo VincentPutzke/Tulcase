@@ -244,6 +244,12 @@
         "command": "tulcase.todo.quickAdd",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t"
+      },
+      {
+        "command": "tulcase.internal.forceCustomValue",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "inQuickOpen"
       }
     ]
   },
