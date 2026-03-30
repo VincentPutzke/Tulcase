@@ -1,8 +1,3 @@
----
-layout: default
-title: Workflows and Hacks
----
-
 # Workflows and Hacks
 
 This page collects practical patterns that make Tulcase pay for itself.

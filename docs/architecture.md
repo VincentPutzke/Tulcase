@@ -1,8 +1,3 @@
----
-layout: default
-title: Architecture Notes
----
-
 # Architecture Notes
 
 Tulcase is intentionally simple in its storage model and practical in its extension architecture.
@@ -93,6 +88,6 @@ The hard parts are not storage. They are behavior and polish:
 The repository uses two levels of documentation:
 
 - the root README for repository orientation
-- the `docs/` site for durable product and workflow guidance
+- the `docs/` folder for durable product and workflow guidance
 
 That split keeps GitHub visitors productive without forcing every detail into a single landing page.

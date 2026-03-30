@@ -64,9 +64,9 @@ The product goal is simple:
 
 ## Docs
 
-The repository includes a GitHub Pages-ready documentation site in `docs/`.
+The repository includes a plain GitHub documentation set in `docs/`.
 
-- `docs/index.md`
+- `docs/README.md`
 - `docs/getting-started.md`
 - `docs/workflows-and-hacks.md`
 - `docs/architecture.md`
@@ -124,7 +124,7 @@ Open the Tulcase workspace in VS Code and press `F5` to launch an Extension Deve
 
 The README is the fast overview.
 
-The Pages site is the deeper reference for:
+The `docs/` folder is the deeper reference for:
 
 - onboarding
 - workflows

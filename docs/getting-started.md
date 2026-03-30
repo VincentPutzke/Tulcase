@@ -1,8 +1,3 @@
----
-layout: default
-title: Getting Started
----
-
 # Getting Started
 
 ## Install From Source

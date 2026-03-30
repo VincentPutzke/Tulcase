@@ -5,6 +5,22 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.11] – 2026-03-30
+
+### Summary
+Hotfix release: rework the documentation so it works directly in the GitHub repository without GitHub Pages.
+
+### Changed
+- `README.md` — updated the docs section to point at a plain repository docs folder instead of a Pages site.
+- `docs/` — converted all documentation pages to plain GitHub markdown by removing Jekyll frontmatter.
+- `docs/README.md` — added a repository-native documentation landing page for GitHub browsing.
+
+### Removed
+- `docs/_config.yml` — removed the Jekyll configuration because Pages is not enabled.
+- `.github/workflows/pages.yml` — removed the GitHub Pages deployment workflow.
+
+---
+
 ## [1.3.10] – 2026-03-30
 
 ### Summary

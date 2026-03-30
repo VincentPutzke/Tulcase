@@ -1,8 +1,3 @@
----
-layout: default
-title: Roadmap and Ideas
----
-
 # Roadmap and Ideas
 
 This page captures the direction that makes Tulcase more useful for developer reality, not just more feature-rich on paper.
