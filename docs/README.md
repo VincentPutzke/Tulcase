@@ -10,6 +10,7 @@ It is meant to be browsed directly in the repository without requiring GitHub Pa
 - [Workflows and Hacks](workflows-and-hacks.md)
 - [Architecture Notes](architecture.md)
 - [Roadmap and Ideas](roadmap.md)
+- [Releasing Tulcase](releasing.md)
 
 ## What Tulcase Is
 

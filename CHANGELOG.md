@@ -5,6 +5,23 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.12] – 2026-03-30
+
+### Summary
+Feature release: add upstream CI and automated VSIX release workflows with automatic semantic version bumping.
+
+### Added
+- `.github/workflows/ci.yml` — GitHub Actions CI pipeline with dedicated test and build jobs for pushes and pull requests.
+- `.github/workflows/release.yml` — GitHub-hosted release pipeline with test, build, and release stages.
+- `docs/releasing.md` — documentation for the automated GitHub release flow.
+
+### Changed
+- `README.md` — documents the new release automation entry points.
+- `docs/README.md` — links to release-process documentation.
+- `package.json` and `package-lock.json` — synchronized to version `1.3.12`.
+
+---
+
 ## [1.3.11] – 2026-03-30
 
 ### Summary
