@@ -1,6 +1,17 @@
 # Tulcase
 
-Tulcase is a VS Code productivity suite for developers who want task tracking, time logging, notes, command snippets, bookmarks, tags, and recurring work in the same place they already code.
+Tulcase is a VS Code extension for developers who want their personal productivity system directly inside the editor.
+
+Instead of spreading work across browser tabs, sticky notes, temporary files, and terminal history, Tulcase keeps the supporting pieces of development work inside VS Code:
+
+- todos
+- notes
+- saved commands
+- links
+- tags
+- time records
+- recurring tasks
+- multiple local databases
 
 It is designed as a practical local-first companion:
 
@@ -9,9 +20,22 @@ It is designed as a practical local-first companion:
 - file-based so your data stays inspectable and portable
 - integrated with VS Code instead of fighting it
 
+## A VS Code Extension First
+
+Tulcase is not a separate web app wrapped around your workflow.
+
+It is built to feel like part of VS Code:
+
+- work from the Activity Bar and panel views
+- trigger actions from the command palette
+- keep context next to the code you are editing
+- stay in one environment while planning, executing, and tracking work
+
+The point is simple: less context switching, less repeated friction, and faster everyday development work.
+
 ## What It Does
 
-Tulcase currently provides these core modules inside VS Code:
+Tulcase provides these core modules inside VS Code:
 
 - TODOs with date buckets, quick add, tagging, postpone, and done flows
 - Notes with folders, metadata editing, markdown editing, and tag decorations
@@ -29,7 +53,46 @@ The product goal is simple:
 
 > save time, reduce context switching, and keep everyday developer support tools close to the code.
 
-## Quick Start
+## Daily Workflow Highlights
+
+- Capture todos without leaving the editor.
+- Keep reusable shell commands where you can copy or insert them in seconds.
+- Store links that belong to the codebase you are working on.
+- Take lightweight project notes without switching tools.
+- Track time directly from the same environment where the work happened.
+- Maintain multiple Tulcase databases for different contexts.
+
+## Docs
+
+The repository includes a GitHub Pages-ready documentation site in `docs/`.
+
+- `docs/index.md`
+- `docs/getting-started.md`
+- `docs/workflows-and-hacks.md`
+- `docs/architecture.md`
+- `docs/roadmap.md`
+
+## Release Status
+
+Current release line: `1.3.x`
+
+See `CHANGELOG.md` for release history.
+
+## Documentation Intent
+
+The README is the fast overview.
+
+The Pages site is the deeper reference for:
+
+- onboarding
+- workflows
+- architecture
+- practical usage patterns
+- future ideas worth building
+
+## For Developers
+
+This section is for working on the extension itself.
 
 ### Install dependencies
 
@@ -59,47 +122,10 @@ npm run package
 
 Open the Tulcase workspace in VS Code and press `F5` to launch an Extension Development Host.
 
-## Daily Workflow Highlights
-
-- Capture todos without leaving the editor.
-- Keep reusable shell commands where you can copy or insert them in seconds.
-- Store links that belong to the codebase you are working on.
-- Take lightweight project notes without switching tools.
-- Track time directly from the same environment where the work happened.
-- Maintain multiple Tulcase databases for different contexts.
-
-## Docs
-
-The repository includes a GitHub Pages-ready documentation site in `docs/`.
-
-- `docs/index.md`
-- `docs/getting-started.md`
-- `docs/workflows-and-hacks.md`
-- `docs/architecture.md`
-- `docs/roadmap.md`
-
-## Repository Structure
+### Repository Structure
 
 - `src/` extension source code
 - `out/` bundled output
 - `media/` icons and static assets
 - `docs/` GitHub Pages documentation
 - `vscode-working-tool/` planning and migration notes
-
-## Release Status
-
-Current release line: `1.3.x`
-
-See `CHANGELOG.md` for release history.
-
-## Documentation Intent
-
-The README is the fast overview.
-
-The Pages site is the deeper reference for:
-
-- onboarding
-- workflows
-- architecture
-- practical usage patterns
-- future ideas worth building
