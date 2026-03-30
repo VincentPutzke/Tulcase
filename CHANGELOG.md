@@ -5,6 +5,26 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.10] – 2026-03-30
+
+### Summary
+Patch release: add a proper GitHub-facing README and a GitHub Pages-ready documentation site for Tulcase.
+
+### Added
+- `README.md` — repository landing page covering product purpose, feature overview, setup, and doc links.
+- `docs/index.md` — documentation home page for GitHub Pages.
+- `docs/getting-started.md` — practical setup and first-use guidance.
+- `docs/workflows-and-hacks.md` — productivity patterns and usage tips for developers.
+- `docs/architecture.md` — high-level architecture and storage notes.
+- `docs/roadmap.md` — focused product direction and future ideas.
+- `docs/_config.yml` — Jekyll configuration for a GitHub Pages publish target.
+- `.github/workflows/pages.yml` — automated Pages deployment workflow for documentation updates on `main`.
+
+### Changed
+- `package.json` — bumped the extension version to `1.3.10`.
+
+---
+
 ## [1.3.9] – 2026-03-30
 
 ### Summary

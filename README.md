@@ -72,11 +72,11 @@ Open the Tulcase workspace in VS Code and press `F5` to launch an Extension Deve
 
 The repository includes a GitHub Pages-ready documentation site in `docs/`.
 
-- [Documentation Home](docs/index.md)
-- [Getting Started](docs/getting-started.md)
-- [Workflows and Hacks](docs/workflows-and-hacks.md)
-- [Architecture Notes](docs/architecture.md)
-- [Roadmap and Ideas](docs/roadmap.md)
+- `docs/index.md`
+- `docs/getting-started.md`
+- `docs/workflows-and-hacks.md`
+- `docs/architecture.md`
+- `docs/roadmap.md`
 
 ## Repository Structure
 
@@ -90,7 +90,7 @@ The repository includes a GitHub Pages-ready documentation site in `docs/`.
 
 Current release line: `1.3.x`
 
-See [CHANGELOG.md](CHANGELOG.md) for release history.
+See `CHANGELOG.md` for release history.
 
 ## Documentation Intent
 
