@@ -1,0 +1,11 @@
+title: Tulcase
+description: A local-first VS Code productivity suite for developers.
+theme: minima
+markdown: kramdown
+plugins:
+  - jekyll-seo-tag
+header_pages:
+  - getting-started.md
+  - workflows-and-hacks.md
+  - architecture.md
+  - roadmap.md
