@@ -4,13 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: Semantic version bump for the release
+        description: Release mode. Normal releases use the synced version; major releases bump manually.
         required: true
-        default: patch
+        default: none
         type: choice
         options:
-          - patch
-          - minor
+          - none
           - major
 
 permissions:
@@ -91,11 +90,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version
+      - name: Determine release version
         id: version
         shell: bash
         run: |
-          npm version "${{ inputs.release_type }}" --no-git-tag-version
+          if [ "${{ inputs.release_type }}" = "major" ]; then
+            npm version major --no-git-tag-version
+          fi
+
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
@@ -105,6 +107,7 @@ jobs:
         run: npm run package
 
       - name: Commit release version
+        if: ${{ inputs.release_type == 'major' }}
         run: |
           git add package.json package-lock.json
           git commit -m "[skip ci] chore: release v${{ steps.version.outputs.version }}"
@@ -113,9 +116,14 @@ jobs:
         run: git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
 
       - name: Push release commit and tag
+        if: ${{ inputs.release_type == 'major' }}
         run: |
           git push origin HEAD:main
           git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Push release tag
+        if: ${{ inputs.release_type != 'major' }}
+        run: git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Publish GitHub release
         env:
