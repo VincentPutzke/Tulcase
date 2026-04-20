@@ -8,9 +8,9 @@
 //   .cal-pane      — Month navigation, calendar grid, month summary.
 //   .entries-pane  — Selected-day entries (rendered by JS).
 //
-// Narrow (sidebar) mode — column stack: add-bar → cal-pane → entries-pane.
-// Wide (panel) mode     — 2-column grid: cal-pane fills the left side;
-//                         add-bar + entries-pane stack in the right column.
+// Records uses a single stack in both narrow and wide modes so the calendar
+// always receives the full available width. The entries section stays below
+// the calendar and scrolls independently when needed.
 @use 'shared';
 
 // Re-export a few colour variables from shared for local use.
@@ -23,157 +23,60 @@ $blue        : var(--vscode-charts-blue, #75beff);
 $btn-bg      : var(--vscode-button-background, #0e639c);
 $btn-fg      : var(--vscode-button-foreground, #fff);
 
-// ── Records layout: portrait (sidebar) vs landscape (bottom panel) ───────────
+// ── Records layout: keep the calendar wide in every panel shape ──────────────
 //
-// VS Code sidebar views are portrait (height > width).
-// VS Code bottom-panel views are landscape (width > height).
-// CSS Container Query `orientation` detects this without any pixel threshold,
-// so the wide grid layout is exclusive to the bottom panel and always active
-// there, while the sidebar always gets the single-column stack.
-//
-// Portrait — single column, add-bar always above the calendar:
-//   add-bar → cal-pane → entries-pane
-//   A portrait @container rule resets the shared min-width:500px flex-row
-//   override so a wide open sidebar stays in column mode.
-//
-// Landscape — 2-column grid, always active:
-//   col 1 (1fr):   cal-pane — fills full height, calendar does NOT overflow
-//   col 2 (220px): add-bar (top) + entries-pane (bottom, scrolls)
-//   Calendar cells drop aspect-ratio and share available height equally via
-//   grid-auto-rows:1fr so the grid never exceeds the panel height.
+// The records calendar is width-sensitive. Splitting the panel into columns
+// leaves too little room for the 7th day column on some VS Code panel sizes,
+// so records keeps a single stack regardless of orientation.
 
-// Base defaults (portrait / sidebar).
+// Base layout: always stack top-to-bottom.
 .add-bar      { flex-shrink : 0; }
-// cal-pane height is driven by its content (calendar has an explicit min() height,
-// see portrait @container block below) — overflow:hidden clips any rounding dust.
-.cal-pane     { flex-shrink : 0; overflow : hidden; }
-.entries-pane { flex : 1 1 0; min-height : 0; overflow-y : auto; }
+.cal-pane     { flex-shrink : 0; overflow : hidden; min-width : 0; }
+.entries-pane { flex : 1 1 0; min-height : 0; overflow-y : auto; min-width : 0; }
 
-// ── Portrait — keep column layout at all widths ───────────────────────────────
-// Overrides the shared @container min-width:500px rule that would otherwise
-// switch .layout to flex-direction:row when the sidebar is wider than 500 px.
-@container view-panel (orientation: portrait) {
-  .layout {
-    flex-direction : column;
-  }
-
-  // The calendar must never push its rows outside the visible panel.
-  //
-  // Without an explicit height the grid's height is driven by
-  //   aspect-ratio: 1  →  height = 6 rows × (panelWidth / 7)
-  // which silently overflows when the panel is shorter than wide.
-  //
-  // We cap the calendar with the SMALLER of:
-  //   a) its natural square height  — calc((available-width) × 6/7)
-  //   b) the space that actually exists below the other fixed elements
-  //      — calc(100cqh − 190px)
-  //      190 px ≈ body-padding(16) + add-bar(46) + month-nav(42)
-  //             + day-headers(18) + wrapper-margin(4) + month-summary(43)
-  //             + a small safety buffer
-  //
-  // grid-auto-rows:1fr then divides that height equally among the 6 rows,
-  // so all days are always visible.  aspect-ratio:auto lets cells conform
-  // to the row height instead of forcing squares when height is the
-  // limiting dimension.
-  .calendar {
-    height         : min(
-      calc((100cqw - 20px) * 6 / 7),
-      calc(100cqh - 190px)
-    );
-    grid-auto-rows : 1fr;
-  }
-
-  .day {
-    aspect-ratio : auto;
-  }
+.layout {
+  flex-direction : column;
 }
 
-// ── Landscape — 2-column grid for the bottom panel ────────────────────────────
-@container view-panel (orientation: landscape) {
-  .layout {
-    display               : grid;
-    // Column 1 (cal-pane): width is derived from the container HEIGHT — the
-    // smaller dimension in landscape — so the 7×6 calendar cells stay square.
-    //
-    //   available-grid-height = 100cqh − 120px
-    //     120px ≈ body-padding(16) + month-nav(42) + day-headers(22) + month-summary(40)
-    //
-    //   cal-pane-width = available-grid-height × 7/6
-    //     (7 columns, 6 rows → width / height = 7/6 for square cells)
-    //
-    //   clamped:
-    //     min 180px — always usable even in very short panels
-    //     max calc(100cqw − 232px) — leaves ≥ 200px for the entries column
-    //       (232px = 12px gap + 20px body-padding + 200px min-entries-content)
-    //
-    // Column 2 (entries-pane): 1fr — fills ALL remaining space.
-    // In wide panels this gives the notes section generous room to breathe.
-    grid-template-columns : clamp(180px, calc((100cqh - 120px) * 7 / 6), calc(100cqw - 232px)) 1fr;
-    grid-template-rows    : auto 1fr;   // row 1: add-bar height; row 2: entries
-    gap                   : 0 12px;
-  }
+.cal-wrapper {
+  margin-bottom : 4px;
+}
 
-  // Calendar: left column, spans both grid rows — occupies full panel height.
-  .cal-pane {
-    grid-column    : 1;
-    grid-row       : 1 / 3;
-    display        : flex;
-    flex-direction : column;
-    overflow       : hidden;    // hard boundary — nothing escapes the panel
-    min-height     : 0;
-  }
+.day-headers {
+  display               : grid;
+  grid-template-columns : repeat(7, minmax(0, 1fr));
+  gap                   : 1px;
+  margin-bottom         : 2px;
+}
 
-  // Cal-wrapper grows to fill the space between the month-nav and the summary.
-  .cal-wrapper {
-    flex           : 1 1 0;
-    min-height     : 0;
-    overflow       : hidden;
-    display        : flex;
-    flex-direction : column;
-  }
+.calendar {
+  display               : grid;
+  grid-template-columns : repeat(7, minmax(0, 1fr));
+  gap                   : 1px;
+  background            : $grid-line;
+  border                : 1px solid $grid-line;
+  border-radius         : 5px;
+  overflow              : hidden;
+  width                 : 100%;
+  min-width             : 0;
+  height                : min(
+    calc((100cqw - 20px) * 6 / 7),
+    calc(100cqh - 190px)
+  );
+  grid-auto-rows        : 1fr;
+}
 
-  // Day-header strip is fixed height inside the wrapper.
-  .day-headers {
-    flex-shrink : 0;
-  }
-
-  // Calendar grid fills the wrapper; rows share available height equally.
-  // grid-auto-rows:1fr distributes height instead of letting aspect-ratio drive it.
-  .calendar {
-    flex           : 1 1 0;
-    min-height     : 0;
-    grid-auto-rows : 1fr;
-  }
-
-  // Drop aspect-ratio so cells conform to the equal-height rows.
-  .day {
-    aspect-ratio : auto;
-  }
-
-  // Month summary pinned below the calendar at fixed height.
-  .month-summary {
-    flex-shrink : 0;
-  }
-
-  // Add-bar: top of the right column; buttons stack vertically.
-  .add-bar {
-    grid-column    : 2;
-    grid-row       : 1;
-    // flex-direction : column;
-    border-left    : 1px solid $grid-line;
-    padding-left   : 12px;
-    // margin-bottom  : 10px;
-  }
-
-  // Entries pane: fills the right column below the add-bar and scrolls.
-  .entries-pane {
-    grid-column  : 2;
-    grid-row     : 2;
-    overflow-y   : auto;
-    min-height   : 0;
-    border-left  : 1px solid $grid-line;
-    padding-left : 12px;
-  }
+.day {
+  background      : $view-bg;
+  aspect-ratio    : auto;
+  display         : flex;
+  flex-direction  : column;
+  align-items     : center;
+  justify-content : center;
+  cursor          : pointer;
+  transition      : background 0.12s, box-shadow 0.12s;
+  user-select     : none;
+  position        : relative;
 }
 
 // ── Month navigation bar ──────────────────────────────────────────────────────
@@ -218,54 +121,8 @@ $btn-fg      : var(--vscode-button-foreground, #fff);
   text-transform : uppercase;
 }
 
-// ── Calendar wrapper ──────────────────────────────────────────────────────────
-.cal-wrapper {
-  margin-bottom : 4px;
-}
-
-// ── Day-of-week header row ────────────────────────────────────────────────────
-.day-headers {
-  display               : grid;
-  grid-template-columns : repeat(7, 1fr);
-  gap                   : 1px;
-  margin-bottom         : 2px;
-}
-
-.day-hdr {
-  text-align     : center;
-  font-size      : 10px;
-  font-weight    : 700;
-  letter-spacing : 0.07em;
-  color          : var(--vscode-descriptionForeground);
-  padding        : 3px 0;
-}
-
-// ── Calendar grid ─────────────────────────────────────────────────────────────
-// `gap: 1px` + opaque cell backgrounds reveals the container's background
-// colour as grid lines between every cell.
-.calendar {
-  display               : grid;
-  grid-template-columns : repeat(7, 1fr);
-  gap                   : 1px;
-  background            : $grid-line;
-  border                : 1px solid $grid-line;
-  border-radius         : 5px;
-  overflow              : hidden;
-}
-
 // ── Day cell ──────────────────────────────────────────────────────────────────
 .day {
-  background      : $view-bg;
-  aspect-ratio    : 1;
-  display         : flex;
-  flex-direction  : column;
-  align-items     : center;
-  justify-content : center;
-  cursor          : pointer;
-  transition      : background 0.12s, box-shadow 0.12s;
-  user-select     : none;
-  position        : relative;
-
   &.empty {
     pointer-events : none;
   }

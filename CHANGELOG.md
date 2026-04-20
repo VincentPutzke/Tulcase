@@ -5,6 +5,22 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.1] – 2026-04-20
+
+### Summary
+Patch release: fix the records calendar width regression and add branch-aware automatic version sync.
+
+### Fixed
+- `src/views/record-calendar.scss` — the Records view now keeps a single stacked layout so the calendar always gets the full width and the Sunday column is no longer clipped in the panel.
+
+### Added
+- `scripts/auto-version.mjs` — computes branch-aware versions for `main`, `develop`, and feature branches.
+- `.github/workflows/version-sync.yml` — commits automatic version bumps on push with `[skip ci]`.
+
+### Changed
+- `package.json` / `package-lock.json` — bumped the current develop line to `1.4.1`.
+- `.github/workflows/release.yml` — release publishing now uses the already-synced version by default and keeps manual major bumps separate.
+
 ## [1.4.0] – 2026-03-30
 
 ### Summary
