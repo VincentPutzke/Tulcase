@@ -62,6 +62,9 @@ export class TodoListViewProvider extends BaseListViewProvider {
             case 'quickAddTodo':
                 await this._quickAddTodo();
                 break;
+            case 'clearDone':
+                await this._clearDone();
+                break;
         }
     }
 
@@ -125,6 +128,21 @@ export class TodoListViewProvider extends BaseListViewProvider {
         if (confirm !== 'Delete') { return; }
 
         data.items = data.items.filter(i => i.id !== id);
+        await store.write(this.settings.todosFile, data);
+        await this._sendData();
+    }
+
+    private async _clearDone(): Promise<void> {
+        const data = await store.read<TodoStore>(this.settings.todosFile, { items: [] });
+        const doneCount = data.items.filter(i => i.done).length;
+        if (doneCount === 0) { return; }
+
+        const confirm = await vscode.window.showWarningMessage(
+            `Delete all ${doneCount} completed todo(s)?`, { modal: true }, 'Delete',
+        );
+        if (confirm !== 'Delete') { return; }
+
+        data.items = data.items.filter(i => !i.done);
         await store.write(this.settings.todosFile, data);
         await this._sendData();
     }
