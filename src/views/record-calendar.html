@@ -14,14 +14,18 @@
 
 <div class="layout">
 
-<!-- ── Add bar ───────────────────────────────────────────────
-     Narrow (sidebar): sits above the calendar, full width.
-     Wide (panel):     moves to the top of the detail column
-     (right side), above the entries list.                  -->
-<div class="add-bar">
-  <button class="add-btn" id="btn-add">+ Log Time</button>
-  <button class="add-btn add-btn-secondary" id="btn-add-other">+ Another Day</button>
+<!-- ── Controls pane ────────────────────────────────────────
+     Pinned at the top in sidebar mode, just like all other
+     Tulcase views (todos, commands, links, etc.).          -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-add">+ Log Time</button>
+    <button class="add-btn add-btn-secondary" id="btn-add-other">+ Another Day</button>
+  </div>
 </div>
+
+<!-- ── Scrollable content (calendar + entries) ────────────── -->
+<div class="content-pane">
 
 <!-- ── Calendar pane ──────────────────────────────────────── -->
 <div class="cal-pane">
@@ -47,6 +51,7 @@
 <!-- ── Entries pane ────────────────────────────────────────── -->
 <div class="entries-pane" id="entries-section"></div>
 
+</div><!-- /.content-pane -->
 </div><!-- /.layout -->
 
 <script nonce="{{NONCE}}">
