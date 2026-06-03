@@ -67,7 +67,12 @@
   let month     = new Date().getMonth() + 1;
   let monthData = null;   // RecordDb | null
   let selected  = null;   // 'YYYY-MM-DD' | null
-  let entriesCollapsed = false;
+  var savedState = vscode.getState() || {};
+  let entriesCollapsed = savedState.entriesCollapsed !== undefined ? savedState.entriesCollapsed : false;
+
+  function saveState() {
+    vscode.setState({ entriesCollapsed: entriesCollapsed });
+  }
 
   // ── Utility ─────────────────────────────────────────────
 
@@ -273,6 +278,7 @@
     if (toggle) {
       toggle.addEventListener('click', function () {
         entriesCollapsed = !entriesCollapsed;
+        saveState();
         renderEntries();
       });
     }

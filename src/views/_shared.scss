@@ -60,12 +60,13 @@ body {
 
 // Wide layout: horizontal split
 @container view-panel (min-width: 500px) {
-  .layout {
+  // Only enable horizontal split when NOT in sidebar mode
+  body:not(.sidebar-mode) .layout {
     flex-direction : row;
     gap            : 12px;
   }
 
-  .controls-pane {
+  body:not(.sidebar-mode) .controls-pane {
     display        : flex;
     flex-direction : column;
     gap            : 10px;
@@ -81,7 +82,7 @@ body {
     }
   }
 
-  .tree-pane {
+  body:not(.sidebar-mode) .tree-pane {
     order      : 1;           // tree on the left
     flex       : 1 1 0;       // fills remaining space
     overflow-y : auto;
@@ -249,19 +250,19 @@ body {
   border-radius : 8px;
   min-width     : 18px;
   text-align    : center;
+  margin-left   : auto;
 }
 
 .section-actions {
   display     : flex;
+  visibility  : hidden;
   align-items : center;
   gap         : 2px;
   flex-shrink : 0;
-  opacity     : 0;
-  transition  : opacity 0.15s;
 }
 
 .section-header:hover .section-actions {
-  opacity: 1;
+  visibility: visible;
 }
 
 .section-body {
@@ -287,6 +288,14 @@ body {
     border-bottom: none;
   }
 
+  // Hide bottom border when a folder section follows directly
+  & + .section {
+    margin-top: 4px;
+  }
+  &:has(+ .section) {
+    border-bottom: none;
+  }
+
   &:hover {
     background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
   }
@@ -296,6 +305,7 @@ body {
   display     : flex;
   align-items : center;
   cursor      : pointer;
+  position    : relative;
 }
 
 .tree-item-icon {
@@ -321,6 +331,12 @@ body {
   overflow      : hidden;
   text-overflow : ellipsis;
   font-weight   : 500;
+}
+
+.tree-item:hover .tree-item-label {
+  white-space   : normal;
+  overflow      : visible;
+  text-overflow : clip;
 }
 
 .tree-item-meta {
@@ -355,18 +371,19 @@ body {
 }
 
 // ── Action buttons ────────────────────────────────────────────────────────────
+// Actions sit in the normal flex flow so that text can wrap to make room.
+// They are hidden via visibility so they reserve space even when not shown.
 .tree-item-actions {
   display     : flex;
+  visibility  : hidden;
   align-items : center;
   gap         : 2px;
   flex-shrink : 0;
   margin-left : 8px;
-  opacity     : 0;
-  transition  : opacity 0.15s;
 }
 
 .tree-item:hover .tree-item-actions {
-  opacity: 1;
+  visibility: visible;
 }
 
 .action-btn {

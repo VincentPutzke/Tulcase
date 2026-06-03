@@ -48,8 +48,13 @@
   let tagMap  = {};        // Record<string, TagDef>
   let today   = '';        // YYYY-MM-DD
   let query   = '';        // current search text
-  /** Track which sections the user has collapsed. */
-  const collapsed = { active: false, upcoming: false, done: true };
+  /** Track which sections the user has collapsed (persisted across reloads). */
+  const savedState = vscode.getState() || {};
+  const collapsed = savedState.collapsed || { active: false, upcoming: false, done: true };
+
+  function saveState() {
+    vscode.setState({ collapsed: collapsed });
+  }
 
   // ── DOM refs ────────────────────────────────────────────
   const searchEl   = document.getElementById('search');
@@ -177,7 +182,25 @@
     html += '  <span class="' + chevronCls + '">▼</span>';
     html += '  <span class="section-icon">' + icon + '</span>';
     html += '  <span class="section-label">' + label + '</span>';
+
+    // Section-specific action buttons (before badge so they appear to its left)
+    if (key === 'active') {
+      html += '  <span class="section-actions">';
+      html += '    <button class="action-btn btn-postpone" data-section-action="catchUp" title="Catch Up — set all active to today">';
+      html += '      ⟳';
+      html += '    </button>';
+      html += '  </span>';
+    }
+    if (key === 'done') {
+      html += '  <span class="section-actions">';
+      html += '    <button class="action-btn btn-delete" data-section-action="clearDone" title="Clear all done">';
+      html += '      <svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      html += '    </button>';
+      html += '  </span>';
+    }
+
     html += '  <span class="section-badge">' + items.length + '</span>';
+
     html += '</div>';
     html += '<div class="' + bodyCls + '">';
 
@@ -263,10 +286,22 @@
   function bindEvents() {
     // Section toggle
     document.querySelectorAll('[data-toggle]').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        // Don't toggle if a section action button was clicked
+        if (e.target.closest('[data-section-action]')) { return; }
         const key = el.getAttribute('data-toggle');
         collapsed[key] = !collapsed[key];
+        saveState();
         render();
+      });
+    });
+
+    // Section action buttons (e.g. clear done)
+    document.querySelectorAll('[data-section-action]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const action = el.getAttribute('data-section-action');
+        vscode.postMessage({ type: action });
       });
     });
 

@@ -14,6 +14,9 @@ export const DEFAULT_DB = 'default';
 /** File (inside rootDir) that stores the active database name. */
 const ACTIVE_DB_FILE = '.active-database';
 
+/** File (inside each db dir) that stores the last update/import timestamp. */
+const LAST_UPDATED_FILE = '.last-updated';
+
 /** Directories and seed data for an empty database. */
 const EMPTY_DB_STORES: Record<string, string> = {
     [path.join('todo_db', 'todos.json')]:     '{"items":[]}',
@@ -189,4 +192,20 @@ export function switchSettingsTo(settings: TulcaseSettings, dbName: string): voi
     Object.assign(settings, fresh);
     ensureDatabase(settings.baseDir);
     writeActiveDb(settings.rootDir, dbName);
+}
+
+// ── Last-updated tracking ──────────────────────────────────────────────────────
+
+/** Read the last-updated ISO timestamp for a database directory. Returns undefined if none. */
+export function readLastUpdated(dbDir: string): string | undefined {
+    try {
+        return fs.readFileSync(path.join(dbDir, LAST_UPDATED_FILE), 'utf-8').trim() || undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Write the current timestamp as the last-updated marker. */
+export function writeLastUpdated(dbDir: string): void {
+    fs.writeFileSync(path.join(dbDir, LAST_UPDATED_FILE), new Date().toISOString(), 'utf-8');
 }

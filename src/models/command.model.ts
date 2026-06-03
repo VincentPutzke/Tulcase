@@ -22,6 +22,15 @@ export interface CommandItem {
 /** Root shape of commands.json (v2 — items array). */
 export interface CommandStore {
     items: CommandItem[];
+    /** Named folders with parent-based nesting (v3). */
+    folders?: CommandFolder[];
+}
+
+/** A folder that can contain commands or other folders. */
+export interface CommandFolder {
+    id: string;          // e.g. 'cf_abc12345'
+    name: string;        // display name
+    parent: string;      // parent folder ID, '' = root
 }
 
 // ── Legacy format (v1) ────────────────────────────────────────────────────────
