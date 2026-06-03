@@ -85,9 +85,22 @@ export async function setRemoteUrl(dir: string, url: string): Promise<GitResult>
     return run(dir, ['remote', 'add', 'origin', url]);
 }
 
-/** `git add -A` — stage everything. */
+/** `git add -A` — stage everything, then purge any backslash-path index entries. */
 export async function gitAdd(dir: string): Promise<GitResult> {
-    return run(dir, ['add', '-A']);
+    const r = await run(dir, ['add', '-A']);
+    if (r.code !== 0) { return r; }
+
+    // Safety: remove index entries whose path contains a literal backslash.
+    // These are phantom duplicates caused by Windows path separators leaking
+    // into the git tree on some git versions / configurations.
+    const ls = await run(dir, ['ls-files']);
+    if (ls.code === 0) {
+        const bad = ls.stdout.split('\n').filter(f => f.includes('\\'));
+        for (const f of bad) {
+            await run(dir, ['rm', '--cached', '--', f]);
+        }
+    }
+    return r;
 }
 
 /** `git commit -m <message>`.  Returns code 1 if nothing to commit. */
