@@ -22,8 +22,19 @@ function run(cwd: string, args: string[], env?: Record<string, string>): Promise
     return new Promise(resolve => {
         const merged = { ...process.env, ...env };
         execFile('git', args, { cwd, env: merged, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-            const code = err ? (err as NodeJS.ErrnoException & { code?: number | string }).code === 'ENOENT' ? -1 : (err as { code?: number }).code ?? 1 : 0;
-            resolve({ stdout: stdout?.toString() ?? '', stderr: stderr?.toString() ?? '', code: typeof code === 'number' ? code : 1 });
+            if (!err) {
+                resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: 0 });
+                return;
+            }
+            // ENOENT → git binary not found
+            const nodeErr = err as NodeJS.ErrnoException;
+            if (nodeErr.code === 'ENOENT') {
+                resolve({ stdout: '', stderr: 'git not found', code: -1 });
+                return;
+            }
+            // Non-zero exit from git
+            const exitCode = (err as unknown as { status?: number }).status ?? 1;
+            resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: exitCode });
         });
     });
 }

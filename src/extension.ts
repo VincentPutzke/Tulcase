@@ -124,6 +124,13 @@ export function activate(context: vscode.ExtensionContext): void {
         statusBar.update();
     };
 
+    // Refresh views after sync pulls in new data
+    syncService.onStateChanged(state => {
+        if (state.status === 'idle' && state.lastSync) {
+            refreshAll();
+        }
+    });
+
     // 5. Register commands
     registerPlaceholderCommands(context);
     registerTodoCommands(context, settings, todoList, tagTree);
