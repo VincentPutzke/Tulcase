@@ -27,6 +27,7 @@ const store = new JsonStore();
 export class LinkListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.links';
     protected readonly viewName = 'link-list';
+    protected override readonly sidebarMode = true;
 
     /** Public entry-point for the palette command `tulcase.link.add`. */
     addLinkFromPalette(): void {

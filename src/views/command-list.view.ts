@@ -22,6 +22,7 @@ const store = new JsonStore();
 export class CommandListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.commands';
     protected readonly viewName = 'command-list';
+    protected override readonly sidebarMode = true;
 
     // ── Public palette entry-points ───────────────────────────────────────────
 

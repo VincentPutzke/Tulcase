@@ -60,12 +60,13 @@ body {
 
 // Wide layout: horizontal split
 @container view-panel (min-width: 500px) {
-  .layout {
+  // Only enable horizontal split when NOT in sidebar mode
+  body:not(.sidebar-mode) .layout {
     flex-direction : row;
     gap            : 12px;
   }
 
-  .controls-pane {
+  body:not(.sidebar-mode) .controls-pane {
     display        : flex;
     flex-direction : column;
     gap            : 10px;
@@ -81,7 +82,7 @@ body {
     }
   }
 
-  .tree-pane {
+  body:not(.sidebar-mode) .tree-pane {
     order      : 1;           // tree on the left
     flex       : 1 1 0;       // fills remaining space
     overflow-y : auto;

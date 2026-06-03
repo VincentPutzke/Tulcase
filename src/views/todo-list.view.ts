@@ -11,6 +11,7 @@ const store = new JsonStore();
 export class TodoListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.todos';
     protected readonly viewName = 'todo-list';
+    protected override readonly sidebarMode = true;
 
     // ── Public palette entry-points ───────────────────────────────────────────
 

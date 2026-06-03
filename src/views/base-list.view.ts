@@ -24,6 +24,9 @@ export abstract class BaseListViewProvider implements vscode.WebviewViewProvider
     /** Asset basename without extension, e.g. `'note-list'`. */
     protected abstract readonly viewName: string;
 
+    /** Whether this view defaults to the activity bar (sidebar). Disables wide layout. */
+    protected readonly sidebarMode: boolean = false;
+
     /** Handle a message from the webview. */
     protected abstract _handleMessage(msg: { type: string; id?: string }): Promise<void>;
 
@@ -65,9 +68,16 @@ export abstract class BaseListViewProvider implements vscode.WebviewViewProvider
             path.join(outDir, `${this.viewName}.css`), 'utf-8',
         );
 
-        return htmlTemplate
+        // Inject sidebar-mode class on body to disable wide layout in activity bar
+        let html = htmlTemplate
             .replace(/\{\{NONCE\}\}/g, nonce)
             .replace('{{STYLE}}', css);
+
+        if (this.sidebarMode) {
+            html = html.replace('<body>', '<body class="sidebar-mode">');
+        }
+
+        return html;
     }
 }
 

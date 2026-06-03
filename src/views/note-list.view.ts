@@ -25,6 +25,7 @@ const store = new JsonStore();
 export class NoteListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.lists';
     protected readonly viewName = 'note-list';
+    protected override readonly sidebarMode = true;
 
     // ── Public palette entry-points ───────────────────────────────────────────
 
