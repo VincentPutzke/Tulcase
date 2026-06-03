@@ -1,6 +1,16 @@
 // Sync panel – extends the shared design system
 @use 'shared' as *;
 
+// Override body overflow so the sync panel can scroll
+body {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+}
+
+.sync-scroll-container {
+  padding: 0;
+}
+
 // ── Config form ───────────────────────────────────────────────────────────────
 .sync-section {
   margin-bottom: 14px;

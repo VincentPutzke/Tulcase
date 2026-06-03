@@ -10,7 +10,7 @@
 </head>
 <body class="sidebar-mode">
 
-<div style="padding: 0; height: 100vh; overflow-y: auto;">
+<div class="sync-scroll-container">
 
   <!-- ── Configuration ──────────────────────────────── -->
   <div class="sync-section">
@@ -126,9 +126,7 @@
 
   btnSetupKeepLocal.addEventListener('click', function () { vscode.postMessage({ type: 'setupKeepLocal' }); });
   btnSetupUseRemote.addEventListener('click', function () {
-    if (confirm('This will delete ALL local Tulcase data and replace it with the remote repository. Continue?')) {
-      vscode.postMessage({ type: 'setupUseRemote' });
-    }
+    vscode.postMessage({ type: 'setupUseRemote' });
   });
 
   // ── Auto-sync toggle ───────────────────────────────

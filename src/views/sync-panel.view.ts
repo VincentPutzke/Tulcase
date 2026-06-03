@@ -96,8 +96,15 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
             }
 
             case 'setupUseRemote': {
-                // Discard local data and use remote
-                await this.syncService.resetToRemote();
+                // Confirm destructive action from the extension side
+                const pick = await vscode.window.showWarningMessage(
+                    'This will delete ALL local Tulcase data and replace it with the remote repository. Continue?',
+                    { modal: true },
+                    'Reset to Remote',
+                );
+                if (pick === 'Reset to Remote') {
+                    await this.syncService.resetToRemote();
+                }
                 break;
             }
 
