@@ -150,6 +150,16 @@ export function activate(context: vscode.ExtensionContext): void {
             const ok = await syncService.setup();
             if (ok) { await syncService.fullSync(); }
         }),
+        vscode.commands.registerCommand('tulcase.sync.resetToRemote', async () => {
+            const confirm = await vscode.window.showWarningMessage(
+                'This will delete ALL local Tulcase data and replace it with the remote repository. Continue?',
+                { modal: true },
+                'Reset to Remote',
+            );
+            if (confirm === 'Reset to Remote') {
+                await syncService.resetToRemote();
+            }
+        }),
         syncService,
     );
 

@@ -201,6 +201,67 @@ export class SyncService implements vscode.Disposable {
         });
     }
 
+    /**
+     * Discard all local data and replace it with the remote repository contents.
+     * Equivalent to: rm local → clone remote.
+     */
+    async resetToRemote(): Promise<boolean> {
+        return this._run('Resetting to remote…', async (url, pat) => {
+            // 1. Ensure git is available
+            if (!(await git.gitAvailable())) {
+                this._fail('Git is not installed or not on PATH.');
+                return false;
+            }
+
+            // 2. Ensure data dir exists
+            fs.mkdirSync(this.dir, { recursive: true });
+
+            // 3. Write .gitignore
+            this._ensureGitignore();
+
+            // 4. Remove existing repo and start fresh
+            const gitDir = path.join(this.dir, '.git');
+            if (fs.existsSync(gitDir)) {
+                fs.rmSync(gitDir, { recursive: true, force: true });
+            }
+
+            // 5. Init fresh repo
+            const init = await git.gitInit(this.dir);
+            if (init.code !== 0) {
+                this._fail('git init failed: ' + init.stderr);
+                return false;
+            }
+            await git.configureUser(this.dir, 'Tulcase', 'tulcase@sync');
+
+            // 6. Set remote
+            await git.setRemoteUrl(this.dir, url);
+
+            // 7. Fetch remote
+            const fetch = await git.gitFetch(this.dir, url, pat);
+            if (fetch.code !== 0) {
+                this._fail('Fetch failed: ' + fetch.stderr);
+                return false;
+            }
+
+            // 8. Hard-reset to remote main — overwrites all local files
+            const reset = await git.gitResetHard(this.dir, 'FETCH_HEAD');
+            if (reset.code !== 0) {
+                this._fail('Reset failed: ' + reset.stderr);
+                return false;
+            }
+
+            // 9. Clean untracked files
+            await git.gitClean(this.dir);
+
+            this._setState({
+                status: 'idle',
+                message: 'Reset to remote complete.',
+                lastSync: new Date().toISOString(),
+            });
+            return true;
+        });
+    }
+
     /** Refresh the state (check for uncommitted changes, last commit time). */
     async refreshState(): Promise<void> {
         const url = getRepoUrl();

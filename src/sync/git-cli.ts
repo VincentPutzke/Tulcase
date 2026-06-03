@@ -119,14 +119,36 @@ export async function gitPull(dir: string, remoteUrl: string, pat: string): Prom
     return run(dir, ['pull', '--ff-only', url, 'main']);
 }
 
-/** `git pull --rebase` from origin.  Aborts the rebase on conflict. */
+/** Remove stale rebase-merge / rebase-apply directories so a fresh pull can proceed. */
+export async function cleanRebaseState(dir: string): Promise<void> {
+    await run(dir, ['rebase', '--abort']).catch(() => {});
+    // Belt-and-suspenders: remove leftover dirs that confuse git
+    const { join } = await import('path');
+    const { rmSync } = await import('fs');
+    for (const sub of ['rebase-merge', 'rebase-apply']) {
+        try { rmSync(join(dir, '.git', sub), { recursive: true, force: true }); } catch { /* ok */ }
+    }
+}
+
+/** `git pull --rebase` from origin.  Cleans stale rebase state first, aborts on conflict. */
 export async function gitPullRebase(dir: string, remoteUrl: string, pat: string): Promise<GitResult> {
+    await cleanRebaseState(dir);
     const url = authenticatedUrl(remoteUrl, pat);
     const r = await run(dir, ['pull', '--rebase', url, 'main']);
     if (r.code !== 0 && r.stderr.includes('CONFLICT')) {
         await run(dir, ['rebase', '--abort']);
     }
     return r;
+}
+
+/** Hard-reset the working tree to a given ref (e.g. 'origin/main'). */
+export async function gitResetHard(dir: string, ref: string): Promise<GitResult> {
+    return run(dir, ['reset', '--hard', ref]);
+}
+
+/** Remove untracked files and directories. */
+export async function gitClean(dir: string): Promise<GitResult> {
+    return run(dir, ['clean', '-fd']);
 }
 
 /** `git fetch` from origin using an authenticated URL. */

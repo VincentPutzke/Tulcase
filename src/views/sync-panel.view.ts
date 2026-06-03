@@ -86,6 +86,21 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
                 break;
             }
 
+            case 'setupKeepLocal': {
+                // Keep local data, merge with remote
+                const ok2 = await this.syncService.setup();
+                if (ok2) {
+                    await this.syncService.fullSync();
+                }
+                break;
+            }
+
+            case 'setupUseRemote': {
+                // Discard local data and use remote
+                await this.syncService.resetToRemote();
+                break;
+            }
+
             case 'setAutoSync':
                 await cfg.setAutoSync(msg.enabled as boolean);
                 break;

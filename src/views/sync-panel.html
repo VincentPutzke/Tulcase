@@ -54,6 +54,28 @@
 
   <hr class="sync-divider">
 
+  <!-- ── Setup ──────────────────────────────────────── -->
+  <div class="sync-section">
+    <div class="sync-section-title">Initial Setup</div>
+    <p style="font-size: 12px; color: var(--vscode-descriptionForeground); margin: 0 0 6px;">
+      Choose how to initialise this machine:
+    </p>
+    <div class="sync-actions" style="flex-direction: column;">
+      <button class="sync-btn sync-btn-secondary" id="btnSetupKeepLocal" disabled style="width:100%;">
+        Keep Local &amp; Sync
+      </button>
+      <button class="sync-btn sync-btn-primary" id="btnSetupUseRemote" disabled style="width:100%;">
+        Use Remote (Reset)
+      </button>
+    </div>
+    <p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 6px 0 0;">
+      <strong>Keep Local</strong> — merges your existing data with the remote.<br>
+      <strong>Use Remote</strong> — discards all local data and downloads from the repo.
+    </p>
+  </div>
+
+  <hr class="sync-divider">
+
   <!-- ── Auto-sync ──────────────────────────────────── -->
   <div class="sync-section">
     <label class="sync-toggle">
@@ -81,6 +103,8 @@
   var btnPush     = document.getElementById('btnPush');
   var btnPull     = document.getElementById('btnPull');
   var btnFullSync = document.getElementById('btnFullSync');
+  var btnSetupKeepLocal = document.getElementById('btnSetupKeepLocal');
+  var btnSetupUseRemote = document.getElementById('btnSetupUseRemote');
   var autoSyncEl  = document.getElementById('autoSync');
 
   // ── Save config ─────────────────────────────────────
@@ -99,6 +123,13 @@
   btnPush.addEventListener('click',     function () { vscode.postMessage({ type: 'push' }); });
   btnPull.addEventListener('click',     function () { vscode.postMessage({ type: 'pull' }); });
   btnFullSync.addEventListener('click', function () { vscode.postMessage({ type: 'fullSync' }); });
+
+  btnSetupKeepLocal.addEventListener('click', function () { vscode.postMessage({ type: 'setupKeepLocal' }); });
+  btnSetupUseRemote.addEventListener('click', function () {
+    if (confirm('This will delete ALL local Tulcase data and replace it with the remote repository. Continue?')) {
+      vscode.postMessage({ type: 'setupUseRemote' });
+    }
+  });
 
   // ── Auto-sync toggle ───────────────────────────────
   autoSyncEl.addEventListener('change', function () {
@@ -132,6 +163,8 @@
     btnPush.disabled     = !configured || busy;
     btnPull.disabled     = !configured || busy;
     btnFullSync.disabled = !configured || busy;
+    btnSetupKeepLocal.disabled = !configured || busy;
+    btnSetupUseRemote.disabled = !configured || busy;
   }
 
   // ── Message handler ─────────────────────────────────

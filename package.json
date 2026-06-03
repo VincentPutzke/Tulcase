@@ -236,6 +236,11 @@
         "command": "tulcase.sync.fullSync",
         "title": "Sync: Full Sync",
         "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.resetToRemote",
+        "title": "Sync: Use Remote (Reset Local)",
+        "category": "Tulcase"
       }
     ],
     "menus": {
