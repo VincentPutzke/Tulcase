@@ -180,6 +180,13 @@
     html += '  <span class="section-badge">' + items.length + '</span>';
 
     // Section-specific action buttons
+    if (key === 'active') {
+      html += '  <span class="section-actions">';
+      html += '    <button class="action-btn btn-postpone" data-section-action="catchUp" title="Catch Up — set all active to today">';
+      html += '      ⟳';
+      html += '    </button>';
+      html += '  </span>';
+    }
     if (key === 'done') {
       html += '  <span class="section-actions">';
       html += '    <button class="action-btn btn-delete" data-section-action="clearDone" title="Clear all done">';

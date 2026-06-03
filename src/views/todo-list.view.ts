@@ -65,6 +65,9 @@ export class TodoListViewProvider extends BaseListViewProvider {
             case 'clearDone':
                 await this._clearDone();
                 break;
+            case 'catchUp':
+                await this._catchUp();
+                break;
         }
     }
 
@@ -143,6 +146,25 @@ export class TodoListViewProvider extends BaseListViewProvider {
         if (confirm !== 'Delete') { return; }
 
         data.items = data.items.filter(i => !i.done);
+        await store.write(this.settings.todosFile, data);
+        await this._sendData();
+    }
+
+    private async _catchUp(): Promise<void> {
+        const data  = await store.read<TodoStore>(this.settings.todosFile, { items: [] });
+        const today = todayStr();
+        const overdue = data.items.filter(i => !i.done && i.date < today);
+        if (overdue.length === 0) {
+            vscode.window.showInformationMessage('All active todos are already up to date.');
+            return;
+        }
+
+        const confirm = await vscode.window.showInformationMessage(
+            `Move ${overdue.length} overdue todo(s) to today?`, 'Catch Up', 'Cancel',
+        );
+        if (confirm !== 'Catch Up') { return; }
+
+        for (const item of overdue) { item.date = today; }
         await store.write(this.settings.todosFile, data);
         await this._sendData();
     }
