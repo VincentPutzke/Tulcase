@@ -48,8 +48,13 @@
   let tagMap  = {};        // Record<string, TagDef>
   let today   = '';        // YYYY-MM-DD
   let query   = '';        // current search text
-  /** Track which sections the user has collapsed. */
-  const collapsed = { active: false, upcoming: false, done: true };
+  /** Track which sections the user has collapsed (persisted across reloads). */
+  const savedState = vscode.getState() || {};
+  const collapsed = savedState.collapsed || { active: false, upcoming: false, done: true };
+
+  function saveState() {
+    vscode.setState({ collapsed: collapsed });
+  }
 
   // ── DOM refs ────────────────────────────────────────────
   const searchEl   = document.getElementById('search');
@@ -285,6 +290,7 @@
         if (e.target.closest('[data-section-action]')) { return; }
         const key = el.getAttribute('data-toggle');
         collapsed[key] = !collapsed[key];
+        saveState();
         render();
       });
     });

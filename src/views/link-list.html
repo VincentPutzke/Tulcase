@@ -54,8 +54,13 @@
   var tagMap = {};       // Record<string, TagDef>
   var query  = '';       // current search text
 
-  /** Track which folders the user has collapsed/expanded. Key = node id. */
-  var collapsedFolders = {};
+  /** Track which folders the user has expanded. Default = collapsed (persisted). */
+  var savedState = vscode.getState() || {};
+  var expandedFolders = savedState.expandedFolders || {};
+
+  function saveState() {
+    vscode.setState({ expandedFolders: expandedFolders });
+  }
 
   // ── DOM refs ────────────────────────────────────────────
   var searchEl = document.getElementById('search');
@@ -188,7 +193,7 @@
     // During search, skip folders completely empty of matches
     if (query && !folderHasMatch(folder)) { return ''; }
 
-    var isCollapsed = !!collapsedFolders[folder.id];
+    var isCollapsed = !expandedFolders[folder.id];
     var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
     var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
 
@@ -305,7 +310,8 @@
       el.addEventListener('click', function(e) {
         if (e.target.closest('.action-btn')) { return; }
         var id = el.getAttribute('data-toggle-folder');
-        collapsedFolders[id] = !collapsedFolders[id];
+        expandedFolders[id] = !expandedFolders[id];
+        saveState();
         render();
       });
     });

@@ -58,6 +58,9 @@ export class NoteListViewProvider extends BaseListViewProvider {
             case 'addFolder':
                 await this._addFolder();
                 break;
+            case 'addSubFolder':
+                if (msg.id) { await this._addFolder(msg.id); }
+                break;
             case 'renameFolder':
                 if (msg.id) { await this._renameFolder(msg.id); }
                 break;

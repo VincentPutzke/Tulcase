@@ -9,6 +9,7 @@ import {
 import { resolveCommand } from '../utils/placeholder-resolve';
 import type {
     CommandItem,
+    CommandFolder,
     CommandStore,
     LegacyCommandStore,
     LegacyCommandEntry,
@@ -54,6 +55,18 @@ export class CommandListViewProvider extends BaseListViewProvider {
             case 'addFolder':
                 await this._addFolder();
                 break;
+            case 'addSubFolder':
+                if (msg.id) { await this._addFolder(msg.id); }
+                break;
+            case 'addCommandToFolder':
+                if (msg.id) { await this._addCommand(msg.id); }
+                break;
+            case 'renameFolder':
+                if (msg.id) { await this._renameFolder(msg.id); }
+                break;
+            case 'deleteFolder':
+                if (msg.id) { await this._deleteFolder(msg.id); }
+                break;
         }
     }
 
@@ -69,6 +82,7 @@ export class CommandListViewProvider extends BaseListViewProvider {
         this._view.webview.postMessage({
             type:     'updateData',
             commands: data.items,
+            folders:  data.folders ?? [],
             tagMap,
         });
     }
@@ -114,7 +128,7 @@ export class CommandListViewProvider extends BaseListViewProvider {
             { label: 'Label',   description: item.label },
             { label: 'Command', description: item.command.substring(0, 60) },
             { label: 'Tags',    description: item.tags.join(', ') },
-            { label: 'Folder',  description: item.folder || '(root)' },
+            { label: 'Folder',  description: this._folderName(data, item.folder) || '(root)' },
         ];
 
         // Only show "Placeholders" when the command contains placeholder tokens
@@ -154,8 +168,7 @@ export class CommandListViewProvider extends BaseListViewProvider {
             const picked = await pickTags(this.tagTree, item.tags);
             if (picked) { item.tags = picked; }
         } else if (field.label === 'Folder') {
-            const existing = this._getExistingFolders(data);
-            const folderPick = await this._pickFolder(existing, item.folder);
+            const folderPick = await this._pickFolderById(data, item.folder);
             if (folderPick !== undefined) { item.folder = folderPick; }
         } else if (field.label === 'Placeholders') {
             const names = parsePlaceholders(item.command);
@@ -206,7 +219,7 @@ export class CommandListViewProvider extends BaseListViewProvider {
         await this._sendData();
     }
 
-    private async _addCommand(): Promise<void> {
+    private async _addCommand(folderId?: string): Promise<void> {
         const label = await vscode.window.showInputBox({
             prompt: 'Command label',
             placeHolder: 'e.g. Git Submodule Init',
@@ -244,9 +257,13 @@ export class CommandListViewProvider extends BaseListViewProvider {
         // ── Tags & folder ──────────────────────────────────────────────────
         const tags = await pickTags(this.tagTree) ?? [];
 
-        const data     = await this._readstore();
-        const existing = this._getExistingFolders(data);
-        const folder   = await this._pickFolder(existing, '') ?? '';
+        const data = await this._readstore();
+        let folder = folderId ?? '';
+        if (!folderId) {
+            const picked = await this._pickFolderById(data, '');
+            if (picked === undefined) { return; }
+            folder = picked;
+        }
 
         const item: CommandItem = {
             id: generateId('cmd'),

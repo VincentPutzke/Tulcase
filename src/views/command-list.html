@@ -48,10 +48,15 @@
   let tagMap   = {};       // Record<string, TagDef>
   let query    = '';       // current search text
 
-  /** Track which folders the user has collapsed. Key = folder name. */
-  const collapsedFolders = {};
+  /** Track which folders the user has expanded. Default = collapsed (persisted). */
+  const savedState = vscode.getState() || {};
+  const expandedFolders = savedState.expandedFolders || {};
   /** Track which command code blocks are expanded. Key = item id. */
-  const expandedCode = {};
+  const expandedCode = savedState.expandedCode || {};
+
+  function saveState() {
+    vscode.setState({ expandedFolders: expandedFolders, expandedCode: expandedCode });
+  }
 
   // ── DOM refs ────────────────────────────────────────────
   const searchEl   = document.getElementById('search');
@@ -154,7 +159,7 @@
 
   /** Render a collapsible folder section. */
   function renderFolder(folder, items) {
-    var isCollapsed = !!collapsedFolders[folder];
+    var isCollapsed = !expandedFolders[folder];
     var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
     var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
 
@@ -251,7 +256,8 @@
     document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
       el.addEventListener('click', function() {
         var folder = el.getAttribute('data-toggle-folder');
-        collapsedFolders[folder] = !collapsedFolders[folder];
+        expandedFolders[folder] = !expandedFolders[folder];
+        saveState();
         render();
       });
     });
@@ -261,6 +267,7 @@
       el.addEventListener('click', function() {
         var id = el.getAttribute('data-code-toggle');
         expandedCode[id] = !expandedCode[id];
+        saveState();
         render();
       });
     });
