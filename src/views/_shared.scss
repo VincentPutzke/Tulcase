@@ -252,16 +252,14 @@ body {
 }
 
 .section-actions {
-  display     : flex;
+  display     : none;
   align-items : center;
   gap         : 2px;
   flex-shrink : 0;
-  opacity     : 0;
-  transition  : opacity 0.15s;
 }
 
 .section-header:hover .section-actions {
-  opacity: 1;
+  display: flex;
 }
 
 .section-body {
@@ -296,6 +294,7 @@ body {
   display     : flex;
   align-items : center;
   cursor      : pointer;
+  position    : relative;
 }
 
 .tree-item-icon {
@@ -321,6 +320,12 @@ body {
   overflow      : hidden;
   text-overflow : ellipsis;
   font-weight   : 500;
+}
+
+.tree-item:hover .tree-item-label {
+  white-space   : normal;
+  overflow      : visible;
+  text-overflow : clip;
 }
 
 .tree-item-meta {
@@ -356,17 +361,21 @@ body {
 
 // ── Action buttons ────────────────────────────────────────────────────────────
 .tree-item-actions {
-  display     : flex;
+  display     : none;
   align-items : center;
   gap         : 2px;
   flex-shrink : 0;
   margin-left : 8px;
-  opacity     : 0;
-  transition  : opacity 0.15s;
+  position    : absolute;
+  right       : 4px;
+  top         : 50%;
+  transform   : translateY(-50%);
+  background  : var(--vscode-sideBar-background, var(--vscode-editor-background));
+  padding-left: 4px;
 }
 
 .tree-item:hover .tree-item-actions {
-  opacity: 1;
+  display: flex;
 }
 
 .action-btn {
