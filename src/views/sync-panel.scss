@@ -1,0 +1,161 @@
+// Sync panel – extends the shared design system
+@use 'shared' as *;
+
+// ── Config form ───────────────────────────────────────────────────────────────
+.sync-section {
+  margin-bottom: 14px;
+}
+
+.sync-section-title {
+  font-size      : 11px;
+  font-weight    : 700;
+  letter-spacing : 0.04em;
+  text-transform : uppercase;
+  margin-bottom  : 8px;
+  color          : var(--vscode-foreground);
+  opacity        : 0.8;
+}
+
+.sync-field {
+  margin-bottom: 8px;
+}
+
+.sync-field label {
+  display       : block;
+  font-size     : 11px;
+  margin-bottom : 3px;
+  opacity       : 0.7;
+}
+
+.sync-field input[type="text"],
+.sync-field input[type="password"] {
+  width         : 100%;
+  padding       : 5px 8px;
+  background    : $input-bg;
+  color         : $input-fg;
+  border        : 1px solid $input-border;
+  border-radius : 4px;
+  font-family   : inherit;
+  font-size     : inherit;
+  outline       : none;
+  transition    : border-color 0.15s;
+
+  &::placeholder {
+    color: var(--vscode-input-placeholderForeground, rgba(128, 128, 128, 0.6));
+  }
+
+  &:focus {
+    border-color: var(--vscode-focusBorder);
+  }
+}
+
+// ── Status area ───────────────────────────────────────────────────────────────
+.sync-status {
+  display     : flex;
+  align-items : center;
+  gap         : 8px;
+  padding     : 6px 8px;
+  background  : $card-bg;
+  border      : 1px solid $card-border;
+  border-radius: 5px;
+  font-size   : 12px;
+  margin-bottom: 6px;
+}
+
+.sync-status-dot {
+  width        : 8px;
+  height       : 8px;
+  border-radius: 50%;
+  flex-shrink  : 0;
+
+  &.idle      { background: $green; }
+  &.syncing   { background: $yellow; animation: pulse 1s infinite; }
+  &.error     { background: $red; }
+  &.not-configured { background: rgba(128, 128, 128, 0.4); }
+  &.no-git    { background: rgba(128, 128, 128, 0.4); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.sync-status-text {
+  flex     : 1;
+  min-width: 0;
+}
+
+.sync-status-time {
+  font-size: 10px;
+  opacity  : 0.6;
+}
+
+// ── Action buttons ────────────────────────────────────────────────────────────
+.sync-actions {
+  display   : flex;
+  flex-wrap : wrap;
+  gap       : 6px;
+}
+
+.sync-btn {
+  flex          : 1 1 45%;
+  padding       : 6px 10px;
+  background    : $btn-bg;
+  color         : $btn-fg;
+  border        : none;
+  border-radius : 4px;
+  font-family   : inherit;
+  font-size     : 12px;
+  font-weight   : 600;
+  cursor        : pointer;
+  transition    : opacity 0.12s;
+  text-align    : center;
+  min-width     : 90px;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor : not-allowed;
+  }
+
+  &.sync-btn-primary {
+    flex: 1 1 100%;
+  }
+}
+
+.sync-btn-secondary {
+  background  : transparent;
+  color       : var(--vscode-foreground);
+  border      : 1px solid $card-border;
+
+  &:hover {
+    background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25));
+    opacity: 1;
+  }
+}
+
+// ── Auto-sync toggle ──────────────────────────────────────────────────────────
+.sync-toggle {
+  display     : flex;
+  align-items : center;
+  gap         : 8px;
+  font-size   : 12px;
+  padding     : 4px 0;
+  cursor      : pointer;
+  user-select : none;
+}
+
+.sync-toggle input[type="checkbox"] {
+  accent-color: $btn-bg;
+  cursor      : pointer;
+}
+
+// ── Divider ───────────────────────────────────────────────────────────────────
+.sync-divider {
+  border     : none;
+  border-top : 1px solid $grid-line;
+  margin     : 10px 0;
+}
