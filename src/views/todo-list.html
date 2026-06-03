@@ -182,9 +182,8 @@
     html += '  <span class="' + chevronCls + '">▼</span>';
     html += '  <span class="section-icon">' + icon + '</span>';
     html += '  <span class="section-label">' + label + '</span>';
-    html += '  <span class="section-badge">' + items.length + '</span>';
 
-    // Section-specific action buttons
+    // Section-specific action buttons (before badge so they appear to its left)
     if (key === 'active') {
       html += '  <span class="section-actions">';
       html += '    <button class="action-btn btn-postpone" data-section-action="catchUp" title="Catch Up — set all active to today">';
@@ -199,6 +198,8 @@
       html += '    </button>';
       html += '  </span>';
     }
+
+    html += '  <span class="section-badge">' + items.length + '</span>';
 
     html += '</div>';
     html += '<div class="' + bodyCls + '">';

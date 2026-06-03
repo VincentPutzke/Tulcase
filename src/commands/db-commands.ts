@@ -171,7 +171,14 @@ async function dbSwitch(
         const newName = await vscode.window.showInputBox({
             prompt: 'Name for the new database',
             placeHolder: 'e.g. work, personal, shared',
-            validateInput: validateDbName,
+            validateInput: v => {
+                const err = validateDbName(v);
+                if (err) { return err; }
+                if (existing.includes(v.trim())) {
+                    return 'A database with this name already exists';
+                }
+                return undefined;
+            },
         });
         if (!newName) { return; }
         targetName = newName.trim();

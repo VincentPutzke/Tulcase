@@ -46,6 +46,13 @@ export abstract class BaseListViewProvider implements vscode.WebviewViewProvider
         webviewView.webview.html    = this._buildHtml();
 
         webviewView.webview.onDidReceiveMessage(msg => this._handleMessage(msg));
+
+        // Re-send data whenever the view becomes visible (e.g. after DB switch)
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                void this._sendData();
+            }
+        });
     }
 
     /** Called from extension when the file watcher detects a change. */

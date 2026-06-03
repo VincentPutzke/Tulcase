@@ -254,14 +254,15 @@ body {
 }
 
 .section-actions {
-  display     : none;
+  display     : flex;
+  visibility  : hidden;
   align-items : center;
   gap         : 2px;
   flex-shrink : 0;
 }
 
 .section-header:hover .section-actions {
-  display: flex;
+  visibility: visible;
 }
 
 .section-body {
@@ -284,6 +285,14 @@ body {
   transition     : background 0.1s;
 
   &:last-child {
+    border-bottom: none;
+  }
+
+  // Hide bottom border when a folder section follows directly
+  & + .section {
+    margin-top: 4px;
+  }
+  &:has(+ .section) {
     border-bottom: none;
   }
 
@@ -362,6 +371,12 @@ body {
 }
 
 // ── Action buttons ────────────────────────────────────────────────────────────
+// The actions float over the item as a full-height curtain on the right.
+// The parent .tree-item needs position:relative so the curtain aligns to it.
+.tree-item {
+  position: relative;
+}
+
 .tree-item-actions {
   display     : none;
   align-items : center;
@@ -369,11 +384,11 @@ body {
   flex-shrink : 0;
   margin-left : 8px;
   position    : absolute;
-  right       : 4px;
-  top         : 50%;
-  transform   : translateY(-50%);
-  background  : var(--vscode-sideBar-background, var(--vscode-editor-background));
-  padding-left: 4px;
+  right       : 0;
+  top         : 0;
+  bottom      : 0;
+  background  : var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+  padding     : 0 4px;
 }
 
 .tree-item:hover .tree-item-actions {
