@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as git from './git-cli';
 import { getRepoUrl, getPat } from './sync-config';
-import type { TulcaseSettings } from '../config';
+import { DATABASES_ROOT, readActiveDb, writeActiveDb, type TulcaseSettings } from '../config';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,7 @@ export interface SyncState {
 export class SyncService implements vscode.Disposable {
     private _lock = false;
     private _state: SyncState = { status: 'idle' };
+    private readonly _log: vscode.OutputChannel;
 
     private readonly _onStateChanged = new vscode.EventEmitter<SyncState>();
     readonly onStateChanged = this._onStateChanged.event;
@@ -40,7 +41,9 @@ export class SyncService implements vscode.Disposable {
     constructor(
         private readonly settings: TulcaseSettings,
         private readonly secrets: vscode.SecretStorage,
-    ) {}
+    ) {
+        this._log = vscode.window.createOutputChannel('Tulcase Sync');
+    }
 
     get state(): SyncState { return { ...this._state }; }
 
@@ -49,6 +52,7 @@ export class SyncService implements vscode.Disposable {
 
     dispose(): void {
         this._onStateChanged.dispose();
+        this._log.dispose();
     }
 
     // ── Public operations ──────────────────────────────────────────────────────
@@ -207,20 +211,30 @@ export class SyncService implements vscode.Disposable {
      */
     async resetToRemote(): Promise<boolean> {
         return this._run('Resetting to remote…', async (url, pat) => {
+            this._log.appendLine(`[resetToRemote] Starting — dir=${this.dir}`);
+            this._log.appendLine(`[resetToRemote] Remote URL: ${url}`);
+
             // 1. Ensure git is available
             if (!(await git.gitAvailable())) {
                 this._fail('Git is not installed or not on PATH.');
                 return false;
             }
+            this._log.appendLine('[resetToRemote] git is available');
 
             // 2. Wipe the data directory completely
             if (fs.existsSync(this.dir)) {
                 fs.rmSync(this.dir, { recursive: true, force: true });
+                this._log.appendLine('[resetToRemote] Wiped data directory');
             }
 
             // 3. Clone the remote repo directly into the data dir
             const authUrl = git.authenticatedUrl(url, pat);
+            this._log.appendLine(`[resetToRemote] Cloning into ${this.dir}…`);
             const clone = await git.gitClone(authUrl, this.dir);
+            this._log.appendLine(`[resetToRemote] Clone exit code: ${clone.code}`);
+            if (clone.stdout) { this._log.appendLine(`[resetToRemote] Clone stdout: ${clone.stdout.trim()}`); }
+            if (clone.stderr) { this._log.appendLine(`[resetToRemote] Clone stderr: ${clone.stderr.trim()}`); }
+
             if (clone.code !== 0) {
                 // Ensure dir exists even on failure so the extension doesn't crash
                 fs.mkdirSync(this.dir, { recursive: true });
@@ -228,14 +242,51 @@ export class SyncService implements vscode.Disposable {
                 return false;
             }
 
-            // 4. Strip credentials from stored remote URL
+            // 4. Verify the clone actually produced data
+            const dataDir = path.join(this.dir, DATABASES_ROOT);
+            if (!fs.existsSync(dataDir)) {
+                this._log.appendLine('[resetToRemote] ERROR: data/ directory missing after clone!');
+                this._fail('Clone succeeded but no data was downloaded. Check the repository contents.');
+                return false;
+            }
+            const databases = fs.readdirSync(dataDir).filter(
+                d => fs.statSync(path.join(dataDir, d)).isDirectory(),
+            );
+            this._log.appendLine(`[resetToRemote] Databases found: ${databases.join(', ') || '(none)'}`);
+            if (databases.length === 0) {
+                this._fail('Clone succeeded but the repository contains no databases.');
+                return false;
+            }
+
+            // 5. Restore .active-database marker (gitignored, so not in the clone)
+            const currentActive = this.settings.activeDb;
+            const activeDb = databases.includes(currentActive) ? currentActive : databases[0];
+            writeActiveDb(this.dir, activeDb);
+            this._log.appendLine(`[resetToRemote] Active database set to: ${activeDb}`);
+
+            // 6. Update in-memory settings so providers read from the right paths
+            if (activeDb !== currentActive) {
+                const { buildSettings } = await import('../config');
+                const fresh = buildSettings(this.dir, activeDb);
+                Object.assign(this.settings, fresh);
+                this._log.appendLine(`[resetToRemote] Settings switched from '${currentActive}' → '${activeDb}'`);
+            }
+
+            // 7. Strip credentials from stored remote URL
             await git.setRemoteUrl(this.dir, url);
 
-            // 5. Configure git user
+            // 8. Configure git user
             await git.configureUser(this.dir, 'Tulcase', 'tulcase@sync');
 
-            // 6. Write .gitignore
+            // 9. Write .gitignore
             this._ensureGitignore();
+
+            this._log.appendLine('[resetToRemote] Complete — showing output channel');
+            this._log.show(true);
+
+            vscode.window.showInformationMessage(
+                `Tulcase reset complete — loaded ${databases.length} database(s): ${databases.join(', ')}. Active: ${activeDb}`,
+            );
 
             this._setState({
                 status: 'idle',
@@ -292,7 +343,8 @@ export class SyncService implements vscode.Disposable {
         const url = getRepoUrl();
         const pat = await getPat(this.secrets);
         if (!url || !pat) {
-            vscode.window.showWarningMessage('Git sync is not configured. Set the repository URL and access token.');
+            this._log.appendLine(`[_run] Config missing — url=${url ? 'set' : 'EMPTY'}, pat=${pat ? 'set' : 'EMPTY'}`);
+            vscode.window.showErrorMessage('Tulcase Sync: Repository URL or access token is not configured. Run the setup wizard.');
             return false;
         }
 
