@@ -38,6 +38,7 @@ import { registerLinkCommands } from './commands/link-commands';
 import { registerListCommands } from './commands/list-commands';
 import { registerRecordCommands } from './commands/record-commands';
 import { registerDbCommands } from './commands/db-commands';
+import { registerPlaceholderCommands } from './utils/placeholder-resolve';
 import { StatusBar } from './views/status-bar';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -112,6 +113,7 @@ export function activate(context: vscode.ExtensionContext): void {
     };
 
     // 5. Register commands
+    registerPlaceholderCommands(context);
     registerTodoCommands(context, settings, todoList, tagTree);
     registerTagCommands(context, settings, tagList, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);

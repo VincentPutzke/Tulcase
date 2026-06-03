@@ -11,6 +11,7 @@ const store = new JsonStore();
 export class TodoListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.todos';
     protected readonly viewName = 'todo-list';
+    protected override readonly sidebarMode = true;
 
     // ── Public palette entry-points ───────────────────────────────────────────
 
@@ -61,6 +62,12 @@ export class TodoListViewProvider extends BaseListViewProvider {
                 break;
             case 'quickAddTodo':
                 await this._quickAddTodo();
+                break;
+            case 'clearDone':
+                await this._clearDone();
+                break;
+            case 'catchUp':
+                await this._catchUp();
                 break;
         }
     }
@@ -125,6 +132,32 @@ export class TodoListViewProvider extends BaseListViewProvider {
         if (confirm !== 'Delete') { return; }
 
         data.items = data.items.filter(i => i.id !== id);
+        await store.write(this.settings.todosFile, data);
+        await this._sendData();
+    }
+
+    private async _clearDone(): Promise<void> {
+        const data = await store.read<TodoStore>(this.settings.todosFile, { items: [] });
+        const doneCount = data.items.filter(i => i.done).length;
+        if (doneCount === 0) { return; }
+
+        const confirm = await vscode.window.showWarningMessage(
+            `Delete all ${doneCount} completed todo(s)?`, { modal: true }, 'Delete',
+        );
+        if (confirm !== 'Delete') { return; }
+
+        data.items = data.items.filter(i => !i.done);
+        await store.write(this.settings.todosFile, data);
+        await this._sendData();
+    }
+
+    private async _catchUp(): Promise<void> {
+        const data  = await store.read<TodoStore>(this.settings.todosFile, { items: [] });
+        const today = todayStr();
+        const overdue = data.items.filter(i => !i.done && i.date < today);
+        if (overdue.length === 0) { return; }
+
+        for (const item of overdue) { item.date = today; }
         await store.write(this.settings.todosFile, data);
         await this._sendData();
     }

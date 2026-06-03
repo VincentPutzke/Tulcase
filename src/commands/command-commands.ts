@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { showTreePicker } from '../data/tree-picker';
+import { resolveCommand } from '../utils/placeholder-resolve';
 import type { TulcaseSettings } from '../config';
-import type { CommandStore } from '../models/command.model';
+import type { CommandItem, CommandStore } from '../models/command.model';
 import type { CommandListViewProvider } from '../views/command-list.view';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 
@@ -53,7 +54,7 @@ async function copyCommandFromPicker(settings: TulcaseSettings): Promise<void> {
         data:        cmd,
     }));
 
-    const selected = await showTreePicker({
+    const selected = await showTreePicker<CommandItem>({
         title:        'Copy Command',
         placeholder:  'Type to filter — select a command to copy to clipboard',
         items,
@@ -62,7 +63,11 @@ async function copyCommandFromPicker(settings: TulcaseSettings): Promise<void> {
 
     if (!selected) { return; }
 
-    await vscode.env.clipboard.writeText(selected.command);
+    // Resolve placeholders before copying
+    const resolved = await resolveCommand(selected);
+    if (resolved === undefined) { return; }
+
+    await vscode.env.clipboard.writeText(resolved);
     vscode.window.showInformationMessage(`Copied: ${selected.label}`);
 }
 
@@ -80,7 +85,7 @@ async function insertCommandInTerminal(settings: TulcaseSettings): Promise<void>
         data:        cmd,
     }));
 
-    const selected = await showTreePicker({
+    const selected = await showTreePicker<CommandItem>({
         title:        'Insert Command in Terminal',
         placeholder:  'Type to filter — select a command to insert into the terminal',
         items,
@@ -88,6 +93,10 @@ async function insertCommandInTerminal(settings: TulcaseSettings): Promise<void>
     });
 
     if (!selected) { return; }
+
+    // Resolve placeholders before inserting
+    const resolved = await resolveCommand(selected);
+    if (resolved === undefined) { return; }
 
     // Reuse the active terminal if one is open; otherwise create a dedicated one.
     const terminal = vscode.window.activeTerminal
@@ -98,6 +107,6 @@ async function insertCommandInTerminal(settings: TulcaseSettings): Promise<void>
 
     // Insert the command text without a trailing newline so the user can
     // review and press Enter themselves before the command actually runs.
-    terminal.sendText(selected.command, false);
+    terminal.sendText(resolved, false);
 }
 

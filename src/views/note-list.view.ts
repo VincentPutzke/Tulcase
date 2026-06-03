@@ -25,6 +25,7 @@ const store = new JsonStore();
 export class NoteListViewProvider extends BaseListViewProvider {
     public static readonly viewType = 'tulcase.lists';
     protected readonly viewName = 'note-list';
+    protected override readonly sidebarMode = true;
 
     // ── Public palette entry-points ───────────────────────────────────────────
 
@@ -57,6 +58,9 @@ export class NoteListViewProvider extends BaseListViewProvider {
                 break;
             case 'addFolder':
                 await this._addFolder();
+                break;
+            case 'addSubFolder':
+                if (msg.id) { await this._addFolder(msg.id); }
                 break;
             case 'renameFolder':
                 if (msg.id) { await this._renameFolder(msg.id); }

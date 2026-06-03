@@ -3,7 +3,13 @@ import type {
     CommandItem,
     CommandStore,
     LegacyCommandStore,
+    PlaceholderDef,
 } from '../models/command.model';
+import {
+    parsePlaceholders,
+    applyPlaceholders,
+    prunePlaceholders,
+} from '../utils/placeholder';
 
 // ── Unit-testable helpers extracted from command-list.view.ts ──────────────────
 // We re-implement the pure functions here to test them in isolation without
@@ -160,5 +166,106 @@ describe('CommandStore helpers', () => {
             const sorted = sortedFolders(groups);
             expect(sorted).toEqual(['', 'Alpha', 'Zeta']);
         });
+    });
+});
+
+// ── Placeholder utility tests ─────────────────────────────────────────────────
+
+describe('parsePlaceholders', () => {
+    it('extracts unique names in order of first appearance', () => {
+        const result = parsePlaceholders('git checkout <$branch$> && echo <$msg$> <$branch$>');
+        expect(result).toEqual(['branch', 'msg']);
+    });
+
+    it('returns empty array when no placeholders', () => {
+        expect(parsePlaceholders('git status --short')).toEqual([]);
+    });
+
+    it('returns empty array for empty string', () => {
+        expect(parsePlaceholders('')).toEqual([]);
+    });
+
+    it('handles single placeholder', () => {
+        expect(parsePlaceholders('deploy <$env$>')).toEqual(['env']);
+    });
+
+    it('handles adjacent placeholders', () => {
+        expect(parsePlaceholders('<$a$><$b$>')).toEqual(['a', 'b']);
+    });
+
+    it('ignores incomplete delimiters', () => {
+        expect(parsePlaceholders('echo <$open but no close')).toEqual([]);
+        expect(parsePlaceholders('echo $close$> only')).toEqual([]);
+    });
+
+    it('handles placeholder with multi-word name', () => {
+        expect(parsePlaceholders('<$target env$>')).toEqual(['target env']);
+    });
+});
+
+describe('applyPlaceholders', () => {
+    it('replaces single placeholder', () => {
+        expect(applyPlaceholders('deploy <$env$>', { env: 'staging' }))
+            .toBe('deploy staging');
+    });
+
+    it('replaces multiple different placeholders', () => {
+        expect(applyPlaceholders(
+            'git checkout <$branch$> && echo <$msg$>',
+            { branch: 'main', msg: 'done' },
+        )).toBe('git checkout main && echo done');
+    });
+
+    it('replaces all occurrences of the same placeholder', () => {
+        expect(applyPlaceholders(
+            '<$x$> + <$x$> = 2*<$x$>',
+            { x: '5' },
+        )).toBe('5 + 5 = 2*5');
+    });
+
+    it('leaves unmatched placeholders as-is', () => {
+        expect(applyPlaceholders('echo <$missing$>', {}))
+            .toBe('echo <$missing$>');
+    });
+
+    it('returns original when no placeholders', () => {
+        expect(applyPlaceholders('git status', { any: 'val' }))
+            .toBe('git status');
+    });
+
+    it('handles empty replacement value', () => {
+        expect(applyPlaceholders('echo <$x$>', { x: '' }))
+            .toBe('echo ');
+    });
+});
+
+describe('prunePlaceholders', () => {
+    it('removes keys not in command', () => {
+        const placeholders: Record<string, PlaceholderDef> = {
+            branch: { defaults: ['main'] },
+            stale:  { defaults: ['old'] },
+        };
+        const result = prunePlaceholders('git checkout <$branch$>', placeholders);
+        expect(result).toEqual({ branch: { defaults: ['main'] } });
+    });
+
+    it('returns undefined when all keys are stale', () => {
+        const placeholders: Record<string, PlaceholderDef> = {
+            gone: { defaults: ['x'] },
+        };
+        expect(prunePlaceholders('git status', placeholders)).toBeUndefined();
+    });
+
+    it('returns undefined for undefined input', () => {
+        expect(prunePlaceholders('git status', undefined)).toBeUndefined();
+    });
+
+    it('keeps all keys when all are active', () => {
+        const placeholders: Record<string, PlaceholderDef> = {
+            a: { defaults: ['1'] },
+            b: { defaults: [] },
+        };
+        const result = prunePlaceholders('<$a$> <$b$>', placeholders);
+        expect(result).toEqual({ a: { defaults: ['1'] }, b: { defaults: [] } });
     });
 });
