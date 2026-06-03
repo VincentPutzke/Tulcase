@@ -28,7 +28,8 @@
     "onView:tulcase.links",
     "onView:tulcase.lists",
     "onView:tulcase.tags",
-    "onView:tulcase.records"
+    "onView:tulcase.records",
+    "onView:tulcase.sync"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -39,6 +40,16 @@
           "type": "string",
           "default": "",
           "description": "Path to the Tulcase data directory. Leave empty to use the default (~/.tulcase)."
+        },
+        "tulcase.sync.repoUrl": {
+          "type": "string",
+          "default": "",
+          "description": "HTTPS URL of the git repository used to sync Tulcase data (e.g. https://github.com/user/tulcase-data.git)."
+        },
+        "tulcase.sync.autoSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically pull on activation and push after data changes."
         }
       }
     },
@@ -78,6 +89,11 @@
         {
           "id": "tulcase.links",
           "name": "Links",
+          "type": "webview"
+        },
+        {
+          "id": "tulcase.sync",
+          "name": "Git Sync",
           "type": "webview"
         }
       ],
@@ -200,6 +216,26 @@
         "title": "Update Database",
         "category": "Tulcase",
         "icon": "$(sync)"
+      },
+      {
+        "command": "tulcase.sync.commit",
+        "title": "Sync: Commit",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.push",
+        "title": "Sync: Push",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.pull",
+        "title": "Sync: Pull",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.fullSync",
+        "title": "Sync: Full Sync",
+        "category": "Tulcase"
       }
     ],
     "menus": {
