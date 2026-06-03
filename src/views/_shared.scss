@@ -371,28 +371,19 @@ body {
 }
 
 // ── Action buttons ────────────────────────────────────────────────────────────
-// The actions float over the item as a full-height curtain on the right.
-// The parent .tree-item needs position:relative so the curtain aligns to it.
-.tree-item {
-  position: relative;
-}
-
+// Actions sit in the normal flex flow so that text can wrap to make room.
+// They are hidden via visibility so they reserve space even when not shown.
 .tree-item-actions {
-  display     : none;
+  display     : flex;
+  visibility  : hidden;
   align-items : center;
   gap         : 2px;
   flex-shrink : 0;
   margin-left : 8px;
-  position    : absolute;
-  right       : 0;
-  top         : 0;
-  bottom      : 0;
-  background  : var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
-  padding     : 0 4px;
 }
 
 .tree-item:hover .tree-item-actions {
-  display: flex;
+  visibility: visible;
 }
 
 .action-btn {

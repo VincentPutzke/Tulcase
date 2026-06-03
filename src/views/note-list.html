@@ -187,7 +187,6 @@
     html += '  <span class="' + chevronCls + '">&#9660;</span>';
     html += '  <span class="section-icon">' + ICONS.folder + '</span>';
     html += '  <span class="section-label">' + esc(folder.name) + '</span>';
-    html += '  <span class="section-badge">' + itemCount + '</span>';
 
     // Folder action buttons
     html += '  <span class="section-actions">';
@@ -204,6 +203,7 @@
     html += ICONS.delete;
     html += '    </button>';
     html += '  </span>';
+    html += '  <span class="section-badge">' + itemCount + '</span>';
 
     html += '</div>';
     html += '<div class="' + bodyCls + '">';
