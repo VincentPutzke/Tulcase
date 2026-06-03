@@ -34,6 +34,7 @@ function buildWebviewAssets() {
         { name: 'note-list' },
         { name: 'link-list' },
         { name: 'tag-list' },
+        { name: 'sync-panel' },
     ];
 
     for (const wv of webviews) {

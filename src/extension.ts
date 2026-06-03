@@ -40,6 +40,9 @@ import { registerRecordCommands } from './commands/record-commands';
 import { registerDbCommands } from './commands/db-commands';
 import { registerPlaceholderCommands } from './utils/placeholder-resolve';
 import { StatusBar } from './views/status-bar';
+import { SyncService } from './sync/sync-service';
+import { SyncPanelViewProvider } from './views/sync-panel.view';
+import { AutoSync } from './sync/auto-sync';
 
 export function activate(context: vscode.ExtensionContext): void {
     // 1. Initialise database layout + resolve settings
@@ -59,6 +62,10 @@ export function activate(context: vscode.ExtensionContext): void {
     const noteDecorator = new NoteTagDecorator(tagTree);
     // Records uses a webview calendar instead of a plain tree
     const recordCalendar = new RecordCalendarViewProvider(settings);
+
+    // Sync panel
+    const syncService = new SyncService(settings, context.secrets);
+    const syncPanel   = new SyncPanelViewProvider(syncService, context.secrets);
 
     // 3. Register tree views + webview views
     context.subscriptions.push(
@@ -98,6 +105,11 @@ export function activate(context: vscode.ExtensionContext): void {
             recordCalendar,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
+        vscode.window.registerWebviewViewProvider(
+            SyncPanelViewProvider.viewType,
+            syncPanel,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
     );
 
     // 4. Refresh all providers helper
@@ -112,6 +124,13 @@ export function activate(context: vscode.ExtensionContext): void {
         statusBar.update();
     };
 
+    // Refresh views after sync pulls in new data
+    syncService.onStateChanged(state => {
+        if (state.status === 'idle' && state.lastSync) {
+            refreshAll();
+        }
+    });
+
     // 5. Register commands
     registerPlaceholderCommands(context);
     registerTodoCommands(context, settings, todoList, tagTree);
@@ -124,7 +143,19 @@ export function activate(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
+        vscode.commands.registerCommand('tulcase.sync.commit', () => syncService.commit()),
+        vscode.commands.registerCommand('tulcase.sync.push', () => syncService.push()),
+        vscode.commands.registerCommand('tulcase.sync.pull', () => syncService.pull()),
+        vscode.commands.registerCommand('tulcase.sync.fullSync', async () => {
+            const ok = await syncService.setup();
+            if (ok) { await syncService.fullSync(); }
+        }),
+        syncService,
     );
+
+    // Auto-sync: pull on activation, push on data changes
+    const autoSync = new AutoSync(syncService, context.secrets, settings.rootDir);
+    context.subscriptions.push(autoSync);
 
     // 6. Status bar
     const statusBar = new StatusBar(todoList, settings);
