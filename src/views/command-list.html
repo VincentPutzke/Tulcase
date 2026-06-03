@@ -45,6 +45,7 @@
 
   // ── State ───────────────────────────────────────────────
   let commands = [];       // CommandItem[]
+  let folders  = [];       // CommandFolder[]
   let tagMap   = {};       // Record<string, TagDef>
   let query    = '';       // current search text
 
@@ -92,61 +93,76 @@
     if (cmd.label.toLowerCase().includes(q))   { return true; }
     if (cmd.command.toLowerCase().includes(q))  { return true; }
     if (cmd.tags.some(function(t) { return t.toLowerCase().includes(q); })) { return true; }
-    if (cmd.folder && cmd.folder.toLowerCase().includes(q)) { return true; }
+    // Check folder name
+    if (cmd.folder) {
+      var f = folders.find(function(fld) { return fld.id === cmd.folder; });
+      if (f && f.name.toLowerCase().includes(q)) { return true; }
+    }
     return false;
   }
 
-  // ── Grouping by folder ──────────────────────────────────
+  // ── Folder tree helpers (supports nesting) ──────────────
 
-  /** Group commands into { '': [...], 'folderA': [...], ... }. */
-  function groupByFolder(items) {
-    var groups = {};
-    for (var i = 0; i < items.length; i++) {
-      var folder = items[i].folder || '';
-      if (!groups[folder]) { groups[folder] = []; }
-      groups[folder].push(items[i]);
+  /** Build children map: parentId → child folders */
+  function buildFolderTree() {
+    var children = {};
+    for (var i = 0; i < folders.length; i++) {
+      var f = folders[i];
+      var pid = f.parent || '';
+      if (!children[pid]) { children[pid] = []; }
+      children[pid].push(f);
     }
-    return groups;
+    for (var key in children) {
+      children[key].sort(function(a, b) { return a.name.localeCompare(b.name); });
+    }
+    return children;
   }
 
-  /** Return sorted folder names, root ('') first. */
-  function sortedFolders(groups) {
-    var keys = Object.keys(groups).sort(function(a, b) {
-      if (a === '') { return -1; }
-      if (b === '') { return 1; }
-      return a.localeCompare(b);
-    });
-    return keys;
+  /** Get commands in a specific folder. */
+  function cmdsInFolder(folderId) {
+    return commands.filter(function(c) {
+      return (c.folder || '') === folderId;
+    }).filter(matchesQuery);
+  }
+
+  /** Check if a folder (or descendant) has any matching commands. */
+  function folderHasMatch(folderId, folderTree) {
+    if (cmdsInFolder(folderId).length > 0) { return true; }
+    var children = folderTree[folderId] || [];
+    for (var i = 0; i < children.length; i++) {
+      if (folderHasMatch(children[i].id, folderTree)) { return true; }
+    }
+    return false;
   }
 
   // ── Rendering ───────────────────────────────────────────
 
   function render() {
-    var filtered = commands.filter(matchesQuery);
-    var groups   = groupByFolder(filtered);
-    var folders  = sortedFolders(groups);
-
+    var folderTree = buildFolderTree();
     var html = '';
 
-    for (var fi = 0; fi < folders.length; fi++) {
-      var folder = folders[fi];
-      var items  = groups[folder];
-      // Sort items alphabetically within folder
-      items.sort(function(a, b) { return a.label.localeCompare(b.label); });
-
-      if (folder === '') {
-        // Root-level commands — render without a section wrapper
-        for (var ri = 0; ri < items.length; ri++) {
-          html += renderItem(items[ri]);
-        }
-      } else {
-        html += renderFolder(folder, items);
-      }
+    // Root-level commands (no folder)
+    var rootCmds = cmdsInFolder('');
+    rootCmds.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var ri = 0; ri < rootCmds.length; ri++) {
+      html += renderItem(rootCmds[ri]);
     }
 
-    if (filtered.length === 0 && commands.length > 0) {
+    // Root-level folders (and nested content recursively)
+    var rootFolders = folderTree[''] || [];
+    for (var fi = 0; fi < rootFolders.length; fi++) {
+      html += renderFolderSection(rootFolders[fi], folderTree);
+    }
+
+    // Count total visible items
+    var totalVisible = rootCmds.length;
+    for (var ff = 0; ff < folders.length; ff++) {
+      totalVisible += cmdsInFolder(folders[ff].id).length;
+    }
+
+    if (totalVisible === 0 && commands.length > 0) {
       html = '<div class="no-results">No commands match your search.</div>';
-    } else if (commands.length === 0) {
+    } else if (commands.length === 0 && folders.length === 0) {
       html = '<div class="empty-state">'
         + '<div class="empty-state-icon">' + ICONS.emptyClipboard + '</div>'
         + 'No commands yet. Click <strong>+ Add Command</strong> to get started!'
@@ -157,23 +173,54 @@
     bindEvents();
   }
 
-  /** Render a collapsible folder section. */
-  function renderFolder(folder, items) {
-    var isCollapsed = !expandedFolders[folder];
+  /** Render a folder section (recursive — supports nested folders). */
+  function renderFolderSection(folder, folderTree) {
+    // During search, skip entirely empty branches
+    if (query && !folderHasMatch(folder.id, folderTree)) { return ''; }
+
+    var isCollapsed = !expandedFolders[folder.id];
     var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
     var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
 
-    var html = '<div class="section" data-folder="' + esc(folder) + '">';
-    html += '<div class="section-header" data-toggle-folder="' + esc(folder) + '">';
+    var childCmds    = cmdsInFolder(folder.id);
+    childCmds.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    var childFolders = folderTree[folder.id] || [];
+    var itemCount    = childCmds.length + childFolders.length;
+
+    var html = '<div class="section" data-folder-id="' + esc(folder.id) + '">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '">';
     html += '  <span class="' + chevronCls + '">&#9660;</span>';
     html += '  <span class="section-icon">' + ICONS.folder + '</span>';
-    html += '  <span class="section-label">' + esc(folder) + '</span>';
-    html += '  <span class="section-badge">' + items.length + '</span>';
+    html += '  <span class="section-label">' + esc(folder.name) + '</span>';
+    html += '  <span class="section-badge">' + itemCount + '</span>';
+
+    // Folder action buttons
+    html += '  <span class="section-actions">';
+    html += '    <button class="action-btn btn-add" data-action="addCommandToFolder" data-id="' + esc(folder.id) + '" title="Add command to folder">';
+    html += ICONS.folder;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-add" data-action="addSubFolder" data-id="' + esc(folder.id) + '" title="Add sub-folder">';
+    html += ICONS.folder;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-edit" data-action="renameFolder" data-id="' + esc(folder.id) + '" title="Rename folder">';
+    html += ICONS.edit;
+    html += '    </button>';
+    html += '    <button class="action-btn btn-delete" data-action="deleteFolder" data-id="' + esc(folder.id) + '" title="Delete folder">';
+    html += ICONS.delete;
+    html += '    </button>';
+    html += '  </span>';
+
     html += '</div>';
     html += '<div class="' + bodyCls + '">';
 
-    for (var i = 0; i < items.length; i++) {
-      html += renderItem(items[i]);
+    // Child commands
+    for (var ci = 0; ci < childCmds.length; ci++) {
+      html += renderItem(childCmds[ci]);
+    }
+
+    // Child folders (recursive)
+    for (var fi = 0; fi < childFolders.length; fi++) {
+      html += renderFolderSection(childFolders[fi], folderTree);
     }
 
     html += '</div></div>';
@@ -252,11 +299,12 @@
   // ── Event binding ───────────────────────────────────────
 
   function bindEvents() {
-    // Folder toggle
+    // Folder toggle (click on section header — but not on action buttons)
     document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
-      el.addEventListener('click', function() {
-        var folder = el.getAttribute('data-toggle-folder');
-        expandedFolders[folder] = !expandedFolders[folder];
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.action-btn')) { return; }
+        var id = el.getAttribute('data-toggle-folder');
+        expandedFolders[id] = !expandedFolders[id];
         saveState();
         render();
       });
@@ -302,6 +350,7 @@
     var msg = e.data;
     if (msg.type === 'updateData') {
       commands = msg.commands || [];
+      folders  = msg.folders  || [];
       tagMap   = msg.tagMap   || {};
       render();
     }

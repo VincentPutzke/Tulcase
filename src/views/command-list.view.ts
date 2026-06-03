@@ -282,88 +282,109 @@ export class CommandListViewProvider extends BaseListViewProvider {
         vscode.window.showInformationMessage(`Command added: ${label}`);
     }
 
-    /** Prompt user for a new folder name, then create a placeholder message. */
-    private async _addFolder(): Promise<void> {
+    /** Create a new folder, optionally inside another folder. */
+    private async _addFolder(parentId?: string): Promise<void> {
         const name = await vscode.window.showInputBox({
             prompt: 'New folder name',
             placeHolder: 'e.g. DevOps',
         });
         if (!name) { return; }
 
-        // Folders are implicit (derived from items). Show confirmation.
-        vscode.window.showInformationMessage(
-            `Folder "${name}" created. Assign commands to it via Edit > Folder.`,
-        );
+        const data = await this._readstore();
+        if (!data.folders) { data.folders = []; }
 
-        // To make the folder immediately visible, add a placeholder command
-        // that the user can later edit or delete; or simply refresh.
-        // For now, just inform the user — the folder only appears once an item uses it.
-        // If the user wants the folder visible immediately, we add a hidden item:
-        const create = await vscode.window.showQuickPick([
-            { label: 'Add a command to this folder now' },
-            { label: 'Just create empty folder' },
-        ], { placeHolder: `Folder: ${name}` });
-
-        if (create?.label.startsWith('Add')) {
-            const label = await vscode.window.showInputBox({
-                prompt: 'Command label',
-                placeHolder: 'e.g. Deploy Script',
-            });
-            if (!label) { return; }
-
-            const command = await vscode.window.showInputBox({
-                prompt: 'Command text (shell command)',
-                placeHolder: 'npm run deploy',
-            });
-            if (command === undefined) { return; }
-
-            const tags = await pickTags(this.tagTree) ?? [];
-
-            const data = await this._readstore();
-            data.items.push({
-                id: generateId('cmd'),
-                label,
-                command,
-                tags,
-                folder: name,
-            });
-            await store.write(this.settings.commandsFile, data);
-            await this._sendData();
+        let parent = parentId ?? '';
+        if (!parentId && data.folders.length > 0) {
+            const choice = await this._pickParentFolder(data);
+            if (choice === undefined) { return; }
+            parent = choice;
         }
-        // 'Just create empty folder' — no action needed; folder appears when items use it.
+
+        data.folders.push({
+            id: generateId('cf'),
+            name,
+            parent,
+        });
+
+        await store.write(this.settings.commandsFile, data);
+        await this._sendData();
+    }
+
+    /** Rename a folder. */
+    private async _renameFolder(id: string): Promise<void> {
+        const data = await this._readstore();
+        const folder = (data.folders ?? []).find(f => f.id === id);
+        if (!folder) { return; }
+
+        const name = await vscode.window.showInputBox({
+            prompt: 'Folder name',
+            value: folder.name,
+        });
+        if (name === undefined) { return; }
+
+        folder.name = name;
+        await store.write(this.settings.commandsFile, data);
+        await this._sendData();
+    }
+
+    /** Delete a folder (move children to root). */
+    private async _deleteFolder(id: string): Promise<void> {
+        const data = await this._readstore();
+        const folders = data.folders ?? [];
+        const folder = folders.find(f => f.id === id);
+        if (!folder) { return; }
+
+        const cmdsInFolder = data.items.filter(i => i.folder === id);
+        const subFolders = folders.filter(f => f.parent === id);
+        const total = cmdsInFolder.length + subFolders.length;
+
+        const message = total > 0
+            ? `Delete folder "${folder.name}" and move its ${total} item(s) to root?`
+            : `Delete empty folder "${folder.name}"?`;
+
+        const confirm = await vscode.window.showWarningMessage(
+            message, { modal: true }, 'Delete',
+        );
+        if (confirm !== 'Delete') { return; }
+
+        for (const c of cmdsInFolder) { c.folder = folder.parent; }
+        for (const f of subFolders)   { f.parent = folder.parent; }
+
+        data.folders = folders.filter(f => f.id !== id);
+        await store.write(this.settings.commandsFile, data);
+        await this._sendData();
     }
 
     // ── Folder helpers ────────────────────────────────────────────────────────
 
-    /** Collect unique folder names from a command store. */
-    private _getExistingFolders(data: CommandStore): string[] {
-        const set = new Set<string>();
-        for (const item of data.items) {
-            if (item.folder) { set.add(item.folder); }
-        }
-        return Array.from(set).sort();
+    /** Get a human-readable name for a folder ID. */
+    private _folderName(data: CommandStore, folderId: string): string {
+        if (!folderId) { return ''; }
+        return (data.folders ?? []).find(f => f.id === folderId)?.name ?? folderId;
     }
 
-    /**
-     * Show a QuickPick that lets the user choose an existing folder,
-     * type a new one, or select "(root)".
-     */
-    private async _pickFolder(
-        existing: string[],
-        current: string,
+    /** QuickPick to move a command into an existing folder, root, or new folder. */
+    private async _pickFolderById(
+        data: CommandStore,
+        currentFolderId: string,
     ): Promise<string | undefined> {
+        const currentName = this._folderName(data, currentFolderId) || '(root)';
+        const folders = data.folders ?? [];
+
         const picks: vscode.QuickPickItem[] = [
             { label: '(root)', description: 'No folder' },
-            ...existing.map(f => ({ label: f })),
-            { label: '+ New folder...', description: 'Type a new name' },
+            ...folders.map(f => ({
+                label: f.name,
+                description: f.id,
+            })),
+            { label: '+ New folder...', description: 'Create a new folder' },
         ];
 
         const choice = await vscode.window.showQuickPick(picks, {
-            placeHolder: `Current: ${current || '(root)'} — Choose folder`,
+            placeHolder: `Current: ${currentName} — Choose folder`,
         });
 
         if (!choice) { return undefined; }
-
         if (choice.label === '(root)') { return ''; }
 
         if (choice.label === '+ New folder...') {
@@ -371,10 +392,39 @@ export class CommandListViewProvider extends BaseListViewProvider {
                 prompt: 'New folder name',
                 placeHolder: 'e.g. DevOps',
             });
-            return name ?? undefined;
+            if (!name) { return undefined; }
+
+            const newFolder: CommandFolder = {
+                id: generateId('cf'),
+                name,
+                parent: '',
+            };
+            if (!data.folders) { data.folders = []; }
+            data.folders.push(newFolder);
+            return newFolder.id;
         }
 
-        return choice.label;
+        return choice.description ?? '';
+    }
+
+    /** QuickPick to choose a parent folder (for sub-folder creation). */
+    private async _pickParentFolder(data: CommandStore): Promise<string | undefined> {
+        const folders = data.folders ?? [];
+        const picks: vscode.QuickPickItem[] = [
+            { label: '(root)', description: 'Top level' },
+            ...folders.map(f => ({
+                label: f.name,
+                description: f.id,
+            })),
+        ];
+
+        const choice = await vscode.window.showQuickPick(picks, {
+            placeHolder: 'Place folder inside...',
+        });
+
+        if (!choice) { return undefined; }
+        if (choice.label === '(root)') { return ''; }
+        return choice.description ?? '';
     }
 
     // ── Data access with migration ────────────────────────────────────────────
@@ -392,7 +442,12 @@ export class CommandListViewProvider extends BaseListViewProvider {
 
         // New format: has `items` array at root
         if (Array.isArray(raw.items)) {
-            return raw as unknown as CommandStore;
+            const data = raw as unknown as CommandStore;
+            // Migrate flat folder names → folder IDs (v2 → v3)
+            if (this._migrateFlatFolders(data)) {
+                await store.write(this.settings.commandsFile, data);
+            }
+            return data;
         }
 
         // Legacy format: has `commands` object at root
@@ -403,7 +458,47 @@ export class CommandListViewProvider extends BaseListViewProvider {
         }
 
         // Fallback: empty store
-        return { items: [] };
+        return { items: [], folders: [] };
+    }
+
+    /**
+     * Migrate items that use folder name strings to folder ID references.
+     * Creates folder entries and rewrites item.folder to the new ID.
+     * @returns true if any migration was performed.
+     */
+    private _migrateFlatFolders(data: CommandStore): boolean {
+        // Skip if folders array already exists
+        if (data.folders && data.folders.length > 0) { return false; }
+
+        // Collect unique folder names from items
+        const names = new Set<string>();
+        for (const item of data.items) {
+            if (item.folder && item.folder.length > 0) {
+                names.add(item.folder);
+            }
+        }
+
+        if (names.size === 0) { return false; }
+
+        // Create folder entries
+        const folders: CommandFolder[] = [];
+        const nameToId = new Map<string, string>();
+
+        for (const name of names) {
+            const id = generateId('cf');
+            nameToId.set(name, id);
+            folders.push({ id, name, parent: '' });
+        }
+
+        // Rewrite item folder references from names to IDs
+        for (const item of data.items) {
+            if (item.folder && nameToId.has(item.folder)) {
+                item.folder = nameToId.get(item.folder)!;
+            }
+        }
+
+        data.folders = folders;
+        return true;
     }
 
     /** Convert legacy Record<string, CommandEntry | string> to items array. */
