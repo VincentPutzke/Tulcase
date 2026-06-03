@@ -42,6 +42,7 @@ import { registerPlaceholderCommands } from './utils/placeholder-resolve';
 import { StatusBar } from './views/status-bar';
 import { SyncService } from './sync/sync-service';
 import { SyncPanelViewProvider } from './views/sync-panel.view';
+import { AutoSync } from './sync/auto-sync';
 
 export function activate(context: vscode.ExtensionContext): void {
     // 1. Initialise database layout + resolve settings
@@ -144,6 +145,10 @@ export function activate(context: vscode.ExtensionContext): void {
         }),
         syncService,
     );
+
+    // Auto-sync: pull on activation, push on data changes
+    const autoSync = new AutoSync(syncService, context.secrets, settings.rootDir);
+    context.subscriptions.push(autoSync);
 
     // 6. Status bar
     const statusBar = new StatusBar(todoList, settings);
