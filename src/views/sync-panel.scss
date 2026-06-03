@@ -26,39 +26,6 @@ body {
   opacity        : 0.8;
 }
 
-.sync-field {
-  margin-bottom: 8px;
-}
-
-.sync-field label {
-  display       : block;
-  font-size     : 11px;
-  margin-bottom : 3px;
-  opacity       : 0.7;
-}
-
-.sync-field input[type="text"],
-.sync-field input[type="password"] {
-  width         : 100%;
-  padding       : 5px 8px;
-  background    : $input-bg;
-  color         : $input-fg;
-  border        : 1px solid $input-border;
-  border-radius : 4px;
-  font-family   : inherit;
-  font-size     : inherit;
-  outline       : none;
-  transition    : border-color 0.15s;
-
-  &::placeholder {
-    color: var(--vscode-input-placeholderForeground, rgba(128, 128, 128, 0.6));
-  }
-
-  &:focus {
-    border-color: var(--vscode-focusBorder);
-  }
-}
-
 // ── Status area ───────────────────────────────────────────────────────────────
 .sync-status {
   display     : flex;
@@ -147,20 +114,56 @@ body {
   }
 }
 
-// ── Auto-sync toggle ──────────────────────────────────────────────────────────
-.sync-toggle {
+// ── Slider toggle ─────────────────────────────────────────────────────────────
+.sync-slider-label {
   display     : flex;
   align-items : center;
-  gap         : 8px;
+  gap         : 10px;
   font-size   : 12px;
-  padding     : 4px 0;
   cursor      : pointer;
   user-select : none;
 }
 
-.sync-toggle input[type="checkbox"] {
-  accent-color: $btn-bg;
-  cursor      : pointer;
+.sync-slider-track {
+  position      : relative;
+  display       : inline-block;
+  width         : 36px;
+  height        : 20px;
+  background    : rgba(128, 128, 128, 0.35);
+  border-radius : 10px;
+  transition    : background 0.2s;
+  flex-shrink   : 0;
+
+  input[type="checkbox"] {
+    opacity  : 0;
+    width    : 0;
+    height   : 0;
+    position : absolute;
+
+    &:checked + .sync-slider-thumb {
+      transform: translateX(16px);
+    }
+
+    &:checked ~ & {
+      // handled below
+    }
+  }
+
+  &:has(input:checked) {
+    background: $btn-bg;
+  }
+}
+
+.sync-slider-thumb {
+  position      : absolute;
+  top           : 2px;
+  left          : 2px;
+  width         : 16px;
+  height        : 16px;
+  background    : #fff;
+  border-radius : 50%;
+  transition    : transform 0.2s;
+  box-shadow    : 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 // ── Divider ───────────────────────────────────────────────────────────────────

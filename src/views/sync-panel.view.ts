@@ -57,14 +57,6 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
                 await this._sendInitialData();
                 break;
 
-            case 'saveConfig':
-                await cfg.setRepoUrl(msg.repoUrl as string);
-                if (msg.pat) {
-                    await cfg.setPat(this.secrets, msg.pat as string);
-                }
-                await this.syncService.refreshState();
-                break;
-
             case 'commit':
                 await this.syncService.commit();
                 break;
@@ -78,7 +70,6 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
                 break;
 
             case 'fullSync': {
-                // Setup first if not yet a git repo
                 const ok = await this.syncService.setup();
                 if (ok) {
                     await this.syncService.fullSync();
@@ -86,32 +77,76 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
                 break;
             }
 
-            case 'setupKeepLocal': {
-                // Keep local data, merge with remote
-                const ok2 = await this.syncService.setup();
-                if (ok2) {
-                    await this.syncService.fullSync();
-                }
+            case 'openSetup':
+                await this._runSetupWizard();
                 break;
-            }
-
-            case 'setupUseRemote': {
-                // Confirm destructive action from the extension side
-                const pick = await vscode.window.showWarningMessage(
-                    'This will delete ALL local Tulcase data and replace it with the remote repository. Continue?',
-                    { modal: true },
-                    'Reset to Remote',
-                );
-                if (pick === 'Reset to Remote') {
-                    await this.syncService.resetToRemote();
-                }
-                break;
-            }
 
             case 'setAutoSync':
                 await cfg.setAutoSync(msg.enabled as boolean);
                 break;
         }
+    }
+
+    // ── Setup wizard (native VS Code inputs) ───────────────────────────────────
+
+    private async _runSetupWizard(): Promise<void> {
+        // 1. Repository URL
+        const currentUrl = cfg.getRepoUrl();
+        const repoUrl = await vscode.window.showInputBox({
+            title: 'Tulcase Sync Setup (1/3)',
+            prompt: 'Repository URL (HTTPS)',
+            value: currentUrl,
+            placeHolder: 'https://github.com/user/tulcase-data.git',
+            ignoreFocusOut: true,
+        });
+        if (repoUrl === undefined) { return; }  // cancelled
+
+        // 2. PAT
+        const pat = await vscode.window.showInputBox({
+            title: 'Tulcase Sync Setup (2/3)',
+            prompt: 'Personal Access Token (PAT)',
+            placeHolder: 'ghp_… or glpat-…',
+            password: true,
+            ignoreFocusOut: true,
+        });
+        if (pat === undefined) { return; }  // cancelled
+
+        // Save config
+        await cfg.setRepoUrl(repoUrl.trim());
+        if (pat) {
+            await cfg.setPat(this.secrets, pat);
+        }
+
+        // 3. Mode
+        const mode = await vscode.window.showQuickPick(
+            [
+                { label: '$(cloud-download) Keep Local & Sync', description: 'Merge existing local data with the remote', value: 'keep' },
+                { label: '$(trash) Use Remote (Reset)', description: 'Discard all local data — download from remote', value: 'reset' },
+            ],
+            {
+                title: 'Tulcase Sync Setup (3/3)',
+                placeHolder: 'How should this machine be initialised?',
+                ignoreFocusOut: true,
+            },
+        );
+        if (!mode) { return; }  // cancelled
+
+        if ((mode as { value: string }).value === 'reset') {
+            const confirm = await vscode.window.showWarningMessage(
+                'This will delete ALL local Tulcase data and replace it with the remote repository. Continue?',
+                { modal: true },
+                'Reset to Remote',
+            );
+            if (confirm !== 'Reset to Remote') { return; }
+            await this.syncService.resetToRemote();
+        } else {
+            const ok = await this.syncService.setup();
+            if (ok) {
+                await this.syncService.fullSync();
+            }
+        }
+
+        await this.syncService.refreshState();
     }
 
     // ── Data push ──────────────────────────────────────────────────────────────
@@ -121,14 +156,10 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
 
         await this.syncService.refreshState();
 
-        const repoUrl  = cfg.getRepoUrl();
-        const pat      = await cfg.getPat(this.secrets);
         const autoSync = cfg.getAutoSync();
 
         this._view.webview.postMessage({
             type    : 'updateConfig',
-            repoUrl,
-            hasPat  : pat.length > 0,
             autoSync,
         });
 

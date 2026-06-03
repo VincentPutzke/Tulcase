@@ -12,27 +12,6 @@
 
 <div class="sync-scroll-container">
 
-  <!-- ── Configuration ──────────────────────────────── -->
-  <div class="sync-section">
-    <div class="sync-section-title">Configuration</div>
-
-    <div class="sync-field">
-      <label for="repoUrl">Repository URL</label>
-      <input type="text" id="repoUrl" placeholder="https://github.com/user/tulcase-data.git">
-    </div>
-
-    <div class="sync-field">
-      <label for="pat">Access Token (PAT)</label>
-      <input type="password" id="pat" placeholder="ghp_… or glpat-…">
-    </div>
-
-    <div style="display: flex; gap: 6px; margin-top: 4px;">
-      <button class="sync-btn sync-btn-secondary" id="saveConfig" style="flex:1;">Save</button>
-    </div>
-  </div>
-
-  <hr class="sync-divider">
-
   <!-- ── Status ─────────────────────────────────────── -->
   <div class="sync-section">
     <div class="sync-status">
@@ -54,34 +33,24 @@
 
   <hr class="sync-divider">
 
-  <!-- ── Setup ──────────────────────────────────────── -->
+  <!-- ── Auto-sync ──────────────────────────────────── -->
   <div class="sync-section">
-    <div class="sync-section-title">Initial Setup</div>
-    <p style="font-size: 12px; color: var(--vscode-descriptionForeground); margin: 0 0 6px;">
-      Choose how to initialise this machine:
-    </p>
-    <div class="sync-actions" style="flex-direction: column;">
-      <button class="sync-btn sync-btn-secondary" id="btnSetupKeepLocal" disabled style="width:100%;">
-        Keep Local &amp; Sync
-      </button>
-      <button class="sync-btn sync-btn-primary" id="btnSetupUseRemote" disabled style="width:100%;">
-        Use Remote (Reset)
-      </button>
-    </div>
-    <p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 6px 0 0;">
-      <strong>Keep Local</strong> — merges your existing data with the remote.<br>
-      <strong>Use Remote</strong> — discards all local data and downloads from the repo.
-    </p>
+    <label class="sync-slider-label">
+      <span class="sync-slider-track" id="autoSyncTrack">
+        <input type="checkbox" id="autoSync" checked>
+        <span class="sync-slider-thumb"></span>
+      </span>
+      Auto-sync
+    </label>
   </div>
 
   <hr class="sync-divider">
 
-  <!-- ── Auto-sync ──────────────────────────────────── -->
+  <!-- ── Setup ──────────────────────────────────────── -->
   <div class="sync-section">
-    <label class="sync-toggle">
-      <input type="checkbox" id="autoSync" checked>
-      Auto-sync enabled
-    </label>
+    <button class="sync-btn sync-btn-secondary" id="btnSetup" style="width:100%;">
+      Setup…
+    </button>
   </div>
 
 </div>
@@ -93,9 +62,6 @@
   var vscode = acquireVsCodeApi();
 
   // ── DOM refs ────────────────────────────────────────
-  var repoUrlEl   = document.getElementById('repoUrl');
-  var patEl       = document.getElementById('pat');
-  var saveBtn     = document.getElementById('saveConfig');
   var statusDot   = document.getElementById('statusDot');
   var statusText  = document.getElementById('statusText');
   var statusTime  = document.getElementById('statusTime');
@@ -103,31 +69,15 @@
   var btnPush     = document.getElementById('btnPush');
   var btnPull     = document.getElementById('btnPull');
   var btnFullSync = document.getElementById('btnFullSync');
-  var btnSetupKeepLocal = document.getElementById('btnSetupKeepLocal');
-  var btnSetupUseRemote = document.getElementById('btnSetupUseRemote');
+  var btnSetup    = document.getElementById('btnSetup');
   var autoSyncEl  = document.getElementById('autoSync');
-
-  // ── Save config ─────────────────────────────────────
-  saveBtn.addEventListener('click', function () {
-    vscode.postMessage({
-      type   : 'saveConfig',
-      repoUrl: repoUrlEl.value.trim(),
-      pat    : patEl.value,
-    });
-    patEl.value = '';
-    patEl.placeholder = '(saved)';
-  });
 
   // ── Action buttons ──────────────────────────────────
   btnCommit.addEventListener('click',   function () { vscode.postMessage({ type: 'commit' }); });
   btnPush.addEventListener('click',     function () { vscode.postMessage({ type: 'push' }); });
   btnPull.addEventListener('click',     function () { vscode.postMessage({ type: 'pull' }); });
   btnFullSync.addEventListener('click', function () { vscode.postMessage({ type: 'fullSync' }); });
-
-  btnSetupKeepLocal.addEventListener('click', function () { vscode.postMessage({ type: 'setupKeepLocal' }); });
-  btnSetupUseRemote.addEventListener('click', function () {
-    vscode.postMessage({ type: 'setupUseRemote' });
-  });
+  btnSetup.addEventListener('click',    function () { vscode.postMessage({ type: 'openSetup' }); });
 
   // ── Auto-sync toggle ───────────────────────────────
   autoSyncEl.addEventListener('change', function () {
@@ -136,13 +86,9 @@
 
   // ── State update from extension ─────────────────────
   function updateUI(state) {
-    // Status dot
     statusDot.className = 'sync-status-dot ' + (state.status || 'not-configured');
-
-    // Status text
     statusText.textContent = state.message || '';
 
-    // Last sync time
     if (state.lastSync) {
       try {
         var d = new Date(state.lastSync);
@@ -154,15 +100,12 @@
       statusTime.textContent = '';
     }
 
-    // Enable/disable buttons
     var configured = state.status !== 'not-configured' && state.status !== 'no-git';
     var busy       = state.status === 'syncing';
     btnCommit.disabled   = !configured || busy;
     btnPush.disabled     = !configured || busy;
     btnPull.disabled     = !configured || busy;
     btnFullSync.disabled = !configured || busy;
-    btnSetupKeepLocal.disabled = !configured || busy;
-    btnSetupUseRemote.disabled = !configured || busy;
   }
 
   // ── Message handler ─────────────────────────────────
@@ -172,12 +115,7 @@
       updateUI(msg.state);
     }
     if (msg.type === 'updateConfig') {
-      repoUrlEl.value = msg.repoUrl || '';
       autoSyncEl.checked = msg.autoSync !== false;
-      if (msg.hasPat) {
-        patEl.value = '';
-        patEl.placeholder = '(saved)';
-      }
     }
   });
 
