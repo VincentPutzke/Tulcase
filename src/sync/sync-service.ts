@@ -203,7 +203,7 @@ export class SyncService implements vscode.Disposable {
 
     /**
      * Discard all local data and replace it with the remote repository contents.
-     * Equivalent to: rm local → clone remote.
+     * Wipes the data directory and does a fresh `git clone`.
      */
     async resetToRemote(): Promise<boolean> {
         return this._run('Resetting to remote…', async (url, pat) => {
@@ -213,45 +213,29 @@ export class SyncService implements vscode.Disposable {
                 return false;
             }
 
-            // 2. Ensure data dir exists
-            fs.mkdirSync(this.dir, { recursive: true });
-
-            // 3. Write .gitignore
-            this._ensureGitignore();
-
-            // 4. Remove existing repo and start fresh
-            const gitDir = path.join(this.dir, '.git');
-            if (fs.existsSync(gitDir)) {
-                fs.rmSync(gitDir, { recursive: true, force: true });
+            // 2. Wipe the data directory completely
+            if (fs.existsSync(this.dir)) {
+                fs.rmSync(this.dir, { recursive: true, force: true });
             }
 
-            // 5. Init fresh repo
-            const init = await git.gitInit(this.dir);
-            if (init.code !== 0) {
-                this._fail('git init failed: ' + init.stderr);
+            // 3. Clone the remote repo directly into the data dir
+            const authUrl = git.authenticatedUrl(url, pat);
+            const clone = await git.gitClone(authUrl, this.dir);
+            if (clone.code !== 0) {
+                // Ensure dir exists even on failure so the extension doesn't crash
+                fs.mkdirSync(this.dir, { recursive: true });
+                this._fail('Clone failed: ' + clone.stderr);
                 return false;
             }
-            await git.configureUser(this.dir, 'Tulcase', 'tulcase@sync');
 
-            // 6. Set remote
+            // 4. Strip credentials from stored remote URL
             await git.setRemoteUrl(this.dir, url);
 
-            // 7. Fetch remote
-            const fetch = await git.gitFetch(this.dir, url, pat);
-            if (fetch.code !== 0) {
-                this._fail('Fetch failed: ' + fetch.stderr);
-                return false;
-            }
+            // 5. Configure git user
+            await git.configureUser(this.dir, 'Tulcase', 'tulcase@sync');
 
-            // 8. Hard-reset to remote main — overwrites all local files
-            const reset = await git.gitResetHard(this.dir, 'FETCH_HEAD');
-            if (reset.code !== 0) {
-                this._fail('Reset failed: ' + reset.stderr);
-                return false;
-            }
-
-            // 9. Clean untracked files
-            await git.gitClean(this.dir);
+            // 6. Write .gitignore
+            this._ensureGitignore();
 
             this._setState({
                 status: 'idle',

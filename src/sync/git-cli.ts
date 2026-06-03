@@ -180,4 +180,22 @@ export async function hasUnpushed(dir: string): Promise<boolean> {
 export async function configureUser(dir: string, name: string, email: string): Promise<void> {
     await run(dir, ['config', 'user.name', name]);
     await run(dir, ['config', 'user.email', email]);
+    // Relax path validation so Windows-committed backslash paths work on Linux
+    await run(dir, ['config', 'core.protectNTFS', 'false']);
+    await run(dir, ['config', 'core.protectHFS', 'false']);
+}
+
+/**
+ * Clone a remote repo into `dir`.
+ * `dir` must not exist or must be empty.  Uses `-c` flags to relax
+ * path validation so Windows-committed backslash paths don't break Linux.
+ */
+export async function gitClone(authUrl: string, dir: string): Promise<GitResult> {
+    return run('.', [
+        'clone',
+        '-c', 'core.protectNTFS=false',
+        '-c', 'core.protectHFS=false',
+        authUrl,
+        dir,
+    ]);
 }
