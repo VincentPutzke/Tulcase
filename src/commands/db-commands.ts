@@ -8,13 +8,14 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import {
     listDatabases,
     createDatabase,
     exportDatabase,
     importDatabase,
 } from '../data/db-manager';
-import { switchSettingsTo } from '../config';
+import { switchSettingsTo, writeLastUpdated } from '../config';
 import type { TulcaseSettings } from '../config';
 
 // ── Registration ───────────────────────────────────────────────────────────────
@@ -120,6 +121,9 @@ async function dbImport(
 
     try {
         const savedName = await importDatabase(settings, payload, localName.trim());
+        // Record the import timestamp
+        writeLastUpdated(path.join(settings.rootDir, 'data', savedName));
+
         vscode.window.showInformationMessage(
             `Database imported as "${savedName}".`,
         );
@@ -210,6 +214,10 @@ async function dbUpdate(
     try {
         // importDatabase with no localName override uses the bundle's own name
         const savedName = await importDatabase(settings, payload);
+        // Record the update timestamp
+        const dbDir = path.join(settings.rootDir, 'data', savedName);
+        writeLastUpdated(dbDir);
+
         vscode.window.showInformationMessage(
             `Database "${savedName}" updated from clipboard.`,
         );

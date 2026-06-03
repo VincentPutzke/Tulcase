@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { TodoListViewProvider } from './todo-list.view';
 import type { TulcaseSettings } from '../config';
+import { readLastUpdated } from '../config';
 
 /**
  * Status bar item showing todo count and overdue count.
@@ -16,7 +17,6 @@ export class StatusBar implements vscode.Disposable {
         this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
         // Clicking opens the database switch UI for quick switching
         this.item.command = 'tulcase.db.switch';
-        this.item.tooltip = 'Tulcase — click to switch database';
         this.update();
     }
 
@@ -28,6 +28,17 @@ export class StatusBar implements vscode.Disposable {
             text += ` · ${stats.overdue} overdue`;
         }
         this.item.text = text;
+
+        // Build tooltip with last-updated info
+        const lastUpdated = readLastUpdated(this.settings.baseDir);
+        let tooltip = `Tulcase — click to switch database`;
+        if (lastUpdated) {
+            const d = new Date(lastUpdated);
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const ts = `${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            tooltip += `\nLast updated: ${ts}`;
+        }
+        this.item.tooltip = tooltip;
         this.item.show();
     }
 
