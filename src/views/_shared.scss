@@ -308,10 +308,6 @@ body {
   position    : relative;
 }
 
-[draggable='true'] {
-  -webkit-user-drag: element;
-}
-
 .tree-pane {
   position: relative;
   min-height: 0;
@@ -323,10 +319,8 @@ body {
 
 .root-drop-zone {
   display        : none;
-  position       : sticky;
-  top            : 0;
-  z-index        : 11;
-  margin-bottom  : 8px;
+  position       : static;
+  margin-top     : 8px;
   padding        : 8px 10px;
   border         : 1px dashed $input-border;
   border-radius  : 6px;
@@ -338,6 +332,19 @@ body {
 
 body.drag-active .root-drop-zone {
   display: block;
+}
+
+body.drag-armed,
+body.drag-active,
+body.drag-armed *,
+body.drag-active * {
+  user-select         : none;
+  -webkit-user-select : none;
+}
+
+body.drag-armed,
+body.drag-active {
+  cursor: grabbing;
 }
 
 .drag-source {

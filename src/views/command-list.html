@@ -34,8 +34,8 @@
 
 <!-- ── Tree pane ────────────────────────────────────────── -->
 <div class="tree-pane">
-  <div class="root-drop-zone" id="root-drop-zone">Drop here to move to root</div>
   <div class="tree-content" id="sections"></div>
+  <div class="root-drop-zone" id="root-drop-zone">Drop here to move to root</div>
 </div>
 
 </div>
@@ -91,6 +91,7 @@
     dragPayload = null;
     pressState = null;
     activeDropEl = null;
+    document.body.classList.remove('drag-armed');
     document.body.classList.remove('drag-active');
     clearDragClasses();
   }
@@ -144,6 +145,9 @@
       startX: clientX,
       startY: clientY,
     };
+    document.body.classList.add('drag-armed');
+    const selection = window.getSelection();
+    if (selection) { selection.removeAllRanges(); }
     el.classList.add('drag-press-active');
   }
 
@@ -152,6 +156,7 @@
       el.classList.remove('drag-press-active');
     });
     if (!dragPayload) {
+      document.body.classList.remove('drag-armed');
       pressState = null;
     }
   }
@@ -419,6 +424,7 @@
     document.querySelectorAll('[data-drag-kind]').forEach(function(el) {
       el.addEventListener('mousedown', function(e) {
         if (e.button !== 0 || e.target.closest('.action-btn')) { return; }
+        e.preventDefault();
         markPressed(
           el,
           el.getAttribute('data-drag-kind'),
@@ -456,6 +462,7 @@
 
   window.addEventListener('mousemove', function(e) {
     if (!pressState) { return; }
+    e.preventDefault();
 
     if (!dragPayload) {
       const deltaX = Math.abs(e.clientX - pressState.startX);
@@ -466,7 +473,7 @@
 
     updateDropTarget(e.clientX, e.clientY);
 
-    if (treePaneEl && e.clientY >= 0) {
+    if (dragPayload && treePaneEl && e.clientY >= 0) {
       const rect = treePaneEl.getBoundingClientRect();
       if (e.clientY < rect.top + 24) {
         treePaneEl.scrollTop -= 16;
@@ -489,6 +496,13 @@
     }
 
     clearPressed();
+  });
+
+  window.addEventListener('blur', resetDragState);
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      resetDragState();
+    }
   });
 
   // ── Message handling from extension host ────────────────
