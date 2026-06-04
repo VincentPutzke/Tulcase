@@ -69,7 +69,11 @@
   var searchEl   = document.getElementById('search');
   var rootDropEl = document.getElementById('root-drop-zone');
   var sectionsEl = document.getElementById('sections');
+  var treePaneEl = document.querySelector('.tree-pane');
   var dragPayload = null;
+  var pressState = null;
+  var activeDropEl = null;
+  var suppressClick = false;
 
   // ── Utility helpers ─────────────────────────────────────
 
@@ -94,45 +98,61 @@
 
   function resetDragState() {
     dragPayload = null;
+    pressState = null;
+    activeDropEl = null;
     document.body.classList.remove('drag-active');
     clearDragClasses();
   }
 
-  function getDragPayload(e) {
-    if (dragPayload) { return dragPayload; }
-    if (!e.dataTransfer) { return null; }
-    var raw = e.dataTransfer.getData('text/plain');
-    if (!raw) { return null; }
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+  function consumeSuppressedClick() {
+    if (!suppressClick) { return false; }
+    suppressClick = false;
+    return true;
   }
 
-  function allowDrop(e, targetEl) {
-    var payload = getDragPayload(e);
-    if (!payload) { return null; }
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'move';
-    }
+  function getTargetId(targetEl) {
+    if (!targetEl || targetEl === rootDropEl) { return ''; }
+    return targetEl.getAttribute('data-drop-folder-id') || '';
+  }
+
+  function updateDropTarget(clientX, clientY) {
+    var hovered = document.elementFromPoint(clientX, clientY);
+    var target = hovered ? hovered.closest('[data-drop-folder-id], #root-drop-zone') : null;
+
+    if (activeDropEl === target) { return; }
+
     clearDragClasses();
-    targetEl.classList.add('drop-target-active');
-    return payload;
+    if (pressState && !dragPayload) {
+      pressState.sourceEl.classList.add('drag-press-active');
+    }
+    if (dragPayload && pressState) {
+      pressState.sourceEl.classList.add('drag-source');
+    }
+
+    activeDropEl = target;
+    if (activeDropEl) {
+      activeDropEl.classList.add('drop-target-active');
+    }
   }
 
-  function beginDrag(e, kind, id) {
-    if (!e.dataTransfer) { return; }
-    dragPayload = { kind: kind, id: id };
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', JSON.stringify(dragPayload));
+  function beginDrag() {
+    if (!pressState) { return; }
+    dragPayload = { kind: pressState.kind, id: pressState.id };
     document.body.classList.add('drag-active');
-    e.currentTarget.classList.add('drag-source');
+    pressState.sourceEl.classList.remove('drag-press-active');
+    pressState.sourceEl.classList.add('drag-source');
+    updateDropTarget(pressState.startX, pressState.startY);
   }
 
-  function markPressed(el) {
+  function markPressed(el, kind, id, clientX, clientY) {
+    clearPressed();
+    pressState = {
+      kind: kind,
+      id: id,
+      sourceEl: el,
+      startX: clientX,
+      startY: clientY,
+    };
     el.classList.add('drag-press-active');
   }
 
@@ -140,6 +160,9 @@
     document.querySelectorAll('.drag-press-active').forEach(function(el) {
       el.classList.remove('drag-press-active');
     });
+    if (!dragPayload) {
+      pressState = null;
+    }
   }
 
   function postMove(targetId, payload) {
@@ -254,7 +277,7 @@
     if (query && itemCount === 0) { return ''; }
 
     var html = '<div class="section" data-folder-id="' + esc(folder.id) + '" data-drop-folder-id="' + esc(folder.id) + '">';
-    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '" data-drag-kind="folder" data-drag-id="' + esc(folder.id) + '" draggable="true">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '" data-drag-kind="folder" data-drag-id="' + esc(folder.id) + '">';
     html += '  <span class="' + chevronCls + '">&#9660;</span>';
     html += '  <span class="section-icon">' + ICONS.folder + '</span>';
     html += '  <span class="section-label">' + esc(folder.name) + '</span>';
@@ -299,7 +322,7 @@
 
     var html = '<div class="tree-item" data-id="' + esc(note.id) + '">';
 
-    html += '<div class="tree-item-row" data-action="open" data-id="' + esc(note.id) + '" data-drag-kind="item" data-drag-id="' + esc(note.id) + '" draggable="true">';
+    html += '<div class="tree-item-row" data-action="open" data-id="' + esc(note.id) + '" data-drag-kind="item" data-drag-id="' + esc(note.id) + '">';
     html += '  <span class="tree-item-icon">' + ICONS.note + '</span>';
     html += '  <div class="tree-item-content">';
     html += '    <div class="tree-item-label">' + esc(note.label) + '</div>';
@@ -345,6 +368,7 @@
     // Folder toggle (click on section header — but not on action buttons)
     document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
       el.addEventListener('click', function(e) {
+        if (consumeSuppressedClick()) { return; }
         // Don't toggle if an action button was clicked
         if (e.target.closest('.action-btn')) { return; }
         var id = el.getAttribute('data-toggle-folder');
@@ -357,6 +381,7 @@
     // Note click → open
     document.querySelectorAll('.tree-item-row[data-action="open"]').forEach(function(el) {
       el.addEventListener('click', function(e) {
+        if (consumeSuppressedClick()) { return; }
         if (e.target.closest('.action-btn')) { return; }
         var id = el.getAttribute('data-id');
         vscode.postMessage({ type: 'open', id: id });
@@ -366,43 +391,13 @@
     document.querySelectorAll('[data-drag-kind]').forEach(function(el) {
       el.addEventListener('mousedown', function(e) {
         if (e.button !== 0 || e.target.closest('.action-btn')) { return; }
-        markPressed(el);
-      });
-      el.addEventListener('mouseup', function() {
-        clearPressed();
-      });
-      el.addEventListener('mouseleave', function() {
-        if (!dragPayload) {
-          clearPressed();
-        }
-      });
-      el.addEventListener('dragstart', function(e) {
-        if (e.target.closest('.action-btn')) {
-          e.preventDefault();
-          return;
-        }
-        beginDrag(e, el.getAttribute('data-drag-kind'), el.getAttribute('data-drag-id'));
-      });
-      el.addEventListener('dragend', function() {
-        resetDragState();
-      });
-    });
-
-    document.querySelectorAll('[data-drop-folder-id]').forEach(function(el) {
-      el.addEventListener('dragenter', function(e) {
-        allowDrop(e, el);
-      });
-      el.addEventListener('dragover', function(e) {
-        allowDrop(e, el);
-      });
-      el.addEventListener('dragleave', function(e) {
-        var next = e.relatedTarget;
-        if (next && el.contains(next)) { return; }
-        el.classList.remove('drop-target-active');
-      });
-      el.addEventListener('drop', function(e) {
-        var payload = allowDrop(e, el);
-        postMove(el.getAttribute('data-drop-folder-id') || '', payload);
+        markPressed(
+          el,
+          el.getAttribute('data-drag-kind'),
+          el.getAttribute('data-drag-id'),
+          e.clientX,
+          e.clientY
+        );
       });
     });
 
@@ -432,23 +427,42 @@
     vscode.postMessage({ type: 'addFolder' });
   });
 
-  rootDropEl.addEventListener('dragover', function(e) {
-    allowDrop(e, rootDropEl);
-  });
-  rootDropEl.addEventListener('dragenter', function(e) {
-    allowDrop(e, rootDropEl);
-  });
-  rootDropEl.addEventListener('dragleave', function(e) {
-    var next = e.relatedTarget;
-    if (next && rootDropEl.contains(next)) { return; }
-    rootDropEl.classList.remove('drop-target-active');
-  });
-  rootDropEl.addEventListener('drop', function(e) {
-    var payload = allowDrop(e, rootDropEl);
-    postMove('', payload);
+  window.addEventListener('mousemove', function(e) {
+    if (!pressState) { return; }
+
+    if (!dragPayload) {
+      var deltaX = Math.abs(e.clientX - pressState.startX);
+      var deltaY = Math.abs(e.clientY - pressState.startY);
+      if (deltaX < 4 && deltaY < 4) { return; }
+      beginDrag();
+    }
+
+    updateDropTarget(e.clientX, e.clientY);
+
+    if (treePaneEl && e.clientY >= 0) {
+      var rect = treePaneEl.getBoundingClientRect();
+      if (e.clientY < rect.top + 24) {
+        treePaneEl.scrollTop -= 16;
+      } else if (e.clientY > rect.bottom - 24) {
+        treePaneEl.scrollTop += 16;
+      }
+    }
   });
 
-  window.addEventListener('mouseup', clearPressed);
+  window.addEventListener('mouseup', function() {
+    if (dragPayload) {
+      var targetId = getTargetId(activeDropEl);
+      if (activeDropEl) {
+        suppressClick = true;
+        postMove(targetId, dragPayload);
+        return;
+      }
+      resetDragState();
+      return;
+    }
+
+    clearPressed();
+  });
 
   // ── Message handling from extension host ────────────────
   window.addEventListener('message', function(e) {

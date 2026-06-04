@@ -314,10 +314,11 @@ body {
 
 .tree-pane {
   position: relative;
+  min-height: 0;
 }
 
 .tree-content {
-  min-height: 100%;
+  min-height: 0;
 }
 
 .root-drop-zone {
