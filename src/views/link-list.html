@@ -81,8 +81,8 @@
   }
 
   function clearDragClasses() {
-    document.querySelectorAll('.drag-source, .drop-target-active').forEach(function(el) {
-      el.classList.remove('drag-source', 'drop-target-active');
+    document.querySelectorAll('.drag-source, .drag-press-active, .drop-target-active').forEach(function(el) {
+      el.classList.remove('drag-source', 'drag-press-active', 'drop-target-active');
     });
   }
 
@@ -124,6 +124,16 @@
     e.dataTransfer.setData('text/plain', JSON.stringify(dragPayload));
     document.body.classList.add('drag-active');
     e.currentTarget.classList.add('drag-source');
+  }
+
+  function markPressed(el) {
+    el.classList.add('drag-press-active');
+  }
+
+  function clearPressed() {
+    document.querySelectorAll('.drag-press-active').forEach(function(el) {
+      el.classList.remove('drag-press-active');
+    });
   }
 
   function postMove(targetId, payload) {
@@ -260,8 +270,8 @@
 
     var count = childCount(folder);
 
-    var html = '<div class="section" data-folder-id="' + esc(folder.id) + '">';
-    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '" data-drop-folder-id="' + esc(folder.id) + '" data-drag-kind="folder" data-drag-id="' + esc(folder.id) + '" draggable="true">';
+    var html = '<div class="section" data-folder-id="' + esc(folder.id) + '" data-drop-folder-id="' + esc(folder.id) + '">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '" data-drag-kind="folder" data-drag-id="' + esc(folder.id) + '" draggable="true">';
     html += '  <span class="' + chevronCls + '">&#9660;</span>';
     html += '  <span class="section-icon">' + ICONS.folder + '</span>';
     html += '  <span class="section-label">' + esc(folder.label) + '</span>';
@@ -387,6 +397,18 @@
     });
 
     document.querySelectorAll('[data-drag-kind]').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) {
+        if (e.button !== 0 || e.target.closest('.action-btn')) { return; }
+        markPressed(el);
+      });
+      el.addEventListener('mouseup', function() {
+        clearPressed();
+      });
+      el.addEventListener('mouseleave', function() {
+        if (!dragPayload) {
+          clearPressed();
+        }
+      });
       el.addEventListener('dragstart', function(e) {
         if (e.target.closest('.action-btn')) {
           e.preventDefault();
@@ -400,6 +422,9 @@
     });
 
     document.querySelectorAll('[data-drop-folder-id]').forEach(function(el) {
+      el.addEventListener('dragenter', function(e) {
+        allowDrop(e, el);
+      });
       el.addEventListener('dragover', function(e) {
         allowDrop(e, el);
       });
@@ -443,6 +468,9 @@
   rootDropEl.addEventListener('dragover', function(e) {
     allowDrop(e, rootDropEl);
   });
+  rootDropEl.addEventListener('dragenter', function(e) {
+    allowDrop(e, rootDropEl);
+  });
   rootDropEl.addEventListener('dragleave', function(e) {
     var next = e.relatedTarget;
     if (next && rootDropEl.contains(next)) { return; }
@@ -452,6 +480,8 @@
     var payload = allowDrop(e, rootDropEl);
     postMove('', payload);
   });
+
+  window.addEventListener('mouseup', clearPressed);
 
   // ── Message handling from extension host ────────────────
   window.addEventListener('message', function(e) {
