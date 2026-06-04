@@ -16,7 +16,7 @@
 
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
-import { findNode, removeNode } from '../data/link-tree';
+import { findNode, moveNode, removeNode } from '../data/link-tree';
 import { pickTags } from '../data/tag-picker';
 import { generateId } from '../utils/id';
 import type { LinkNode, LinkStore } from '../models/link.model';
@@ -36,7 +36,7 @@ export class LinkListViewProvider extends BaseListViewProvider {
 
     // ── Message handling ───────────────────────────────────────────────────────
 
-    protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
+    protected async _handleMessage(msg: { type: string; id?: string; targetId?: string; kind?: string }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
@@ -70,6 +70,9 @@ export class LinkListViewProvider extends BaseListViewProvider {
                 break;
             case 'deleteFolder':
                 if (msg.id) { await this._deleteNode(msg.id); }
+                break;
+            case 'move':
+                if (msg.id && msg.targetId !== undefined) { await this._moveNode(msg.id, msg.targetId); }
                 break;
         }
     }
@@ -255,6 +258,14 @@ export class LinkListViewProvider extends BaseListViewProvider {
         if (confirm !== 'Delete') { return; }
 
         removeNode(data.root, id);
+        await store.write(this.settings.linksFile, data);
+        await this._sendData();
+    }
+
+    private async _moveNode(id: string, targetId: string): Promise<void> {
+        const data = await this._readStore();
+        if (!moveNode(data.root, id, targetId)) { return; }
+
         await store.write(this.settings.linksFile, data);
         await this._sendData();
     }

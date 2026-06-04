@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
 import { pickTags } from '../data/tag-picker';
+import { moveFlatFolder, moveFlatItem } from '../data/flat-folder-tree';
 import { generateId } from '../utils/id';
 import {
     parsePlaceholders,
@@ -33,7 +34,7 @@ export class CommandListViewProvider extends BaseListViewProvider {
 
     // ── Message handling ───────────────────────────────────────────────────────
 
-    protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
+    protected async _handleMessage(msg: { type: string; id?: string; targetId?: string; kind?: string }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
@@ -67,6 +68,11 @@ export class CommandListViewProvider extends BaseListViewProvider {
                 break;
             case 'deleteFolder':
                 if (msg.id) { await this._deleteFolder(msg.id); }
+                break;
+            case 'move':
+                if (msg.id && msg.kind && msg.targetId !== undefined) {
+                    await this._moveEntry(msg.id, msg.kind, msg.targetId);
+                }
                 break;
         }
     }
@@ -352,6 +358,21 @@ export class CommandListViewProvider extends BaseListViewProvider {
         for (const f of subFolders)   { f.parent = folder.parent; }
 
         data.folders = folders.filter(f => f.id !== id);
+        await store.write(this.settings.commandsFile, data);
+        await this._sendData();
+    }
+
+    private async _moveEntry(id: string, kind: string, targetId: string): Promise<void> {
+        const data = await this._readstore();
+        const folders = data.folders ?? [];
+
+        const moved = kind === 'folder'
+            ? moveFlatFolder(folders, id, targetId)
+            : moveFlatItem(data.items, folders, id, targetId);
+
+        if (!moved) { return; }
+
+        data.folders = folders;
         await store.write(this.settings.commandsFile, data);
         await this._sendData();
     }

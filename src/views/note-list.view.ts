@@ -9,6 +9,7 @@
  */
 
 import * as vscode from 'vscode';
+import { moveFlatFolder, moveFlatItem } from '../data/flat-folder-tree';
 import { JsonStore } from '../data/json-store';
 import { NoteFileSystemProvider } from '../data/note-fs';
 import { pickTags } from '../data/tag-picker';
@@ -36,7 +37,7 @@ export class NoteListViewProvider extends BaseListViewProvider {
 
     // ── Message handling ───────────────────────────────────────────────────────
 
-    protected async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
+    protected async _handleMessage(msg: { type: string; id?: string; targetId?: string; kind?: string }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
@@ -67,6 +68,11 @@ export class NoteListViewProvider extends BaseListViewProvider {
                 break;
             case 'deleteFolder':
                 if (msg.id) { await this._deleteFolder(msg.id); }
+                break;
+            case 'move':
+                if (msg.id && msg.kind && msg.targetId !== undefined) {
+                    await this._moveEntry(msg.id, msg.kind, msg.targetId);
+                }
                 break;
         }
     }
@@ -260,6 +266,26 @@ export class NoteListViewProvider extends BaseListViewProvider {
         for (const f of subFolders)    { f.parent = ''; }
 
         data.folders = data.folders.filter(f => f.id !== id);
+        await store.write(this.settings.listsFile, data);
+        await this._sendData();
+    }
+
+    private async _moveEntry(id: string, kind: string, targetId: string): Promise<void> {
+        const data = await this._readStore();
+
+        const moved = kind === 'folder'
+            ? moveFlatFolder(data.folders, id, targetId)
+            : moveFlatItem(data.notes, data.folders, id, targetId);
+
+        if (!moved) { return; }
+
+        if (kind !== 'folder') {
+            const note = data.notes.find(entry => entry.id === id);
+            if (note) {
+                note.updatedAt = new Date().toISOString().slice(0, 10);
+            }
+        }
+
         await store.write(this.settings.listsFile, data);
         await this._sendData();
     }

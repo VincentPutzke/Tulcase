@@ -210,6 +210,10 @@ body {
   }
 }
 
+.section-header[data-drag-kind] {
+  cursor: grab;
+}
+
 .section-chevron {
   font-size   : 12px;
   transition  : transform 0.2s;
@@ -306,6 +310,46 @@ body {
   align-items : center;
   cursor      : pointer;
   position    : relative;
+}
+
+.tree-item-row[data-drag-kind] {
+  cursor: grab;
+}
+
+.tree-pane {
+  position: relative;
+}
+
+.tree-content {
+  min-height: 100%;
+}
+
+.root-drop-zone {
+  display        : none;
+  position       : sticky;
+  top            : 0;
+  z-index        : 11;
+  margin-bottom  : 8px;
+  padding        : 8px 10px;
+  border         : 1px dashed $input-border;
+  border-radius  : 6px;
+  background     : $view-bg;
+  color          : var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.8));
+  font-size      : 11px;
+  text-align     : center;
+}
+
+body.drag-active .root-drop-zone {
+  display: block;
+}
+
+.drag-source {
+  opacity: 0.55;
+}
+
+.drop-target-active {
+  border-color: var(--vscode-focusBorder) !important;
+  background  : var(--vscode-list-dropBackground, rgba(14, 99, 156, 0.14)) !important;
 }
 
 .tree-item-icon {

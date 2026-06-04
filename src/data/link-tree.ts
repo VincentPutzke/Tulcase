@@ -36,6 +36,70 @@ export function removeNode(nodes: LinkNode[], nodeId: string): LinkNode | null {
     return null;
 }
 
+function findParentId(nodes: LinkNode[], nodeId: string, parentId = ''): string | null {
+    for (const n of nodes) {
+        if (n.id === nodeId) {
+            return parentId;
+        }
+        if (n.type === 'folder' && n.children) {
+            const found = findParentId(n.children, nodeId, n.id);
+            if (found !== null) {
+                return found;
+            }
+        }
+    }
+    return null;
+}
+
+function hasDescendant(node: LinkNode, descendantId: string): boolean {
+    if (node.id === descendantId) {
+        return true;
+    }
+    if (node.type !== 'folder' || !node.children) {
+        return false;
+    }
+    return node.children.some(child => hasDescendant(child, descendantId));
+}
+
+export function moveNode(nodes: LinkNode[], nodeId: string, targetFolderId: string): boolean {
+    const node = findNode(nodes, nodeId);
+    if (!node) { return false; }
+
+    const currentParentId = findParentId(nodes, nodeId);
+    if (currentParentId === null) { return false; }
+    if (currentParentId === targetFolderId) { return false; }
+    if (targetFolderId === nodeId) { return false; }
+
+    if (targetFolderId) {
+        const target = findNode(nodes, targetFolderId);
+        if (!target || target.type !== 'folder') {
+            return false;
+        }
+        if (node.type === 'folder' && hasDescendant(node, targetFolderId)) {
+            return false;
+        }
+    }
+
+    const removed = removeNode(nodes, nodeId);
+    if (!removed) { return false; }
+
+    if (!targetFolderId) {
+        nodes.push(removed);
+        return true;
+    }
+
+    const target = findNode(nodes, targetFolderId);
+    if (!target || target.type !== 'folder') {
+        nodes.push(removed);
+        return false;
+    }
+
+    target.children ??= [];
+    target.children.push(removed);
+    target.expanded = true;
+    return true;
+}
+
 /**
  * Count total link items in a tree (ignoring folders).
  */
