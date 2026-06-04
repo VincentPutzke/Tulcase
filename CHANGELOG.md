@@ -5,6 +5,21 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.4] - 2026-06-04
+
+### Summary
+Patch release: add Tulcase AI tools for chat agents and complete folder-aware management for notes, links, commands, todos, and tags.
+
+### Added
+- `contributes.languageModelTools` registrations in `package.json` so VS Code agents can call Tulcase tools directly.
+- `src/chat/tools.ts` with AI tools for listing, creating, updating, and deleting TODOs.
+- AI tools for listing, reading, creating, and editing notes, links, commands, and tags.
+- Dedicated AI tools for creating, renaming, deleting, and moving note folders, link folders, and command folders.
+
+### Changed
+- AI edits now validate folder targets for notes and commands instead of allowing invalid folder IDs.
+- Folder operations exposed to agents now follow the same re-parenting rules as the existing Tulcase webviews.
+
 ## [1.4.1] – 2026-04-20
 
 ### Summary
