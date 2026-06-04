@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findNode, removeNode, countLinks } from '../data/link-tree';
+import { findNode, removeNode, countLinks, moveNode } from '../data/link-tree';
 import type { LinkNode } from '../models/link.model';
 
 // ── Test data builder ─────────────────────────────────────────────────────────
@@ -89,6 +89,26 @@ describe('removeNode', () => {
     it('returns null for missing ID', () => {
         const tree = buildTree();
         expect(removeNode(tree, 'nonexistent')).toBeNull();
+    });
+});
+
+describe('moveNode', () => {
+    it('moves a root link into a folder', () => {
+        const tree = buildTree();
+        expect(moveNode(tree, 'l4', 'f1')).toBe(true);
+        expect(findNode(tree, 'f1')?.children?.some(child => child.id === 'l4')).toBe(true);
+    });
+
+    it('moves a nested link back to root', () => {
+        const tree = buildTree();
+        expect(moveNode(tree, 'l1', '')).toBe(true);
+        expect(tree.some(node => node.id === 'l1')).toBe(true);
+    });
+
+    it('rejects moving a folder into its descendant', () => {
+        const tree = buildTree();
+        expect(moveNode(tree, 'f1', 'f2')).toBe(false);
+        expect(findNode(tree, 'f1')).not.toBeNull();
     });
 });
 
