@@ -10,6 +10,7 @@
 
 import * as vscode from 'vscode';
 import { JsonStore } from '../data/json-store';
+import { moveFlatFolder, moveFlatItem } from '../data/flat-folder-tree';
 import { generateId } from '../utils/id';
 import { stripTagFromAll, renameTagInAll } from '../data/tag-propagation';
 import { findNode, removeNode, moveNode } from '../data/link-tree';
@@ -33,6 +34,27 @@ function json(value: unknown): vscode.LanguageModelToolResult {
 }
 
 type Refresher = () => void;
+
+function requireName(value: string | undefined, label: string): string {
+    const trimmed = value?.trim();
+    if (!trimmed) {
+        throw new Error(`${label} is required.`);
+    }
+    return trimmed;
+}
+
+function requireNoteFolder(data: NoteStore, folderId: string): void {
+    if (folderId && !data.folders.some(folder => folder.id === folderId)) {
+        throw new Error(`Note folder not found: ${folderId}. Use tulcase_list_notes to find valid folder IDs.`);
+    }
+}
+
+function requireCommandFolder(data: CommandStore, folderId: string): void {
+    const folders = data.folders ?? [];
+    if (folderId && !folders.some(folder => folder.id === folderId)) {
+        throw new Error(`Command folder not found: ${folderId}. Use tulcase_list_commands to find valid folder IDs.`);
+    }
+}
 
 // ── TODO Tools ───────────────────────────────────────────────────────────────
 
@@ -160,13 +182,15 @@ class AddNoteTool implements vscode.LanguageModelTool<AddNoteInput> {
 
     async invoke(options: vscode.LanguageModelToolInvocationOptions<AddNoteInput>) {
         const data = await store.read<NoteStore>(this.settings.listsFile, { notes: [], folders: [] });
+        const folderId = options.input.folder ?? '';
+        requireNoteFolder(data, folderId);
         const now = new Date().toISOString().slice(0, 10);
         const note: NoteItem = {
             id: generateId('nt'),
             label: options.input.label,
             content: options.input.content ?? '',
             tags: options.input.tags ?? [],
-            folder: options.input.folder ?? '',
+            folder: folderId,
             createdAt: now,
             updatedAt: now,
         };
@@ -190,12 +214,114 @@ class EditNoteTool implements vscode.LanguageModelTool<EditNoteInput> {
         if (options.input.label !== undefined) { note.label = options.input.label; }
         if (options.input.content !== undefined) { note.content = options.input.content; }
         if (options.input.tags !== undefined) { note.tags = options.input.tags; }
-        if (options.input.folder !== undefined) { note.folder = options.input.folder; }
+        if (options.input.folder !== undefined) {
+            requireNoteFolder(data, options.input.folder);
+            note.folder = options.input.folder;
+        }
         note.updatedAt = new Date().toISOString().slice(0, 10);
 
         await store.write(this.settings.listsFile, data);
         this.refresh();
         return json({ updated: note });
+    }
+}
+
+interface ManageNoteFolderInput {
+    action: 'create' | 'rename' | 'delete';
+    id?: string;
+    name?: string;
+    parentId?: string;
+}
+
+class ManageNoteFolderTool implements vscode.LanguageModelTool<ManageNoteFolderInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<ManageNoteFolderInput>) {
+        const data = await store.read<NoteStore>(this.settings.listsFile, { notes: [], folders: [] });
+        const { action, id, name, parentId } = options.input;
+
+        switch (action) {
+            case 'create': {
+                const folderName = requireName(name, 'Folder name');
+                const parent = parentId ?? '';
+                requireNoteFolder(data, parent);
+                const folder: NoteFolder = {
+                    id: generateId('nf'),
+                    name: folderName,
+                    parent,
+                };
+                data.folders.push(folder);
+                await store.write(this.settings.listsFile, data);
+                this.refresh();
+                return json({ created: folder });
+            }
+            case 'rename': {
+                if (!id) { throw new Error('Folder id is required for rename.'); }
+                const folder = data.folders.find(entry => entry.id === id);
+                if (!folder) {
+                    throw new Error(`Note folder not found: ${id}. Use tulcase_list_notes to find valid folder IDs.`);
+                }
+                folder.name = requireName(name, 'Folder name');
+                await store.write(this.settings.listsFile, data);
+                this.refresh();
+                return json({ renamed: folder });
+            }
+            case 'delete': {
+                if (!id) { throw new Error('Folder id is required for delete.'); }
+                const folder = data.folders.find(entry => entry.id === id);
+                if (!folder) {
+                    throw new Error(`Note folder not found: ${id}. Use tulcase_list_notes to find valid folder IDs.`);
+                }
+                const notesInFolder = data.notes.filter(note => note.folder === id);
+                const subFolders = data.folders.filter(entry => entry.parent === id);
+                for (const note of notesInFolder) { note.folder = ''; }
+                for (const entry of subFolders) { entry.parent = ''; }
+                data.folders = data.folders.filter(entry => entry.id !== id);
+                await store.write(this.settings.listsFile, data);
+                this.refresh();
+                return json({
+                    deleted: { id: folder.id, name: folder.name },
+                    movedToRoot: { notes: notesInFolder.length, folders: subFolders.length },
+                });
+            }
+        }
+    }
+}
+
+interface MoveNoteEntryInput {
+    id: string;
+    targetFolderId?: string;
+}
+
+class MoveNoteEntryTool implements vscode.LanguageModelTool<MoveNoteEntryInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<MoveNoteEntryInput>) {
+        const data = await store.read<NoteStore>(this.settings.listsFile, { notes: [], folders: [] });
+        const targetFolderId = options.input.targetFolderId ?? '';
+        const note = data.notes.find(entry => entry.id === options.input.id);
+
+        if (note) {
+            if (!moveFlatItem(data.notes, data.folders, note.id, targetFolderId)) {
+                throw new Error(`Unable to move note ${note.id} to folder ${targetFolderId || '(root)'}.`);
+            }
+            note.updatedAt = new Date().toISOString().slice(0, 10);
+            await store.write(this.settings.listsFile, data);
+            this.refresh();
+            return json({ moved: { kind: 'note', id: note.id, targetFolderId } });
+        }
+
+        const folder = data.folders.find(entry => entry.id === options.input.id);
+        if (!folder) {
+            throw new Error(`Note entry not found: ${options.input.id}. Use tulcase_list_notes to find valid note and folder IDs.`);
+        }
+        if (!moveFlatFolder(data.folders, folder.id, targetFolderId)) {
+            throw new Error(`Unable to move note folder ${folder.id} to folder ${targetFolderId || '(root)'}.`);
+        }
+
+        await store.write(this.settings.listsFile, data);
+        this.refresh();
+        return json({ moved: { kind: 'folder', id: folder.id, targetFolderId } });
     }
 }
 
@@ -280,6 +406,94 @@ class EditLinkTool implements vscode.LanguageModelTool<EditLinkInput> {
     }
 }
 
+interface ManageLinkFolderInput {
+    action: 'create' | 'rename' | 'delete';
+    id?: string;
+    name?: string;
+    parentFolderId?: string;
+}
+
+class ManageLinkFolderTool implements vscode.LanguageModelTool<ManageLinkFolderInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<ManageLinkFolderInput>) {
+        const data = await store.read<LinkStore>(this.settings.linksFile, { root: [] });
+        const { action, id, name, parentFolderId } = options.input;
+
+        switch (action) {
+            case 'create': {
+                const folder: LinkNode = {
+                    id: generateId('lf'),
+                    type: 'folder',
+                    label: requireName(name, 'Folder name'),
+                    expanded: true,
+                    children: [],
+                };
+                const parentId = parentFolderId ?? '';
+                if (parentId) {
+                    const parent = findNode(data.root, parentId);
+                    if (!parent || parent.type !== 'folder') {
+                        throw new Error(`Link folder not found: ${parentId}. Use tulcase_list_links to find valid folder IDs.`);
+                    }
+                    parent.children ??= [];
+                    parent.children.push(folder);
+                } else {
+                    data.root.push(folder);
+                }
+                await store.write(this.settings.linksFile, data);
+                this.refresh();
+                return json({ created: folder });
+            }
+            case 'rename': {
+                if (!id) { throw new Error('Folder id is required for rename.'); }
+                const folder = findNode(data.root, id);
+                if (!folder || folder.type !== 'folder') {
+                    throw new Error(`Link folder not found: ${id}. Use tulcase_list_links to find valid folder IDs.`);
+                }
+                folder.label = requireName(name, 'Folder name');
+                await store.write(this.settings.linksFile, data);
+                this.refresh();
+                return json({ renamed: folder });
+            }
+            case 'delete': {
+                if (!id) { throw new Error('Folder id is required for delete.'); }
+                const folder = findNode(data.root, id);
+                if (!folder || folder.type !== 'folder') {
+                    throw new Error(`Link folder not found: ${id}. Use tulcase_list_links to find valid folder IDs.`);
+                }
+                removeNode(data.root, id);
+                await store.write(this.settings.linksFile, data);
+                this.refresh();
+                return text(`Deleted link folder "${folder.label}" and its nested entries.`);
+            }
+        }
+    }
+}
+
+interface MoveLinkEntryInput {
+    id: string;
+    targetFolderId?: string;
+}
+
+class MoveLinkEntryTool implements vscode.LanguageModelTool<MoveLinkEntryInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<MoveLinkEntryInput>) {
+        const data = await store.read<LinkStore>(this.settings.linksFile, { root: [] });
+        const targetFolderId = options.input.targetFolderId ?? '';
+        const node = findNode(data.root, options.input.id);
+        if (!node) {
+            throw new Error(`Link entry not found: ${options.input.id}. Use tulcase_list_links to find valid link and folder IDs.`);
+        }
+        if (!moveNode(data.root, node.id, targetFolderId)) {
+            throw new Error(`Unable to move link entry ${node.id} to folder ${targetFolderId || '(root)'}.`);
+        }
+        await store.write(this.settings.linksFile, data);
+        this.refresh();
+        return json({ moved: { kind: node.type, id: node.id, targetFolderId } });
+    }
+}
+
 // ── COMMAND Tools ────────────────────────────────────────────────────────────
 
 interface ListCommandsInput { tag?: string }
@@ -305,12 +519,14 @@ class AddCommandTool implements vscode.LanguageModelTool<AddCommandInput> {
 
     async invoke(options: vscode.LanguageModelToolInvocationOptions<AddCommandInput>) {
         const data = await store.read<CommandStore>(this.settings.commandsFile, { items: [], folders: [] });
+        const folderId = options.input.folder ?? '';
+        requireCommandFolder(data, folderId);
         const item: CommandItem = {
             id: generateId('cmd'),
             label: options.input.label,
             command: options.input.command,
             tags: options.input.tags ?? [],
-            folder: options.input.folder ?? '',
+            folder: folderId,
         };
         data.items.push(item);
         await store.write(this.settings.commandsFile, data);
@@ -319,7 +535,7 @@ class AddCommandTool implements vscode.LanguageModelTool<AddCommandInput> {
     }
 }
 
-interface EditCommandInput { id: string; label?: string; command?: string; tags?: string[] }
+interface EditCommandInput { id: string; label?: string; command?: string; tags?: string[]; folder?: string }
 
 class EditCommandTool implements vscode.LanguageModelTool<EditCommandInput> {
     constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
@@ -332,10 +548,116 @@ class EditCommandTool implements vscode.LanguageModelTool<EditCommandInput> {
         if (options.input.label !== undefined) { item.label = options.input.label; }
         if (options.input.command !== undefined) { item.command = options.input.command; }
         if (options.input.tags !== undefined) { item.tags = options.input.tags; }
+        if (options.input.folder !== undefined) {
+            requireCommandFolder(data, options.input.folder);
+            item.folder = options.input.folder;
+        }
 
         await store.write(this.settings.commandsFile, data);
         this.refresh();
         return json({ updated: item });
+    }
+}
+
+interface ManageCommandFolderInput {
+    action: 'create' | 'rename' | 'delete';
+    id?: string;
+    name?: string;
+    parentId?: string;
+}
+
+class ManageCommandFolderTool implements vscode.LanguageModelTool<ManageCommandFolderInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<ManageCommandFolderInput>) {
+        const data = await store.read<CommandStore>(this.settings.commandsFile, { items: [], folders: [] });
+        const folders = data.folders ?? [];
+        data.folders = folders;
+        const { action, id, name, parentId } = options.input;
+
+        switch (action) {
+            case 'create': {
+                const folderName = requireName(name, 'Folder name');
+                const parent = parentId ?? '';
+                requireCommandFolder(data, parent);
+                const folder: CommandFolder = {
+                    id: generateId('cf'),
+                    name: folderName,
+                    parent,
+                };
+                folders.push(folder);
+                await store.write(this.settings.commandsFile, data);
+                this.refresh();
+                return json({ created: folder });
+            }
+            case 'rename': {
+                if (!id) { throw new Error('Folder id is required for rename.'); }
+                const folder = folders.find(entry => entry.id === id);
+                if (!folder) {
+                    throw new Error(`Command folder not found: ${id}. Use tulcase_list_commands to find valid folder IDs.`);
+                }
+                folder.name = requireName(name, 'Folder name');
+                await store.write(this.settings.commandsFile, data);
+                this.refresh();
+                return json({ renamed: folder });
+            }
+            case 'delete': {
+                if (!id) { throw new Error('Folder id is required for delete.'); }
+                const folder = folders.find(entry => entry.id === id);
+                if (!folder) {
+                    throw new Error(`Command folder not found: ${id}. Use tulcase_list_commands to find valid folder IDs.`);
+                }
+                const commandsInFolder = data.items.filter(item => item.folder === id);
+                const subFolders = folders.filter(entry => entry.parent === id);
+                for (const item of commandsInFolder) { item.folder = folder.parent; }
+                for (const entry of subFolders) { entry.parent = folder.parent; }
+                data.folders = folders.filter(entry => entry.id !== id);
+                await store.write(this.settings.commandsFile, data);
+                this.refresh();
+                return json({
+                    deleted: { id: folder.id, name: folder.name },
+                    rehomedToParent: { commands: commandsInFolder.length, folders: subFolders.length, parentId: folder.parent },
+                });
+            }
+        }
+    }
+}
+
+interface MoveCommandEntryInput {
+    id: string;
+    targetFolderId?: string;
+}
+
+class MoveCommandEntryTool implements vscode.LanguageModelTool<MoveCommandEntryInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<MoveCommandEntryInput>) {
+        const data = await store.read<CommandStore>(this.settings.commandsFile, { items: [], folders: [] });
+        const folders = data.folders ?? [];
+        data.folders = folders;
+        const targetFolderId = options.input.targetFolderId ?? '';
+        const item = data.items.find(entry => entry.id === options.input.id);
+
+        if (item) {
+            if (!moveFlatItem(data.items, folders, item.id, targetFolderId)) {
+                throw new Error(`Unable to move command ${item.id} to folder ${targetFolderId || '(root)'}.`);
+            }
+            await store.write(this.settings.commandsFile, data);
+            this.refresh();
+            return json({ moved: { kind: 'command', id: item.id, targetFolderId } });
+        }
+
+        const folder = folders.find(entry => entry.id === options.input.id);
+        if (!folder) {
+            throw new Error(`Command entry not found: ${options.input.id}. Use tulcase_list_commands to find valid command and folder IDs.`);
+        }
+        if (!moveFlatFolder(folders, folder.id, targetFolderId)) {
+            throw new Error(`Unable to move command folder ${folder.id} to folder ${targetFolderId || '(root)'}.`);
+        }
+
+        await store.write(this.settings.commandsFile, data);
+        this.refresh();
+        return json({ moved: { kind: 'folder', id: folder.id, targetFolderId } });
     }
 }
 
@@ -440,14 +762,20 @@ export function registerChatTools(
         vscode.lm.registerTool('tulcase_read_note', new ReadNoteTool(settings)),
         vscode.lm.registerTool('tulcase_add_note', new AddNoteTool(settings, refresh)),
         vscode.lm.registerTool('tulcase_edit_note', new EditNoteTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_manage_note_folder', new ManageNoteFolderTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_move_note_entry', new MoveNoteEntryTool(settings, refresh)),
         // Links
         vscode.lm.registerTool('tulcase_list_links', new ListLinksTool(settings)),
         vscode.lm.registerTool('tulcase_add_link', new AddLinkTool(settings, refresh)),
         vscode.lm.registerTool('tulcase_edit_link', new EditLinkTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_manage_link_folder', new ManageLinkFolderTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_move_link_entry', new MoveLinkEntryTool(settings, refresh)),
         // Commands
         vscode.lm.registerTool('tulcase_list_commands', new ListCommandsTool(settings)),
         vscode.lm.registerTool('tulcase_add_command', new AddCommandTool(settings, refresh)),
         vscode.lm.registerTool('tulcase_edit_command', new EditCommandTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_manage_command_folder', new ManageCommandFolderTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_move_command_entry', new MoveCommandEntryTool(settings, refresh)),
         // Tags
         vscode.lm.registerTool('tulcase_list_tags', new ListTagsTool(settings)),
         vscode.lm.registerTool('tulcase_add_tag', new AddTagTool(settings, refresh)),

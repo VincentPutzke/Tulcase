@@ -442,6 +442,42 @@
         }
       },
       {
+        "name": "tulcase_manage_note_folder",
+        "displayName": "Tulcase: Manage Note Folder",
+        "toolReferenceName": "tulcase_manage_note_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete note folders in Tulcase.",
+        "modelDescription": "Manage Tulcase note folders. Action create makes a folder optionally under parentId. Action rename changes a folder name by id. Action delete removes a folder by id and moves its direct child notes and direct subfolders to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": { "type": "string", "enum": ["create", "rename", "delete"], "description": "Folder operation to perform." },
+            "id": { "type": "string", "description": "Existing folder ID. Required for rename and delete." },
+            "name": { "type": "string", "description": "Folder name. Required for create and rename." },
+            "parentId": { "type": "string", "description": "Parent folder ID for create. Omit or empty for root." }
+          },
+          "required": ["action"]
+        }
+      },
+      {
+        "name": "tulcase_move_note_entry",
+        "displayName": "Tulcase: Move Note Entry",
+        "toolReferenceName": "tulcase_move_note_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a note or note folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase note entry by id. The id may belong to either a note or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The note or folder ID to move." },
+            "targetFolderId": { "type": "string", "description": "Destination folder ID. Omit or empty for root." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
         "name": "tulcase_list_links",
         "displayName": "Tulcase: List Links",
         "toolReferenceName": "tulcase_list_links",
@@ -495,6 +531,42 @@
         }
       },
       {
+        "name": "tulcase_manage_link_folder",
+        "displayName": "Tulcase: Manage Link Folder",
+        "toolReferenceName": "tulcase_manage_link_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete bookmark folders in Tulcase.",
+        "modelDescription": "Manage Tulcase link folders. Action create makes a folder optionally under parentFolderId. Action rename changes a folder label by id. Action delete removes a folder by id and deletes its entire nested subtree.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": { "type": "string", "enum": ["create", "rename", "delete"], "description": "Folder operation to perform." },
+            "id": { "type": "string", "description": "Existing folder ID. Required for rename and delete." },
+            "name": { "type": "string", "description": "Folder name. Required for create and rename." },
+            "parentFolderId": { "type": "string", "description": "Parent folder ID for create. Omit or empty for root." }
+          },
+          "required": ["action"]
+        }
+      },
+      {
+        "name": "tulcase_move_link_entry",
+        "displayName": "Tulcase: Move Link Entry",
+        "toolReferenceName": "tulcase_move_link_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a link or link folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase link entry by id. The id may belong to either a link or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The link or folder ID to move." },
+            "targetFolderId": { "type": "string", "description": "Destination folder ID. Omit or empty for root." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
         "name": "tulcase_list_commands",
         "displayName": "Tulcase: List Commands",
         "toolReferenceName": "tulcase_list_commands",
@@ -542,7 +614,44 @@
             "id": { "type": "string", "description": "The command ID to edit." },
             "label": { "type": "string", "description": "New display name." },
             "command": { "type": "string", "description": "New command text." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." }
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." },
+            "folder": { "type": "string", "description": "Move to this folder ID. Use an empty string for root." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_manage_command_folder",
+        "displayName": "Tulcase: Manage Command Folder",
+        "toolReferenceName": "tulcase_manage_command_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete command folders in Tulcase.",
+        "modelDescription": "Manage Tulcase command folders. Action create makes a folder optionally under parentId. Action rename changes a folder name by id. Action delete removes a folder by id and reparents its direct child commands and direct subfolders to the deleted folder's parent.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": { "type": "string", "enum": ["create", "rename", "delete"], "description": "Folder operation to perform." },
+            "id": { "type": "string", "description": "Existing folder ID. Required for rename and delete." },
+            "name": { "type": "string", "description": "Folder name. Required for create and rename." },
+            "parentId": { "type": "string", "description": "Parent folder ID for create. Omit or empty for root." }
+          },
+          "required": ["action"]
+        }
+      },
+      {
+        "name": "tulcase_move_command_entry",
+        "displayName": "Tulcase: Move Command Entry",
+        "toolReferenceName": "tulcase_move_command_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a command or command folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase command entry by id. The id may belong to either a command or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The command or folder ID to move." },
+            "targetFolderId": { "type": "string", "description": "Destination folder ID. Omit or empty for root." }
           },
           "required": ["id"]
         }
