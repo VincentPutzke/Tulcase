@@ -292,6 +292,310 @@
         "mac": "cmd+enter",
         "when": "inQuickOpen"
       }
+    ],
+    "languageModelTools": [
+      {
+        "name": "tulcase_list_todos",
+        "displayName": "Tulcase: List TODOs",
+        "toolReferenceName": "tulcase_list_todos",
+        "icon": "$(checklist)",
+        "userDescription": "List your Tulcase TODOs with optional filters (all, open, done, overdue, today) and tag filtering.",
+        "modelDescription": "List Tulcase TODO items. Supports filtering by status (all/open/done/overdue/today) and by tag name. Returns an array of todo items with id, note, date, done, and tags fields.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "type": "string",
+              "enum": ["all", "done", "open", "overdue", "today"],
+              "description": "Filter todos by status. Default: all."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Filter todos to only those with this tag."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_add_todo",
+        "displayName": "Tulcase: Add TODO",
+        "toolReferenceName": "tulcase_add_todo",
+        "icon": "$(add)",
+        "userDescription": "Add a new TODO to Tulcase.",
+        "modelDescription": "Create a new Tulcase TODO item. Requires a note (text). Optionally set a date (YYYY-MM-DD, defaults to today) and tags (array of tag names).",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "note": { "type": "string", "description": "The TODO text." },
+            "date": { "type": "string", "description": "Due date in YYYY-MM-DD format. Defaults to today." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." }
+          },
+          "required": ["note"]
+        }
+      },
+      {
+        "name": "tulcase_update_todo",
+        "displayName": "Tulcase: Update TODO",
+        "toolReferenceName": "tulcase_update_todo",
+        "icon": "$(edit)",
+        "userDescription": "Update an existing Tulcase TODO (mark done, change text, date, or tags).",
+        "modelDescription": "Update a Tulcase TODO item by ID. Can change done status, note text, date, or tags. Use tulcase_list_todos first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The todo ID." },
+            "done": { "type": "boolean", "description": "Mark as done or not done." },
+            "note": { "type": "string", "description": "New text for the todo." },
+            "date": { "type": "string", "description": "New date in YYYY-MM-DD format." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_delete_todo",
+        "displayName": "Tulcase: Delete TODO",
+        "toolReferenceName": "tulcase_delete_todo",
+        "icon": "$(trash)",
+        "userDescription": "Delete a Tulcase TODO by ID.",
+        "modelDescription": "Permanently delete a Tulcase TODO item by its ID. Use tulcase_list_todos first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The todo ID to delete." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_list_notes",
+        "displayName": "Tulcase: List Notes",
+        "toolReferenceName": "tulcase_list_notes",
+        "icon": "$(note)",
+        "userDescription": "List all Tulcase notes and folders, with optional tag filtering.",
+        "modelDescription": "List all Tulcase notes and their folder structure. Optionally filter by tag. Returns notes (id, label, content, tags, folder, createdAt, updatedAt) and folders (id, name, parent).",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": { "type": "string", "description": "Filter notes to only those with this tag." }
+          }
+        }
+      },
+      {
+        "name": "tulcase_read_note",
+        "displayName": "Tulcase: Read Note",
+        "toolReferenceName": "tulcase_read_note",
+        "icon": "$(open-preview)",
+        "userDescription": "Read the full content of a Tulcase note by ID.",
+        "modelDescription": "Read the full content and metadata of a Tulcase note by its ID. Use tulcase_list_notes first to find valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The note ID to read." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_add_note",
+        "displayName": "Tulcase: Add Note",
+        "toolReferenceName": "tulcase_add_note",
+        "icon": "$(new-file)",
+        "userDescription": "Create a new Tulcase note.",
+        "modelDescription": "Create a new Tulcase note. Requires a label. Optionally set content (markdown text), tags, and folder ID. Use tulcase_list_notes to see available folders.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string", "description": "The note title." },
+            "content": { "type": "string", "description": "The note content (markdown)." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." },
+            "folder": { "type": "string", "description": "Folder ID to place the note in. Empty string or omit for root." }
+          },
+          "required": ["label"]
+        }
+      },
+      {
+        "name": "tulcase_edit_note",
+        "displayName": "Tulcase: Edit Note",
+        "toolReferenceName": "tulcase_edit_note",
+        "icon": "$(edit)",
+        "userDescription": "Edit an existing Tulcase note (label, content, tags, or folder).",
+        "modelDescription": "Edit a Tulcase note by ID. Can change label, content, tags, or folder. Use tulcase_list_notes first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The note ID to edit." },
+            "label": { "type": "string", "description": "New title." },
+            "content": { "type": "string", "description": "New content (markdown)." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." },
+            "folder": { "type": "string", "description": "Move to this folder ID." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_list_links",
+        "displayName": "Tulcase: List Links",
+        "toolReferenceName": "tulcase_list_links",
+        "icon": "$(link)",
+        "userDescription": "List all Tulcase bookmarks/links as a tree, with optional tag filtering.",
+        "modelDescription": "List the Tulcase link tree. Each node has id, type (link/folder), label, url (for links), tags, and children (for folders). Optionally filter by tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": { "type": "string", "description": "Filter links to only those with this tag." }
+          }
+        }
+      },
+      {
+        "name": "tulcase_add_link",
+        "displayName": "Tulcase: Add Link",
+        "toolReferenceName": "tulcase_add_link",
+        "icon": "$(add)",
+        "userDescription": "Add a new bookmark/link to Tulcase.",
+        "modelDescription": "Create a new Tulcase link (bookmark). Requires label and url. Optionally set tags and parentFolderId to place it inside a folder. Use tulcase_list_links to see folder IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string", "description": "Display name for the link." },
+            "url": { "type": "string", "description": "The URL." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." },
+            "parentFolderId": { "type": "string", "description": "Folder ID to place the link in. Omit for root." }
+          },
+          "required": ["label", "url"]
+        }
+      },
+      {
+        "name": "tulcase_edit_link",
+        "displayName": "Tulcase: Edit Link",
+        "toolReferenceName": "tulcase_edit_link",
+        "icon": "$(edit)",
+        "userDescription": "Edit an existing Tulcase link (label, url, or tags).",
+        "modelDescription": "Edit a Tulcase link by ID. Can change label, url, or tags. Use tulcase_list_links first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The link ID to edit." },
+            "label": { "type": "string", "description": "New display name." },
+            "url": { "type": "string", "description": "New URL." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_list_commands",
+        "displayName": "Tulcase: List Commands",
+        "toolReferenceName": "tulcase_list_commands",
+        "icon": "$(terminal)",
+        "userDescription": "List all Tulcase saved commands/snippets, with optional tag filtering.",
+        "modelDescription": "List Tulcase saved commands (shell snippets). Returns commands (id, label, command text, tags, folder) and folders. Optionally filter by tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": { "type": "string", "description": "Filter commands to only those with this tag." }
+          }
+        }
+      },
+      {
+        "name": "tulcase_add_command",
+        "displayName": "Tulcase: Add Command",
+        "toolReferenceName": "tulcase_add_command",
+        "icon": "$(add)",
+        "userDescription": "Save a new command/snippet to Tulcase.",
+        "modelDescription": "Create a new Tulcase saved command. Requires label and command text. Optionally set tags and folder ID.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string", "description": "Display name for the command." },
+            "command": { "type": "string", "description": "The shell command or snippet text." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." },
+            "folder": { "type": "string", "description": "Folder ID. Omit for root." }
+          },
+          "required": ["label", "command"]
+        }
+      },
+      {
+        "name": "tulcase_edit_command",
+        "displayName": "Tulcase: Edit Command",
+        "toolReferenceName": "tulcase_edit_command",
+        "icon": "$(edit)",
+        "userDescription": "Edit an existing Tulcase command (label, command text, or tags).",
+        "modelDescription": "Edit a Tulcase saved command by ID. Can change label, command text, or tags. Use tulcase_list_commands first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "description": "The command ID to edit." },
+            "label": { "type": "string", "description": "New display name." },
+            "command": { "type": "string", "description": "New command text." },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." }
+          },
+          "required": ["id"]
+        }
+      },
+      {
+        "name": "tulcase_list_tags",
+        "displayName": "Tulcase: List Tags",
+        "toolReferenceName": "tulcase_list_tags",
+        "icon": "$(tag)",
+        "userDescription": "List all Tulcase tags with their colors and categories.",
+        "modelDescription": "List all defined Tulcase tags. Returns tag name, hex color, and category for each tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "tulcase_add_tag",
+        "displayName": "Tulcase: Add Tag",
+        "toolReferenceName": "tulcase_add_tag",
+        "icon": "$(add)",
+        "userDescription": "Create a new Tulcase tag with optional color and category.",
+        "modelDescription": "Create a new Tulcase tag. Requires a name. Optionally set a hex color (default: #8b8fa3) and category (default: general).",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "The tag name." },
+            "color": { "type": "string", "description": "Hex color (e.g. #ff5c5c). Default: #8b8fa3." },
+            "category": { "type": "string", "description": "Category grouping. Default: general." }
+          },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "tulcase_manage_tag",
+        "displayName": "Tulcase: Manage Tag",
+        "toolReferenceName": "tulcase_manage_tag",
+        "icon": "$(gear)",
+        "userDescription": "Rename, recolor, recategorize, or delete a Tulcase tag.",
+        "modelDescription": "Manage a Tulcase tag: rename it, change its color, change its category, or delete it. Deletion also removes the tag from all items. Use tulcase_list_tags to see existing tags.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "The current tag name." },
+            "action": { "type": "string", "enum": ["rename", "recolor", "recategorize", "delete"], "description": "What to do with the tag." },
+            "newValue": { "type": "string", "description": "New name (rename), hex color (recolor), or category (recategorize). Not needed for delete." }
+          },
+          "required": ["name", "action"]
+        }
+      }
     ]
   },
   "scripts": {
