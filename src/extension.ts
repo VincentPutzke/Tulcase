@@ -43,6 +43,7 @@ import { StatusBar } from './views/status-bar';
 import { SyncService } from './sync/sync-service';
 import { SyncPanelViewProvider } from './views/sync-panel.view';
 import { AutoSync } from './sync/auto-sync';
+import { registerChatTools } from './chat/tools';
 
 export function activate(context: vscode.ExtensionContext): void {
     // 1. Initialise database layout + resolve settings
@@ -140,6 +141,9 @@ export function activate(context: vscode.ExtensionContext): void {
     registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
     registerDbCommands(context, settings, refreshAll);
+
+    // 5b. Register Language Model tools for AI agents
+    registerChatTools(context, settings, refreshAll);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
