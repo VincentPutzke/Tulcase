@@ -1,0 +1,261 @@
+// ── Pipe Pipelines View ───────────────────────────────────────────────────────
+// GitLab pipelines tree: scopes → pipelines → stages → jobs (+ downstream).
+
+@use 'shared';
+
+// ── Toolbar tweaks ────────────────────────────────────────────────────────────
+.btn-icon-only {
+  flex: 0 0 auto;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .icon { display: block; }
+}
+
+.search-bar {
+  gap: 6px;
+
+  .search-input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+.status-select {
+  flex: 0 0 auto;
+  width: 86px;
+  padding: 5px 6px;
+  background: var(--vscode-input-background, rgba(128, 128, 128, 0.12));
+  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+
+  &:focus {
+    border-color: var(--vscode-focusBorder);
+  }
+}
+
+// ── Error / info banner ───────────────────────────────────────────────────────
+.banner {
+  background: var(--vscode-inputValidation-errorBackground, rgba(244, 67, 54, 0.18));
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-inputValidation-errorBorder, rgba(244, 67, 54, 0.45));
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 0 0 8px 0;
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  word-break: break-word;
+
+  &.banner-info {
+    background: rgba(76, 175, 80, 0.10);
+    border-color: rgba(76, 175, 80, 0.45);
+    color: var(--vscode-foreground);
+  }
+}
+
+.banner-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+// ── Scope header additions ────────────────────────────────────────────────────
+.scope-tags {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 1;
+}
+
+.scope-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.section-header:hover .scope-actions {
+  visibility: visible;
+}
+
+.bell-btn.bell-on {
+  visibility: visible;          // stays visible when following
+  color: shared.$yellow;
+}
+
+.section-header .bell-btn.bell-on {
+  // Keep the bell visible even when the header is not hovered.
+  visibility: visible;
+}
+
+.section-header:has(.bell-on) .scope-actions {
+  visibility: visible;
+}
+
+.section-badge.running { background: var(--vscode-charts-blue, #1e90ff); color: #fff; }
+.section-badge.success { background: var(--vscode-charts-green, #2ea043); color: #fff; }
+.section-badge.failed  { background: var(--vscode-charts-red, #f85149); color: #fff; }
+
+.section-badge + .section-badge {
+  margin-left: 2px;
+}
+
+// Counts sit at the far right; the auto margin is on the first badge.
+.section-header .section-badge:first-of-type {
+  margin-left: auto;
+}
+
+// ── Pipelines ─────────────────────────────────────────────────────────────────
+.pipeline {
+  margin-bottom: 2px;
+}
+
+.pipeline-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  position: relative;
+
+  &:hover {
+    background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.10));
+  }
+}
+
+.pipeline-ref {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+  flex-shrink: 0;
+}
+
+.pipeline-meta {
+  font-size: 0.85em;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.pipeline-body {
+  margin-left: 8px;
+
+  &.collapsed { display: none; }
+}
+
+// ── Stages & jobs ─────────────────────────────────────────────────────────────
+.stage-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin: 6px 0 2px 4px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.12);
+}
+
+.job-item {
+  padding: 2px 4px;
+  border-bottom: none;
+}
+
+.tree-item-detail.dim {
+  opacity: 0.55;
+}
+
+// ── Status badges ─────────────────────────────────────────────────────────────
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-running  { color: var(--vscode-charts-blue, #1e90ff); animation: pipe-spin 1.6s linear infinite; }
+.status-pending  { color: var(--vscode-charts-yellow, #d4a017); }
+.status-success  { color: var(--vscode-charts-green, #2ea043); }
+.status-failed   { color: var(--vscode-charts-red, #f85149); }
+.status-canceled { color: #8b8fa3; }
+.status-skipped  { color: #8b8fa3; }
+.status-manual   { color: var(--vscode-charts-yellow, #d4a017); }
+
+@keyframes pipe-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+// ── Action overlay ────────────────────────────────────────────────────────────
+// Actions float above the row on hover so labels can use the full width.
+.pipeline-header > .tree-item-actions,
+.tree-item-row > .tree-item-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.pipeline-header:hover > .tree-item-actions {
+  visibility: visible;
+}
+
+// ── Nested downstream tree ────────────────────────────────────────────────────
+.downstream-body {
+  margin-left: 12px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(128, 128, 128, 0.15);
+
+  &.collapsed { display: none; }
+
+  .stage-header { margin-top: 4px; }
+}
+
+.downstream-body.depth-1 { border-left-color: rgba(128, 128, 128, 0.18); }
+.downstream-body.depth-2 { border-left-color: rgba(128, 128, 128, 0.24); }
+.downstream-body.depth-3 { border-left-color: rgba(128, 128, 128, 0.30); }
+.downstream-body.depth-4 { border-left-color: rgba(128, 128, 128, 0.36); }
+
+.sub-chevron {
+  font-size: 10px;
+  width: 12px;
+  margin-right: 2px;
+}
+
+// ── Empty state button ────────────────────────────────────────────────────────
+.empty-state-btn {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: auto;
+  padding: 5px 14px;
+}

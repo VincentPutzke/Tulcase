@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-add-scope">+ Add Scope</button>
+    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-token"  title="Set GitLab token"></button>
+    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-json"   title="Edit as JSON (advanced)"></button>
+    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-import" title="Import scopes.jsonc from the Tulcase Pipe extension"></button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="search"
+      type="text"
+      placeholder="Search scopes by label, project, tag…"
+      spellcheck="false"
+    >
+  </div>
+</div>
+
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane">
+  <div id="toast-host"></div>
+  <div id="content"></div>
+</div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── Persisted view-state ─────────────────────────────────
+  const saved = vscode.getState() || {};
+  const collapsed = saved.collapsed || { scopes: false, rules: true };
+  let query = saved.query || '';
+
+  function persist() {
+    vscode.setState({ collapsed: collapsed, query: query });
+  }
+
+  // ── Reactive state ───────────────────────────────────────
+  let scopes       = [];
+  let customRules  = [];
+  let builtinRules = [];
+  let statuses     = [];
+  let tagMap       = {};
+  let hasToken     = false;
+  let gotData      = false;
+
+  /** Open editor forms. scopeForm: {mode:'add'|'edit', draft} | null */
+  let scopeForm = null;
+  let ruleForm  = null;   // {mode:'add'|'edit', draft, nameLocked} | null
+  let toastTimer = null;
+
+  // ── DOM refs ─────────────────────────────────────────────
+  const content  = document.getElementById('content');
+  const toastEl  = document.getElementById('toast-host');
+  const searchEl = document.getElementById('search');
+  searchEl.value = query;
+
+  // ── Utility ──────────────────────────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  const ICONS = {
+    shield:  '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    braces:  '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    import_: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    edit:    '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    copy:    '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8"/></svg>',
+    trash:   '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    up:      '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    down:    '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M19 12l-7 7-7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bell:    '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bellOn:  '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    search:  '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    folder:  '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    scopeEmpty: '<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>',
+  };
+  document.getElementById('btn-token').innerHTML  = ICONS.shield;
+  document.getElementById('btn-json').innerHTML   = ICONS.braces;
+  document.getElementById('btn-import').innerHTML = ICONS.import_;
+
+  // ── Toast ────────────────────────────────────────────────
+  function showToast(text, kind) {
+    toastEl.innerHTML =
+      '<div class="banner' + (kind === 'error' ? '' : ' banner-info') + '">'
+      + '<span>' + esc(text) + '</span>'
+      + '<button class="banner-close" id="toast-close">×</button></div>';
+    document.getElementById('toast-close').addEventListener('click', clearToast);
+    if (toastTimer) { clearTimeout(toastTimer); }
+    if (kind !== 'error') { toastTimer = setTimeout(clearToast, 4000); }
+  }
+  function clearToast() {
+    toastEl.innerHTML = '';
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+  }
+
+  // ── Rule helpers ─────────────────────────────────────────
+  function customByName(name) {
+    return customRules.find(r => r.name === name);
+  }
+
+  /** Merged rule list for display + scope forms: customs override builtins. */
+  function mergedRules() {
+    const out = [];
+    for (const b of builtinRules) {
+      const override = customByName(b.name);
+      out.push(override
+        ? { rule: override, builtin: true, overridden: true }
+        : { rule: b, builtin: true, overridden: false });
+    }
+    for (const c of customRules) {
+      if (!builtinRules.some(b => b.name === c.name)) {
+        out.push({ rule: c, builtin: false, overridden: false });
+      }
+    }
+    return out;
+  }
+
+  /** Mirror of the extension-side LogRuleEngine.apply (line-based). */
+  function applyRulePreview(rule, text) {
+    let regex;
+    try {
+      regex = new RegExp(rule.pattern, rule.flags || 'g');
+    } catch (err) {
+      return { error: String(err && err.message || err) };
+    }
+    const lines = text.split('\n');
+    const out = [];
+    for (const original of lines) {
+      regex.lastIndex = 0;
+      if (rule.mode === 'replace') {
+        out.push(original.replace(regex, rule.replacement || ''));
+      } else {
+        const line = original.replace(regex, '');
+        if (line.trim() === '' && original.trim() !== '') { continue; }  // dropped
+        out.push(line);
+      }
+    }
+    return { result: out.join('\n') };
+  }
+
+  // ── Scope summary helpers ────────────────────────────────
+  function filterSummary(s) {
+    const parts = [];
+    if (s.branchFilter)  { parts.push('branch = ' + s.branchFilter); }
+    if (s.statusFilter && s.statusFilter.length) { parts.push('status: ' + s.statusFilter.join(', ')); }
+    if (s.userFilter)    { parts.push('@' + s.userFilter); }
+    if (s.nameContains)  { parts.push('contains "' + s.nameContains + '"'); }
+    if (s.sinceHours)    { parts.push('last ' + s.sinceHours + 'h'); }
+    if (s.lastN)         { parts.push('newest ' + s.lastN); }
+    if (s.logRules && s.logRules.length) { parts.push(s.logRules.length + ' log rule' + (s.logRules.length === 1 ? '' : 's')); }
+    return parts.join(' · ');
+  }
+
+  function scopeMatches(s) {
+    if (!query) { return true; }
+    const q = query.toLowerCase();
+    if (s.label.toLowerCase().includes(q)) { return true; }
+    if (s.projects.some(p => p.toLowerCase().includes(q))) { return true; }
+    if ((s.tags || []).some(t => t.toLowerCase().includes(q))) { return true; }
+    return false;
+  }
+
+  // ── Render: top level ────────────────────────────────────
+  function render() {
+    if (!gotData) {
+      content.innerHTML = '<div class="empty-state">Loading…</div>';
+      return;
+    }
+
+    let html = '';
+
+    if (!hasToken) {
+      html += '<div class="token-hint">'
+        + ICONS.shield + ' No GitLab token set — pipelines stay empty. '
+        + '<a id="hint-set-token" href="#">Set token</a>'
+        + '</div>';
+    }
+
+    if (scopeForm && scopeForm.mode === 'add') {
+      html += renderScopeForm(scopeForm.draft, 'add');
+    }
+
+    // ── Scopes section ───────────────────────────
+    const visible = scopes.filter(scopeMatches);
+    html += '<div class="section">';
+    html += '<div class="section-header" data-toggle-section="scopes">';
+    html += '<span class="section-chevron' + (collapsed.scopes ? ' collapsed' : '') + '">▾</span>';
+    html += '<span class="section-icon">' + ICONS.folder + '</span>';
+    html += '<span class="section-label">Scopes</span>';
+    html += '<span class="section-badge">' + scopes.length + '</span>';
+    html += '</div>';
+    html += '<div class="section-body' + (collapsed.scopes ? ' collapsed' : '') + '">';
+    if (scopes.length === 0 && !scopeForm) {
+      html += '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.scopeEmpty + '</div>'
+        + 'Scopes define which projects and pipelines appear in the Pipelines view.<br><br>'
+        + '<button class="add-btn empty-state-btn" id="empty-add-scope">+ Add your first scope</button>'
+        + '</div>';
+    } else if (visible.length === 0 && scopes.length > 0) {
+      html += '<div class="no-results">No scopes match your search.</div>';
+    } else {
+      for (const s of visible) { html += renderScopeCard(s); }
+    }
+    html += '</div></div>';
+
+    // ── Log rules section ────────────────────────
+    const rules = mergedRules();
+    html += '<div class="section">';
+    html += '<div class="section-header" data-toggle-section="rules">';
+    html += '<span class="section-chevron' + (collapsed.rules ? ' collapsed' : '') + '">▾</span>';
+    html += '<span class="section-icon">' + ICONS.braces + '</span>';
+    html += '<span class="section-label">Log Rules</span>';
+    html += '<span class="section-badge">' + rules.length + '</span>';
+    html += '</div>';
+    html += '<div class="section-body' + (collapsed.rules ? ' collapsed' : '') + '">';
+    html += '<div class="rules-intro">Regex filters applied to job logs. Attach them to scopes in the scope editor.</div>';
+    html += '<button class="add-btn add-btn-secondary rule-add-btn" id="btn-add-rule">+ Add Rule</button>';
+    if (ruleForm && ruleForm.mode === 'add') {
+      html += renderRuleForm(ruleForm.draft, false);
+    }
+    for (const entry of rules) {
+      if (ruleForm && ruleForm.mode === 'edit' && ruleForm.draft.name === entry.rule.name) {
+        html += renderRuleForm(ruleForm.draft, true);
+      } else {
+        html += renderRuleRow(entry);
+      }
+    }
+    html += '</div></div>';
+
+    content.innerHTML = html;
+    bind();
+  }
+
+  // ── Render: scope card ───────────────────────────────────
+  function renderScopeCard(s) {
+    if (scopeForm && scopeForm.mode === 'edit' && scopeForm.draft.id === s.id) {
+      return renderScopeForm(scopeForm.draft, 'edit');
+    }
+
+    let html = '<div class="scope-card' + (s.enabled ? '' : ' scope-disabled') + '">';
+    html += '<div class="scope-card-header">';
+    html += '<label class="toggle" title="' + (s.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable') + '">'
+          + '<input type="checkbox" data-enable="' + esc(s.id) + '"' + (s.enabled ? ' checked' : '') + '>'
+          + '<span class="toggle-track"></span></label>';
+    html += '<span class="scope-label">' + esc(s.label) + '</span>';
+    html += '<button class="action-btn bell-btn' + (s.follow ? ' bell-on' : '') + '" data-follow="' + esc(s.id) + '" title="'
+          + (s.follow ? 'Following — click to stop notifications' : 'Follow — notify when a pipeline finishes')
+          + '">' + (s.follow ? ICONS.bellOn : ICONS.bell) + '</button>';
+    html += '<span class="scope-card-actions">';
+    html += '<button class="action-btn btn-edit"   data-edit-scope="'   + esc(s.id) + '" title="Edit">'      + ICONS.edit  + '</button>';
+    html += '<button class="action-btn btn-copy"   data-dup-scope="'    + esc(s.id) + '" title="Duplicate">' + ICONS.copy  + '</button>';
+    html += '<button class="action-btn"            data-move-scope="'   + esc(s.id) + '" data-dir="up"   title="Move up">'   + ICONS.up   + '</button>';
+    html += '<button class="action-btn"            data-move-scope="'   + esc(s.id) + '" data-dir="down" title="Move down">' + ICONS.down + '</button>';
+    html += '<button class="action-btn btn-delete" data-delete-scope="' + esc(s.id) + '" title="Delete">'    + ICONS.trash + '</button>';
+    html += '</span>';
+    html += '</div>';
+
+    html += '<div class="scope-card-body">';
+    html += '<div class="chip-row">';
+    for (const p of s.projects) {
+      html += '<span class="chip chip-project">' + esc(p) + '</span>';
+    }
+    html += '</div>';
+    const summary = filterSummary(s);
+    if (summary) {
+      html += '<div class="scope-summary">' + esc(summary) + '</div>';
+    }
+    if (s.tags && s.tags.length) {
+      html += '<div class="chip-row">';
+      for (const t of s.tags) {
+        const color = (tagMap[t] && tagMap[t].color) || '#8b8fa3';
+        html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(t) + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  // ── Render: scope form ───────────────────────────────────
+  function renderScopeForm(d, mode) {
+    let html = '<div class="form-card" id="scope-form">';
+    html += '<div class="form-title">' + (mode === 'add' ? 'New Scope' : 'Edit Scope') + '</div>';
+
+    html += '<label class="form-label">Label</label>';
+    html += '<input class="form-input" id="sf-label" type="text" value="' + esc(d.label || '') + '" placeholder="e.g. Backend · develop" spellcheck="false">';
+
+    html += '<label class="form-label">Projects <span class="form-hint">(path or numeric id)</span></label>';
+    html += '<div class="chip-row" id="sf-projects">';
+    for (let i = 0; i < d.projects.length; i++) {
+      html += '<span class="chip chip-project">' + esc(d.projects[i])
+        + '<button class="chip-x" data-rm-project="' + i + '" title="Remove">×</button></span>';
+    }
+    html += '</div>';
+    html += '<div class="form-row">';
+    html += '<input class="form-input" id="sf-project-input" type="text" placeholder="group/project" spellcheck="false">';
+    html += '<button class="mini-btn" id="sf-project-add">Add</button>';
+    html += '<button class="mini-btn" id="sf-project-search" title="Search GitLab">' + ICONS.search + '</button>';
+    html += '</div>';
+
+    html += '<div class="form-grid">';
+    html += '<div><label class="form-label">Branch <span class="form-hint">(exact)</span></label>'
+          + '<input class="form-input" id="sf-branch" type="text" value="' + esc(d.branchFilter || '') + '" placeholder="develop" spellcheck="false"></div>';
+    html += '<div><label class="form-label">Author <span class="form-hint">(username)</span></label>'
+          + '<input class="form-input" id="sf-user" type="text" value="' + esc(d.userFilter || '') + '" placeholder="username" spellcheck="false"></div>';
+    html += '<div><label class="form-label">Ref / SHA contains</label>'
+          + '<input class="form-input" id="sf-contains" type="text" value="' + esc(d.nameContains || '') + '" placeholder="feature/" spellcheck="false"></div>';
+    html += '<div class="form-grid-2">'
+          + '<div><label class="form-label">Newest N</label>'
+          + '<input class="form-input" id="sf-lastn" type="number" min="1" value="' + (d.lastN || '') + '" placeholder="20"></div>'
+          + '<div><label class="form-label">Since hours</label>'
+          + '<input class="form-input" id="sf-since" type="number" min="1" value="' + (d.sinceHours || '') + '" placeholder="24"></div>'
+          + '</div>';
+    html += '</div>';
+
+    html += '<label class="form-label">Statuses <span class="form-hint">(empty = all)</span></label>';
+    html += '<div class="chip-row" id="sf-statuses">';
+    for (const st of statuses) {
+      const on = (d.statusFilter || []).includes(st);
+      html += '<button class="chip chip-toggle' + (on ? ' on' : '') + '" data-status-chip="' + esc(st) + '">' + esc(st) + '</button>';
+    }
+    html += '</div>';
+
+    html += '<label class="form-label">Log rules <span class="form-hint">(applied in listed order)</span></label>';
+    html += '<div class="chip-row" id="sf-rules">';
+    for (const entry of mergedRules()) {
+      const name = entry.rule.name;
+      const on = (d.logRules || []).includes(name);
+      html += '<button class="chip chip-toggle' + (on ? ' on' : '') + '" data-rule-chip="' + esc(name) + '" title="'
+        + esc(entry.rule.description || entry.rule.pattern) + '">' + esc(name) + '</button>';
+    }
+    html += '</div>';
+
+    html += '<label class="form-label">Tags</label>';
+    html += '<div class="form-row">';
+    html += '<div class="chip-row grow" id="sf-tags">';
+    for (const t of (d.tags || [])) {
+      const color = (tagMap[t] && tagMap[t].color) || '#8b8fa3';
+      html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(t) + '</span>';
+    }
+    if (!(d.tags || []).length) { html += '<span class="form-hint">none</span>'; }
+    html += '</div>';
+    html += '<button class="mini-btn" id="sf-pick-tags">Pick…</button>';
+    html += '</div>';
+
+    html += '<div class="form-row form-toggles">';
+    html += '<label class="check-label"><input type="checkbox" id="sf-enabled"' + (d.enabled !== false ? ' checked' : '') + '> Enabled</label>';
+    html += '<label class="check-label"><input type="checkbox" id="sf-follow"' + (d.follow ? ' checked' : '') + '> Follow (notify on finish)</label>';
+    html += '</div>';
+
+    html += '<div class="form-row form-buttons">';
+    html += '<button class="add-btn" id="sf-save">Save Scope</button>';
+    html += '<button class="add-btn add-btn-secondary" id="sf-cancel">Cancel</button>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // ── Render: rule row + form ──────────────────────────────
+  function renderRuleRow(entry) {
+    const r = entry.rule;
+    let badge = '';
+    if (entry.overridden)    { badge = '<span class="rule-badge rule-badge-override">customized</span>'; }
+    else if (entry.builtin)  { badge = '<span class="rule-badge">built-in</span>'; }
+    let html = '<div class="rule-row">';
+    html += '<div class="rule-row-head">';
+    html += '<span class="rule-name">' + esc(r.name) + '</span>' + badge;
+    html += '<span class="rule-actions">';
+    html += '<button class="action-btn btn-edit" data-edit-rule="' + esc(r.name) + '" title="'
+          + (entry.builtin && !entry.overridden ? 'Customize (creates an override)' : 'Edit') + '">' + ICONS.edit + '</button>';
+    if (entry.overridden || !entry.builtin) {
+      html += '<button class="action-btn btn-delete" data-delete-rule="' + esc(r.name) + '" title="'
+            + (entry.overridden ? 'Remove override (restore built-in)' : 'Delete') + '">' + ICONS.trash + '</button>';
+    }
+    html += '</span></div>';
+    const desc = r.description || (r.mode === 'replace' ? 'replace: ' : 'remove: ') + r.pattern;
+    html += '<div class="rule-desc">' + esc(desc) + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderRuleForm(d, nameLocked) {
+    let html = '<div class="form-card" id="rule-form">';
+    html += '<div class="form-title">' + (nameLocked ? 'Edit Rule' : 'New Rule') + '</div>';
+
+    html += '<div class="form-grid">';
+    html += '<div><label class="form-label">Name</label>'
+          + '<input class="form-input" id="rf-name" type="text" value="' + esc(d.name || '') + '"'
+          + (nameLocked ? ' disabled' : '') + ' placeholder="my-filter" spellcheck="false"></div>';
+    html += '<div><label class="form-label">Mode</label>'
+          + '<select class="form-input" id="rf-mode">'
+          + '<option value="remove"'  + (d.mode !== 'replace' ? ' selected' : '') + '>remove matches</option>'
+          + '<option value="replace"' + (d.mode === 'replace' ? ' selected' : '') + '>replace matches</option>'
+          + '</select></div>';
+    html += '</div>';
+
+    html += '<label class="form-label">Description</label>';
+    html += '<input class="form-input" id="rf-desc" type="text" value="' + esc(d.description || '') + '" placeholder="What does this rule clean up?" spellcheck="false">';
+
+    html += '<div class="form-grid">';
+    html += '<div class="grow"><label class="form-label">Pattern <span class="form-hint">(JS regex, no delimiters)</span></label>'
+          + '<input class="form-input mono" id="rf-pattern" type="text" value="' + esc(d.pattern || '') + '" spellcheck="false"></div>';
+    html += '<div class="flags-col"><label class="form-label">Flags</label>'
+          + '<input class="form-input mono" id="rf-flags" type="text" value="' + esc(d.flags || 'g') + '" spellcheck="false"></div>';
+    html += '</div>';
+
+    html += '<div id="rf-replacement-row"' + (d.mode === 'replace' ? '' : ' class="hidden"') + '>';
+    html += '<label class="form-label">Replacement <span class="form-hint">($1, $2 … for groups)</span></label>';
+    html += '<input class="form-input mono" id="rf-replacement" type="text" value="' + esc(d.replacement || '') + '" spellcheck="false">';
+    html += '</div>';
+
+    html += '<div class="rule-error hidden" id="rf-error"></div>';
+
+    html += '<label class="form-label">Try it <span class="form-hint">(paste sample log lines)</span></label>';
+    html += '<textarea class="form-input mono" id="rf-test" rows="3" spellcheck="false" placeholder="2026-06-11T10:00:00Z $ npm run build…">' + esc(d.testInput || '') + '</textarea>';
+    html += '<div class="rule-preview-label form-hint">Preview</div>';
+    html += '<pre class="rule-preview mono" id="rf-preview"></pre>';
+
+    html += '<div class="form-row form-buttons">';
+    html += '<button class="add-btn" id="rf-save">Save Rule</button>';
+    html += '<button class="add-btn add-btn-secondary" id="rf-cancel">Cancel</button>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // ── Bind events ──────────────────────────────────────────
+  function bind() {
+    const hintToken = document.getElementById('hint-set-token');
+    if (hintToken) {
+      hintToken.addEventListener('click', e => {
+        e.preventDefault();
+        vscode.postMessage({ type: 'setToken' });
+      });
+    }
+    const emptyAdd = document.getElementById('empty-add-scope');
+    if (emptyAdd) { emptyAdd.addEventListener('click', openAddScope); }
+
+    content.querySelectorAll('[data-toggle-section]').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.getAttribute('data-toggle-section');
+        collapsed[key] = !collapsed[key];
+        persist();
+        render();
+      });
+    });
+
+    // Scope card actions
+    content.querySelectorAll('[data-enable]').forEach(el => {
+      el.addEventListener('change', () => {
+        vscode.postMessage({ type: 'setEnabled', id: el.getAttribute('data-enable'), value: el.checked });
+      });
+    });
+    content.querySelectorAll('[data-follow]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-follow');
+        const scope = scopes.find(s => s.id === id);
+        vscode.postMessage({ type: 'setFollow', id: id, value: !(scope && scope.follow) });
+      });
+    });
+    content.querySelectorAll('[data-edit-scope]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const scope = scopes.find(s => s.id === btn.getAttribute('data-edit-scope'));
+        if (scope) {
+          scopeForm = { mode: 'edit', draft: JSON.parse(JSON.stringify(scope)) };
+          ruleForm = null;
+          render();
+        }
+      });
+    });
+    content.querySelectorAll('[data-dup-scope]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'duplicateScope', id: btn.getAttribute('data-dup-scope') });
+      });
+    });
+    content.querySelectorAll('[data-move-scope]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        vscode.postMessage({
+          type: 'moveScope',
+          id: btn.getAttribute('data-move-scope'),
+          direction: btn.getAttribute('data-dir'),
+        });
+      });
+    });
+    content.querySelectorAll('[data-delete-scope]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'deleteScope', id: btn.getAttribute('data-delete-scope') });
+      });
+    });
+
+    // Rule rows
+    content.querySelectorAll('[data-edit-rule]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.getAttribute('data-edit-rule');
+        const entry = mergedRules().find(e => e.rule.name === name);
+        if (entry) {
+          ruleForm = {
+            mode: 'edit',
+            draft: JSON.parse(JSON.stringify(entry.rule)),
+            nameLocked: true,
+          };
+          scopeForm = null;
+          render();
+        }
+      });
+    });
+    content.querySelectorAll('[data-delete-rule]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'deleteRule', name: btn.getAttribute('data-delete-rule') });
+      });
+    });
+
+    bindScopeForm();
+    bindRuleForm();
+  }
+
+  // ── Scope form behaviour ─────────────────────────────────
+  function openAddScope() {
+    scopeForm = {
+      mode: 'add',
+      draft: { id: '', label: '', projects: [], enabled: true, follow: false, tags: [] },
+    };
+    ruleForm = null;
+    render();
+    const el = document.getElementById('sf-label');
+    if (el) { el.focus(); }
+  }
+
+  function syncScopeDraft() {
+    if (!scopeForm) { return; }
+    const d = scopeForm.draft;
+    const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    d.label = val('sf-label');
+    d.branchFilter = val('sf-branch') || undefined;
+    d.userFilter = val('sf-user') || undefined;
+    d.nameContains = val('sf-contains') || undefined;
+    const lastN = parseInt(val('sf-lastn'), 10);
+    d.lastN = isNaN(lastN) || lastN <= 0 ? undefined : lastN;
+    const since = parseInt(val('sf-since'), 10);
+    d.sinceHours = isNaN(since) || since <= 0 ? undefined : since;
+    const enabledEl = document.getElementById('sf-enabled');
+    const followEl  = document.getElementById('sf-follow');
+    d.enabled = enabledEl ? enabledEl.checked : true;
+    d.follow  = followEl ? followEl.checked : false;
+  }
+
+  function bindScopeForm() {
+    const form = document.getElementById('scope-form');
+    if (!form || !scopeForm) { return; }
+    const d = scopeForm.draft;
+
+    function addProjectFromInput() {
+      const input = document.getElementById('sf-project-input');
+      const v = input.value.trim();
+      if (!v) { return; }
+      if (!d.projects.includes(v)) { d.projects.push(v); }
+      syncScopeDraft();
+      render();
+      const fresh = document.getElementById('sf-project-input');
+      if (fresh) { fresh.focus(); }
+    }
+
+    document.getElementById('sf-project-add').addEventListener('click', addProjectFromInput);
+    document.getElementById('sf-project-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addProjectFromInput(); }
+    });
+    document.getElementById('sf-project-search').addEventListener('click', () => {
+      syncScopeDraft();
+      vscode.postMessage({ type: 'pickProject' });
+    });
+    form.querySelectorAll('[data-rm-project]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        d.projects.splice(Number(btn.getAttribute('data-rm-project')), 1);
+        syncScopeDraft();
+        render();
+      });
+    });
+    form.querySelectorAll('[data-status-chip]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const st = chip.getAttribute('data-status-chip');
+        const list = d.statusFilter || [];
+        const idx = list.indexOf(st);
+        if (idx >= 0) { list.splice(idx, 1); } else { list.push(st); }
+        d.statusFilter = list.length ? list : undefined;
+        syncScopeDraft();
+        render();
+      });
+    });
+    form.querySelectorAll('[data-rule-chip]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const name = chip.getAttribute('data-rule-chip');
+        const list = d.logRules || [];
+        const idx = list.indexOf(name);
+        if (idx >= 0) { list.splice(idx, 1); } else { list.push(name); }
+        d.logRules = list.length ? list : undefined;
+        syncScopeDraft();
+        render();
+      });
+    });
+    document.getElementById('sf-pick-tags').addEventListener('click', () => {
+      syncScopeDraft();
+      vscode.postMessage({ type: 'pickTagsForForm', current: d.tags || [] });
+    });
+    document.getElementById('sf-save').addEventListener('click', () => {
+      syncScopeDraft();
+      if (!d.projects.length) {
+        showToast('Add at least one project to the scope.', 'error');
+        return;
+      }
+      if (!d.label) { d.label = d.projects[0]; }
+      vscode.postMessage({ type: 'saveScope', scope: d });
+      scopeForm = null;
+      render();
+    });
+    document.getElementById('sf-cancel').addEventListener('click', () => {
+      scopeForm = null;
+      render();
+    });
+  }
+
+  // ── Rule form behaviour ──────────────────────────────────
+  function syncRuleDraft() {
+    if (!ruleForm) { return; }
+    const d = ruleForm.draft;
+    const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+    if (!ruleForm.nameLocked) { d.name = val('rf-name').trim(); }
+    d.description = val('rf-desc').trim() || undefined;
+    d.mode = val('rf-mode') === 'replace' ? 'replace' : 'remove';
+    d.pattern = val('rf-pattern');
+    d.flags = val('rf-flags').trim() || undefined;
+    d.replacement = val('rf-replacement');
+    d.testInput = val('rf-test');
+  }
+
+  function updateRulePreview() {
+    if (!ruleForm) { return; }
+    syncRuleDraft();
+    const d = ruleForm.draft;
+    const errEl = document.getElementById('rf-error');
+    const prevEl = document.getElementById('rf-preview');
+    const repRow = document.getElementById('rf-replacement-row');
+    if (repRow) { repRow.classList.toggle('hidden', d.mode !== 'replace'); }
+    if (!prevEl) { return; }
+    if (!d.pattern) {
+      errEl.classList.add('hidden');
+      prevEl.textContent = d.testInput || '';
+      return;
+    }
+    const out = applyRulePreview(d, d.testInput || '');
+    if (out.error) {
+      errEl.textContent = 'Invalid regex: ' + out.error;
+      errEl.classList.remove('hidden');
+      prevEl.textContent = '';
+    } else {
+      errEl.classList.add('hidden');
+      prevEl.textContent = out.result;
+    }
+  }
+
+  function bindRuleForm() {
+    const form = document.getElementById('rule-form');
+    if (!form || !ruleForm) { return; }
+
+    ['rf-name', 'rf-desc', 'rf-pattern', 'rf-flags', 'rf-replacement', 'rf-test'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener('input', updateRulePreview); }
+    });
+    document.getElementById('rf-mode').addEventListener('change', updateRulePreview);
+
+    document.getElementById('rf-save').addEventListener('click', () => {
+      syncRuleDraft();
+      const d = ruleForm.draft;
+      if (!d.name)    { showToast('Rule name is required.', 'error'); return; }
+      if (!d.pattern) { showToast('Regex pattern is required.', 'error'); return; }
+      const out = applyRulePreview(d, '');
+      if (out.error) { showToast('Invalid regex: ' + out.error, 'error'); return; }
+      vscode.postMessage({ type: 'saveRule', rule: {
+        name: d.name,
+        description: d.description,
+        pattern: d.pattern,
+        flags: d.flags,
+        mode: d.mode,
+        replacement: d.mode === 'replace' ? (d.replacement || '') : undefined,
+      }});
+      ruleForm = null;
+      render();
+    });
+    document.getElementById('rf-cancel').addEventListener('click', () => {
+      ruleForm = null;
+      render();
+    });
+
+    updateRulePreview();
+  }
+
+  // ── Toolbar ──────────────────────────────────────────────
+  document.getElementById('btn-add-scope').addEventListener('click', openAddScope);
+  document.getElementById('btn-token').addEventListener('click', () => {
+    vscode.postMessage({ type: 'setToken' });
+  });
+  document.getElementById('btn-json').addEventListener('click', () => {
+    vscode.postMessage({ type: 'editJson' });
+  });
+  document.getElementById('btn-import').addEventListener('click', () => {
+    vscode.postMessage({ type: 'importLegacy' });
+  });
+
+  searchEl.addEventListener('input', () => {
+    query = searchEl.value.trim();
+    persist();
+    render();
+  });
+
+  // btn-add-rule is re-rendered with the section; delegate via content.
+  content.addEventListener('click', e => {
+    if (e.target && e.target.id === 'btn-add-rule') {
+      ruleForm = { mode: 'add', draft: { name: '', pattern: '', mode: 'remove', flags: 'g', testInput: '' }, nameLocked: false };
+      scopeForm = null;
+      render();
+      const el = document.getElementById('rf-name');
+      if (el) { el.focus(); }
+    }
+  });
+
+  // ── Inbound messages ─────────────────────────────────────
+  window.addEventListener('message', event => {
+    const msg = event.data;
+    if (msg.type === 'updateData') {
+      scopes       = msg.scopes || [];
+      customRules  = msg.customRules || [];
+      builtinRules = msg.builtinRules || [];
+      statuses     = msg.statuses || [];
+      tagMap       = msg.tagMap || {};
+      hasToken     = !!msg.hasToken;
+      gotData      = true;
+      render();
+    } else if (msg.type === 'toast') {
+      showToast(msg.text, msg.kind);
+    } else if (msg.type === 'projectPicked') {
+      if (scopeForm && msg.path) {
+        if (!scopeForm.draft.projects.includes(msg.path)) {
+          scopeForm.draft.projects.push(msg.path);
+        }
+        render();
+      }
+    } else if (msg.type === 'tagsPicked') {
+      if (scopeForm && Array.isArray(msg.tags)) {
+        scopeForm.draft.tags = msg.tags;
+        render();
+      }
+    }
+  });
+
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

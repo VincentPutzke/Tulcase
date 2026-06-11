@@ -35,6 +35,8 @@ function buildWebviewAssets() {
         { name: 'link-list' },
         { name: 'tag-list' },
         { name: 'sync-panel' },
+        { name: 'pipe-pipelines' },
+        { name: 'pipe-scopes' },
     ];
 
     for (const wv of webviews) {

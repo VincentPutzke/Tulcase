@@ -307,7 +307,13 @@
           "properties": {
             "filter": {
               "type": "string",
-              "enum": ["all", "done", "open", "overdue", "today"],
+              "enum": [
+                "all",
+                "done",
+                "open",
+                "overdue",
+                "today"
+              ],
               "description": "Filter todos by status. Default: all."
             },
             "tag": {
@@ -328,11 +334,25 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "note": { "type": "string", "description": "The TODO text." },
-            "date": { "type": "string", "description": "Due date in YYYY-MM-DD format. Defaults to today." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." }
+            "note": {
+              "type": "string",
+              "description": "The TODO text."
+            },
+            "date": {
+              "type": "string",
+              "description": "Due date in YYYY-MM-DD format. Defaults to today."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            }
           },
-          "required": ["note"]
+          "required": [
+            "note"
+          ]
         }
       },
       {
@@ -346,13 +366,33 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The todo ID." },
-            "done": { "type": "boolean", "description": "Mark as done or not done." },
-            "note": { "type": "string", "description": "New text for the todo." },
-            "date": { "type": "string", "description": "New date in YYYY-MM-DD format." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." }
+            "id": {
+              "type": "string",
+              "description": "The todo ID."
+            },
+            "done": {
+              "type": "boolean",
+              "description": "Mark as done or not done."
+            },
+            "note": {
+              "type": "string",
+              "description": "New text for the todo."
+            },
+            "date": {
+              "type": "string",
+              "description": "New date in YYYY-MM-DD format."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -366,9 +406,14 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The todo ID to delete." }
+            "id": {
+              "type": "string",
+              "description": "The todo ID to delete."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -382,7 +427,10 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "tag": { "type": "string", "description": "Filter notes to only those with this tag." }
+            "tag": {
+              "type": "string",
+              "description": "Filter notes to only those with this tag."
+            }
           }
         }
       },
@@ -397,9 +445,14 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The note ID to read." }
+            "id": {
+              "type": "string",
+              "description": "The note ID to read."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -413,12 +466,29 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "label": { "type": "string", "description": "The note title." },
-            "content": { "type": "string", "description": "The note content (markdown)." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." },
-            "folder": { "type": "string", "description": "Folder ID to place the note in. Empty string or omit for root." }
+            "label": {
+              "type": "string",
+              "description": "The note title."
+            },
+            "content": {
+              "type": "string",
+              "description": "The note content (markdown)."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Folder ID to place the note in. Empty string or omit for root."
+            }
           },
-          "required": ["label"]
+          "required": [
+            "label"
+          ]
         }
       },
       {
@@ -432,13 +502,33 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The note ID to edit." },
-            "label": { "type": "string", "description": "New title." },
-            "content": { "type": "string", "description": "New content (markdown)." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." },
-            "folder": { "type": "string", "description": "Move to this folder ID." }
+            "id": {
+              "type": "string",
+              "description": "The note ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New title."
+            },
+            "content": {
+              "type": "string",
+              "description": "New content (markdown)."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Move to this folder ID."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -452,12 +542,31 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "action": { "type": "string", "enum": ["create", "rename", "delete"], "description": "Folder operation to perform." },
-            "id": { "type": "string", "description": "Existing folder ID. Required for rename and delete." },
-            "name": { "type": "string", "description": "Folder name. Required for create and rename." },
-            "parentId": { "type": "string", "description": "Parent folder ID for create. Omit or empty for root." }
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
           },
-          "required": ["action"]
+          "required": [
+            "action"
+          ]
         }
       },
       {
@@ -471,10 +580,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The note or folder ID to move." },
-            "targetFolderId": { "type": "string", "description": "Destination folder ID. Omit or empty for root." }
+            "id": {
+              "type": "string",
+              "description": "The note or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -488,7 +605,10 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "tag": { "type": "string", "description": "Filter links to only those with this tag." }
+            "tag": {
+              "type": "string",
+              "description": "Filter links to only those with this tag."
+            }
           }
         }
       },
@@ -503,12 +623,30 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "label": { "type": "string", "description": "Display name for the link." },
-            "url": { "type": "string", "description": "The URL." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." },
-            "parentFolderId": { "type": "string", "description": "Folder ID to place the link in. Omit for root." }
+            "label": {
+              "type": "string",
+              "description": "Display name for the link."
+            },
+            "url": {
+              "type": "string",
+              "description": "The URL."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "parentFolderId": {
+              "type": "string",
+              "description": "Folder ID to place the link in. Omit for root."
+            }
           },
-          "required": ["label", "url"]
+          "required": [
+            "label",
+            "url"
+          ]
         }
       },
       {
@@ -522,12 +660,29 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The link ID to edit." },
-            "label": { "type": "string", "description": "New display name." },
-            "url": { "type": "string", "description": "New URL." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." }
+            "id": {
+              "type": "string",
+              "description": "The link ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New display name."
+            },
+            "url": {
+              "type": "string",
+              "description": "New URL."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -541,12 +696,31 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "action": { "type": "string", "enum": ["create", "rename", "delete"], "description": "Folder operation to perform." },
-            "id": { "type": "string", "description": "Existing folder ID. Required for rename and delete." },
-            "name": { "type": "string", "description": "Folder name. Required for create and rename." },
-            "parentFolderId": { "type": "string", "description": "Parent folder ID for create. Omit or empty for root." }
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentFolderId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
           },
-          "required": ["action"]
+          "required": [
+            "action"
+          ]
         }
       },
       {
@@ -560,10 +734,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The link or folder ID to move." },
-            "targetFolderId": { "type": "string", "description": "Destination folder ID. Omit or empty for root." }
+            "id": {
+              "type": "string",
+              "description": "The link or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -577,7 +759,10 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "tag": { "type": "string", "description": "Filter commands to only those with this tag." }
+            "tag": {
+              "type": "string",
+              "description": "Filter commands to only those with this tag."
+            }
           }
         }
       },
@@ -592,12 +777,30 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "label": { "type": "string", "description": "Display name for the command." },
-            "command": { "type": "string", "description": "The shell command or snippet text." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Tag names to attach." },
-            "folder": { "type": "string", "description": "Folder ID. Omit for root." }
+            "label": {
+              "type": "string",
+              "description": "Display name for the command."
+            },
+            "command": {
+              "type": "string",
+              "description": "The shell command or snippet text."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Folder ID. Omit for root."
+            }
           },
-          "required": ["label", "command"]
+          "required": [
+            "label",
+            "command"
+          ]
         }
       },
       {
@@ -611,13 +814,33 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The command ID to edit." },
-            "label": { "type": "string", "description": "New display name." },
-            "command": { "type": "string", "description": "New command text." },
-            "tags": { "type": "array", "items": { "type": "string" }, "description": "Replace tags with this list." },
-            "folder": { "type": "string", "description": "Move to this folder ID. Use an empty string for root." }
+            "id": {
+              "type": "string",
+              "description": "The command ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New display name."
+            },
+            "command": {
+              "type": "string",
+              "description": "New command text."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Move to this folder ID. Use an empty string for root."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -631,12 +854,31 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "action": { "type": "string", "enum": ["create", "rename", "delete"], "description": "Folder operation to perform." },
-            "id": { "type": "string", "description": "Existing folder ID. Required for rename and delete." },
-            "name": { "type": "string", "description": "Folder name. Required for create and rename." },
-            "parentId": { "type": "string", "description": "Parent folder ID for create. Omit or empty for root." }
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
           },
-          "required": ["action"]
+          "required": [
+            "action"
+          ]
         }
       },
       {
@@ -650,10 +892,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "The command or folder ID to move." },
-            "targetFolderId": { "type": "string", "description": "Destination folder ID. Omit or empty for root." }
+            "id": {
+              "type": "string",
+              "description": "The command or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
           },
-          "required": ["id"]
+          "required": [
+            "id"
+          ]
         }
       },
       {
@@ -680,11 +930,22 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "name": { "type": "string", "description": "The tag name." },
-            "color": { "type": "string", "description": "Hex color (e.g. #ff5c5c). Default: #8b8fa3." },
-            "category": { "type": "string", "description": "Category grouping. Default: general." }
+            "name": {
+              "type": "string",
+              "description": "The tag name."
+            },
+            "color": {
+              "type": "string",
+              "description": "Hex color (e.g. #ff5c5c). Default: #8b8fa3."
+            },
+            "category": {
+              "type": "string",
+              "description": "Category grouping. Default: general."
+            }
           },
-          "required": ["name"]
+          "required": [
+            "name"
+          ]
         }
       },
       {
@@ -698,11 +959,29 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "name": { "type": "string", "description": "The current tag name." },
-            "action": { "type": "string", "enum": ["rename", "recolor", "recategorize", "delete"], "description": "What to do with the tag." },
-            "newValue": { "type": "string", "description": "New name (rename), hex color (recolor), or category (recategorize). Not needed for delete." }
+            "name": {
+              "type": "string",
+              "description": "The current tag name."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "rename",
+                "recolor",
+                "recategorize",
+                "delete"
+              ],
+              "description": "What to do with the tag."
+            },
+            "newValue": {
+              "type": "string",
+              "description": "New name (rename), hex color (recolor), or category (recategorize). Not needed for delete."
+            }
           },
-          "required": ["name", "action"]
+          "required": [
+            "name",
+            "action"
+          ]
         }
       }
     ]
@@ -724,6 +1003,7 @@
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.24.0",
     "eslint": "^9.0.0",
+    "jsonc-parser": "^3.3.1",
     "prettier": "^3.2.0",
     "sass": "^1.98.0",
     "typescript": "^5.5.0",
