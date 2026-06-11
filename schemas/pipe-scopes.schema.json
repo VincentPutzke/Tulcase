@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tulcase Pipe scopes",
+  "description": "Pipeline scopes and custom log rules for the Tulcase Pipe feature. Prefer editing through the Pipe Scopes view; this file is the raw storage.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "scopes": {
+      "type": "array",
+      "description": "Pipeline scopes shown in the Pipelines view (top to bottom).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["projects"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable generated id. Leave untouched; a new one is generated when missing."
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label. Defaults to the first project path."
+          },
+          "projects": {
+            "type": "array",
+            "description": "Project paths (group/project) or numeric ids.",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Disabled scopes are kept but not polled or rendered.",
+            "default": true
+          },
+          "follow": {
+            "type": "boolean",
+            "description": "Raise a VS Code notification when a pipeline in this scope finishes (works in the background).",
+            "default": false
+          },
+          "tags": {
+            "type": "array",
+            "description": "Tulcase tag names attached to this scope.",
+            "items": { "type": "string" }
+          },
+          "branchFilter": {
+            "type": "string",
+            "description": "Only pipelines on this branch (exact match, case-insensitive)."
+          },
+          "statusFilter": {
+            "type": "array",
+            "description": "Only pipelines with one of these statuses.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "created", "waiting_for_resource", "preparing", "pending",
+                "running", "success", "failed", "canceled", "skipped",
+                "manual", "scheduled"
+              ]
+            }
+          },
+          "userFilter": {
+            "type": "string",
+            "description": "Only pipelines triggered by this username."
+          },
+          "nameContains": {
+            "type": "string",
+            "description": "Case-insensitive substring filter on ref / commit SHA."
+          },
+          "sinceHours": {
+            "type": "number",
+            "description": "Only pipelines updated within the last N hours.",
+            "exclusiveMinimum": 0
+          },
+          "lastN": {
+            "type": "integer",
+            "description": "Keep only the most recent N pipelines.",
+            "minimum": 1
+          },
+          "logRules": {
+            "type": "array",
+            "description": "Ordered log-rule names (built-in or custom) applied to job logs.",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "logRules": {
+      "type": "array",
+      "description": "Custom log rules. A rule with the same name as a built-in rule overrides it.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "pattern", "mode"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique rule name (letters, digits, '.', '-', '_').",
+            "pattern": "^[\\w][\\w.-]*$"
+          },
+          "description": {
+            "type": "string",
+            "description": "Short human description shown in the scope editor."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "JavaScript regex pattern (no delimiters)."
+          },
+          "flags": {
+            "type": "string",
+            "description": "Regex flags. Default: g.",
+            "default": "g"
+          },
+          "mode": {
+            "type": "string",
+            "description": "'remove' deletes matches (lines emptied by removal are dropped); 'replace' substitutes with `replacement`.",
+            "enum": ["remove", "replace"]
+          },
+          "replacement": {
+            "type": "string",
+            "description": "Replacement string for mode 'replace' ($1, $2 … for capture groups)."
+          }
+        }
+      }
+    }
+  }
+}

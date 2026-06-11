@@ -10,6 +10,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { parse as parseJsonc } from 'jsonc-parser';
 import type { GitLabClient, PipelineVariable } from '../pipe/gitlab-client';
 import { describeApiError } from '../pipe/gitlab-client';
 import type { GitLabSecrets } from '../pipe/secrets';
@@ -19,6 +20,7 @@ import type { LogPoller } from '../pipe/log-poller';
 import { stripAnsi } from '../pipe/log-poller';
 import type { PipelinePoller } from '../pipe/pipeline-poller';
 import type { LogLens } from '../pipe/log-lens';
+import { LogDocumentProvider } from '../pipe/log-document';
 import type { Job, Pipeline } from '../pipe/models';
 
 export interface PipeCommandDeps {
@@ -79,24 +81,58 @@ export function registerPipeCommands(
     });
 
     reg('tulcase.pipe.saveJobLog', async (jobId?: number) => {
-        const job = resolveJob(deps.store, jobId);
-        if (!job) { return; }
-        const session = deps.logPoller.getSession(job.id);
-        const raw = session?.snapshot() ?? '';
-        if (!raw) {
-            vscode.window.showInformationMessage('Open the job log first, then save it.');
+        if (jobId === undefined) {
+            vscode.window.showWarningMessage('Tulcase Pipe: no job selected.');
             return;
         }
-        const target = await vscode.window.showSaveDialog({
-            title: 'Save job log',
-            defaultUri: vscode.Uri.file(`${job.name}-${job.id}.log`),
-            filters: { 'Log File': ['log', 'txt'] },
+        await saveLogForJob(deps, jobId);
+    });
+
+    // Save the log of the currently focused log editor (editor title button).
+    reg('tulcase.pipe.saveOpenLog', async () => {
+        const uri = vscode.window.activeTextEditor?.document.uri;
+        if (!uri || uri.scheme !== LogDocumentProvider.scheme) {
+            vscode.window.showInformationMessage('Focus a Tulcase Pipe job log first.');
+            return;
+        }
+        // Path shape: /<projectId>/<jobId>/<name>.log
+        const jobId = Number(uri.path.split('/')[2]);
+        if (!Number.isFinite(jobId)) { return; }
+        await saveLogForJob(deps, jobId);
+    });
+
+    // ── Scopes file helpers ──────────────────────────────────────────────────
+
+    reg('tulcase.pipe.editScopesJson', async () => {
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(deps.scopes.filePath));
+        await vscode.window.showTextDocument(doc, { preview: false });
+    });
+
+    reg('tulcase.pipe.importScopes', async () => {
+        const picked = await vscode.window.showOpenDialog({
+            title: 'Import Tulcase Pipe scopes (scopes.jsonc)',
+            canSelectMany: false,
+            filters: { 'Scopes file': ['jsonc', 'json'] },
         });
-        if (!target) { return; }
-        const clean = stripAnsi(raw);
-        await fs.promises.mkdir(path.dirname(target.fsPath), { recursive: true });
-        await fs.promises.writeFile(target.fsPath, clean, 'utf-8');
-        vscode.window.showInformationMessage(`Log saved to ${target.fsPath}`);
+        if (!picked || picked.length === 0) { return; }
+        try {
+            const text = await fs.promises.readFile(picked[0].fsPath, 'utf-8');
+            const parsed: unknown = parseJsonc(text);
+            const result = await deps.scopes.importLegacy(parsed);
+            if (result.scopes === 0 && result.rules === 0) {
+                vscode.window.showInformationMessage(
+                    'Tulcase Pipe: nothing new to import (scopes already exist or the file is empty).',
+                );
+            } else {
+                vscode.window.showInformationMessage(
+                    `Tulcase Pipe: imported ${result.scopes} scope(s) and ${result.rules} log rule(s).`,
+                );
+            }
+        } catch (err) {
+            vscode.window.showErrorMessage(
+                `Tulcase Pipe: import failed — ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
     });
 
     // ── Browser / clipboard ──────────────────────────────────────────────────
@@ -208,6 +244,27 @@ export function registerPipeCommands(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Save a job's streamed log to disk (works from the store or a live session). */
+async function saveLogForJob(deps: PipeCommandDeps, jobId: number): Promise<void> {
+    const session = deps.logPoller.getSession(jobId);
+    const job = session?.job ?? deps.store.findJob(jobId);
+    const raw = session?.snapshot() ?? '';
+    if (!job || !raw) {
+        vscode.window.showInformationMessage('Open the job log first, then save it.');
+        return;
+    }
+    const target = await vscode.window.showSaveDialog({
+        title: 'Save job log',
+        defaultUri: vscode.Uri.file(`${job.name}-${job.id}.log`),
+        filters: { 'Log File': ['log', 'txt'] },
+    });
+    if (!target) { return; }
+    const clean = stripAnsi(raw);
+    await fs.promises.mkdir(path.dirname(target.fsPath), { recursive: true });
+    await fs.promises.writeFile(target.fsPath, clean, 'utf-8');
+    vscode.window.showInformationMessage(`Log saved to ${target.fsPath}`);
+}
+
 function resolveJob(store: PipelineStore, jobId?: number): Job | undefined {
     if (jobId === undefined) {
         vscode.window.showWarningMessage('Tulcase Pipe: no job selected.');
@@ -306,7 +363,7 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
 
     // 3. Variables & inputs ──────────────────────────────────────────────────
     const entries: RunEntry[] = [];
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
         const menu: vscode.QuickPickItem[] = [
             { label: '$(play) Run now', description: `${project} · ${ref}`, alwaysShow: true },

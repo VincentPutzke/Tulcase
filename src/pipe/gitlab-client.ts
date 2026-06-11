@@ -148,7 +148,7 @@ export class GitLabClient {
 
         const all: JobRaw[] = [];
         let page = 1;
-        // eslint-disable-next-line no-constant-condition
+         
         while (true) {
             const url = this._url(`${basePath}?${qs}&page=${page}`);
             const res = await this._fetchRaw(url, { headers: await this._headers(), signal });
@@ -175,7 +175,7 @@ export class GitLabClient {
 
         const all: BridgeRaw[] = [];
         let page = 1;
-        // eslint-disable-next-line no-constant-condition
+         
         while (true) {
             const url = this._url(`${basePath}?per_page=100&page=${page}`);
             const res = await this._fetchRaw(url, { headers: await this._headers(), signal });
@@ -435,7 +435,7 @@ export class GitLabClient {
         },
     ): Promise<Response> {
         let attempt = 0;
-        // eslint-disable-next-line no-constant-condition
+         
         while (true) {
             const res = await this._fetch(url, init);
             if (res.status !== 429 || attempt >= this._maxRetries) { return res; }

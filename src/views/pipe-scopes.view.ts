@@ -1,6 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'node:fs';
-import { parse as parseJsonc } from 'jsonc-parser';
 import type { TulcaseSettings } from '../config';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 import type { PipeScopeStore } from '../pipe/scope-store';
@@ -248,38 +246,14 @@ export class PipeScopesViewProvider extends BaseListViewProvider implements vsco
         this._view?.webview.postMessage({ type: 'tagsPicked', requestId, tags: picked });
     }
 
-    // ── JSON escape hatch + legacy import ──────────────────────────────────────
+    // ── JSON escape hatch + legacy import (shared command implementations) ─────
 
     private async _openJson(): Promise<void> {
-        const uri = vscode.Uri.file(this.scopes.filePath);
-        const doc = await vscode.workspace.openTextDocument(uri);
-        await vscode.window.showTextDocument(doc, { preview: false });
+        await vscode.commands.executeCommand('tulcase.pipe.editScopesJson');
     }
 
-    /** Import scopes.jsonc from the standalone Tulcase Pipe extension. */
     private async _importLegacy(): Promise<void> {
-        const picked = await vscode.window.showOpenDialog({
-            title: 'Import Tulcase Pipe scopes (scopes.jsonc)',
-            canSelectMany: false,
-            filters: { 'Scopes file': ['jsonc', 'json'] },
-        });
-        if (!picked || picked.length === 0) { return; }
-
-        try {
-            const text = await fs.promises.readFile(picked[0].fsPath, 'utf-8');
-            const parsed: unknown = parseJsonc(text);
-            const result = await this.scopes.importLegacy(parsed);
-            if (result.scopes === 0 && result.rules === 0) {
-                this._toast('Nothing new to import (scopes already exist or file is empty).');
-            } else {
-                this._toast(`Imported ${result.scopes} scope(s) and ${result.rules} log rule(s).`);
-            }
-        } catch (err) {
-            this._toast(
-                `Import failed — ${err instanceof Error ? err.message : String(err)}`,
-                'error',
-            );
-        }
+        await vscode.commands.executeCommand('tulcase.pipe.importScopes');
     }
 
     private _toast(text: string, kind: 'info' | 'error' = 'info'): void {

@@ -1,7 +1,7 @@
 {
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
-  "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
+  "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, tags, and GitLab pipelines — all inside your editor.",
   "version": "1.7.4",
   "publisher": "codewerk",
   "license": "MIT",
@@ -20,7 +20,10 @@
     "todo",
     "bookmarks",
     "time-tracking",
-    "snippets"
+    "snippets",
+    "gitlab",
+    "pipelines",
+    "ci"
   ],
   "activationEvents": [
     "onView:tulcase.todos",
@@ -29,7 +32,9 @@
     "onView:tulcase.lists",
     "onView:tulcase.tags",
     "onView:tulcase.records",
-    "onView:tulcase.sync"
+    "onView:tulcase.sync",
+    "onView:tulcase.pipePipelines",
+    "onView:tulcase.pipeScopes"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -50,6 +55,40 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically pull on activation and push after data changes."
+        },
+        "tulcase.pipe.url": {
+          "type": "string",
+          "default": "https://gitlab.com",
+          "description": "GitLab base URL (e.g. https://gitlab.com or your self-hosted instance). The /api/v4 suffix is stripped automatically."
+        },
+        "tulcase.pipe.pollIntervalSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "description": "Seconds between pipeline-list refreshes."
+        },
+        "tulcase.pipe.logPollIntervalSeconds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "description": "Seconds between log refreshes for an open running job."
+        },
+        "tulcase.pipe.maxConcurrentRequests": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Maximum concurrent GitLab requests during a poll cycle."
+        },
+        "tulcase.pipe.notifyOnFinish": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when a job whose log you opened finishes. (Followed scopes always notify.)"
+        },
+        "tulcase.pipe.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the latest pipeline status for the current Git branch in the status bar."
         }
       }
     },
@@ -59,6 +98,16 @@
           "id": "tulcase",
           "title": "Tulcase",
           "icon": "media/icon.svg"
+        },
+        {
+          "id": "tulcase-pipe",
+          "title": "Tulcase Pipe",
+          "icon": "media/pipe-icon.svg"
+        },
+        {
+          "id": "tulcase-pipe-scopes",
+          "title": "Pipe Scopes",
+          "icon": "media/pipe-scopes-icon.svg"
         }
       ],
       "panel": [
@@ -106,6 +155,20 @@
         {
           "id": "tulcase.records",
           "name": "Records",
+          "type": "webview"
+        }
+      ],
+      "tulcase-pipe": [
+        {
+          "id": "tulcase.pipePipelines",
+          "name": "Pipelines",
+          "type": "webview"
+        }
+      ],
+      "tulcase-pipe-scopes": [
+        {
+          "id": "tulcase.pipeScopes",
+          "name": "Pipe Scopes",
           "type": "webview"
         }
       ]
@@ -241,6 +304,105 @@
         "command": "tulcase.sync.resetToRemote",
         "title": "Sync: Use Remote (Reset Local)",
         "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.runPipeline",
+        "title": "Pipe: Run Pipeline",
+        "category": "Tulcase",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tulcase.pipe.refresh",
+        "title": "Pipe: Refresh Pipelines",
+        "category": "Tulcase",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "tulcase.pipe.setToken",
+        "title": "Pipe: Set GitLab Token",
+        "category": "Tulcase",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "tulcase.pipe.clearToken",
+        "title": "Pipe: Clear GitLab Token",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.editScopesJson",
+        "title": "Pipe: Edit Scopes (JSON)",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.importScopes",
+        "title": "Pipe: Import Scopes from Tulcase Pipe Extension",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.saveOpenLog",
+        "title": "Pipe: Save Job Log",
+        "category": "Tulcase",
+        "icon": "$(save-as)"
+      },
+      {
+        "command": "tulcase.pipe.openJobLog",
+        "title": "Pipe: Open Job Log",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.openJobInBrowser",
+        "title": "Pipe: Open Job in Browser",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.openPipelineInBrowser",
+        "title": "Pipe: Open Pipeline in Browser",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.copyJobUrl",
+        "title": "Pipe: Copy Job URL",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.copyPipelineUrl",
+        "title": "Pipe: Copy Pipeline URL",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.downloadArtifacts",
+        "title": "Pipe: Download Artifacts",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.saveJobLog",
+        "title": "Pipe: Save Job Log to File",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.retryPipeline",
+        "title": "Pipe: Retry Pipeline",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.cancelPipeline",
+        "title": "Pipe: Cancel Pipeline",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.retryJob",
+        "title": "Pipe: Retry Job",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.cancelJob",
+        "title": "Pipe: Cancel Job",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.playJob",
+        "title": "Pipe: Run Manual Job",
+        "category": "Tulcase"
       }
     ],
     "menus": {
@@ -256,8 +418,25 @@
           "group": "navigation"
         },
         {
+          "command": "tulcase.pipe.runPipeline",
+          "when": "view == tulcase.pipePipelines",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tulcase.pipe.refresh",
+          "when": "view == tulcase.pipePipelines",
+          "group": "navigation@2"
+        },
+        {
           "command": "tulcase.refresh",
-          "when": "view =~ /^tulcase\\./",
+          "when": "view =~ /^tulcase\\./ && view != tulcase.pipePipelines && view != tulcase.pipeScopes",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "tulcase.pipe.saveOpenLog",
+          "when": "resourceScheme == tulcase-pipe-log",
           "group": "navigation"
         }
       ],
@@ -277,9 +456,67 @@
         {
           "command": "tulcase.refresh",
           "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.openJobLog",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.openJobInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.openPipelineInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.copyJobUrl",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.copyPipelineUrl",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.downloadArtifacts",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.saveJobLog",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.retryPipeline",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.cancelPipeline",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.retryJob",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.cancelJob",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.playJob",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.saveOpenLog",
+          "when": "resourceScheme == tulcase-pipe-log"
         }
       ]
     },
+    "jsonValidation": [
+      {
+        "fileMatch": "**/pipe_db/scopes.json",
+        "url": "./schemas/pipe-scopes.schema.json"
+      }
+    ],
     "keybindings": [
       {
         "command": "tulcase.todo.quickAdd",
@@ -981,6 +1218,132 @@
           "required": [
             "name",
             "action"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_pipe_list_scopes",
+        "displayName": "Tulcase Pipe: List Scopes",
+        "toolReferenceName": "tulcase_pipe_list_scopes",
+        "icon": "$(filter)",
+        "userDescription": "List the configured GitLab pipeline scopes.",
+        "modelDescription": "List all Tulcase Pipe scopes (GitLab pipeline watch configurations). Returns id, label, projects, filters, enabled/follow flags, tags, and attached log rules per scope.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "tulcase_pipe_status",
+        "displayName": "Tulcase Pipe: Pipeline Status",
+        "toolReferenceName": "tulcase_pipe_status",
+        "icon": "$(rocket)",
+        "userDescription": "Get the current GitLab pipeline status per scope, including jobs.",
+        "modelDescription": "Get current GitLab pipelines per Tulcase Pipe scope, including their jobs (id, name, stage, status, duration). Optionally filter by scope label, pipeline status, limit results, or force a fresh poll with refresh:true. Job ids can be used with tulcase_pipe_job_log.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "description": "Only this scope (label or id). Default: all enabled scopes."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "created",
+                "waiting_for_resource",
+                "preparing",
+                "pending",
+                "running",
+                "success",
+                "failed",
+                "canceled",
+                "skipped",
+                "manual",
+                "scheduled"
+              ],
+              "description": "Only pipelines with this status."
+            },
+            "refresh": {
+              "type": "boolean",
+              "description": "Force a fresh GitLab poll before answering. Default: only when no data is cached."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max pipelines per scope (1-50, default 10)."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_pipe_job_log",
+        "displayName": "Tulcase Pipe: Read Job Log",
+        "toolReferenceName": "tulcase_pipe_job_log",
+        "icon": "$(output)",
+        "userDescription": "Read the log of a GitLab CI job (great for analyzing failures).",
+        "modelDescription": "Fetch the trace/log of a GitLab CI job by job id (ANSI codes stripped). Returns the last N lines (default 200). Use tulcase_pipe_status first to find job ids — especially useful for analyzing failed jobs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "jobId": {
+              "type": "number",
+              "description": "The GitLab job id."
+            },
+            "tailLines": {
+              "type": "number",
+              "description": "How many trailing lines to return (10-2000, default 200)."
+            }
+          },
+          "required": [
+            "jobId"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_pipe_trigger_pipeline",
+        "displayName": "Tulcase Pipe: Run Pipeline",
+        "toolReferenceName": "tulcase_pipe_trigger_pipeline",
+        "icon": "$(play)",
+        "userDescription": "Trigger a new GitLab pipeline (asks for confirmation).",
+        "modelDescription": "Trigger a new GitLab pipeline on a project and ref, optionally with CI/CD variables. The user is asked to confirm before anything runs. Returns the new pipeline id, status, and web URL.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "description": "Project path (group/project) or numeric id."
+            },
+            "ref": {
+              "type": "string",
+              "description": "Branch or tag to run on."
+            },
+            "variables": {
+              "type": "array",
+              "description": "CI/CD variables to pass.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ]
+              }
+            }
+          },
+          "required": [
+            "project",
+            "ref"
           ]
         }
       }

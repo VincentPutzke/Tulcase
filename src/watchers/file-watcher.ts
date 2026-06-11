@@ -18,6 +18,7 @@ export class DataFileWatcher implements vscode.Disposable {
     private readonly _onListsChanged = new vscode.EventEmitter<void>();
     private readonly _onRecordsChanged = new vscode.EventEmitter<void>();
     private readonly _onRecurringChanged = new vscode.EventEmitter<void>();
+    private readonly _onPipeScopesChanged = new vscode.EventEmitter<void>();
 
     readonly onTodosChanged = this._onTodosChanged.event;
     readonly onTagsChanged = this._onTagsChanged.event;
@@ -26,6 +27,7 @@ export class DataFileWatcher implements vscode.Disposable {
     readonly onListsChanged = this._onListsChanged.event;
     readonly onRecordsChanged = this._onRecordsChanged.event;
     readonly onRecurringChanged = this._onRecurringChanged.event;
+    readonly onPipeScopesChanged = this._onPipeScopesChanged.event;
 
     constructor(private settings: TulcaseSettings) {
         this.startWatching();
@@ -51,7 +53,7 @@ export class DataFileWatcher implements vscode.Disposable {
         this.disposables.push(
             this._onTodosChanged, this._onTagsChanged, this._onCommandsChanged,
             this._onLinksChanged, this._onListsChanged, this._onRecordsChanged,
-            this._onRecurringChanged
+            this._onRecurringChanged, this._onPipeScopesChanged
         );
     }
 
@@ -104,6 +106,8 @@ export class DataFileWatcher implements vscode.Disposable {
             this._onListsChanged.fire();
         } else if (normalized.includes('/records_db/')) {
             this._onRecordsChanged.fire();
+        } else if (normalized.includes('/pipe_db/')) {
+            this._onPipeScopesChanged.fire();
         }
     }
 

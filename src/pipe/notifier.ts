@@ -16,7 +16,7 @@ import * as vscode from 'vscode';
 import type { PipelineStore, JobStatusTransition, PipelineStatusTransition } from './pipeline-store';
 import type { PipeScopeStore } from './scope-store';
 import type { Subscription } from './events';
-import { TERMINAL_STATUSES, type GitLabStatus, type Pipeline } from './models';
+import { TERMINAL_STATUSES, type GitLabStatus } from './models';
 
 export interface NotifierConfigProvider {
     (): { notifyOnFinish: boolean };
