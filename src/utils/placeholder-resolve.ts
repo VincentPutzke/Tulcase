@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { CommandItem } from '../models/command.model';
+import type { CommandItem, PlaceholderDef } from '../models/command.model';
 import { parsePlaceholders, applyPlaceholders } from './placeholder';
 
 // ── Ctrl+Enter "force custom value" support ───────────────────────────────────
@@ -39,15 +39,32 @@ export function registerPlaceholderCommands(context: vscode.ExtensionContext): v
 export async function resolveCommand(
     item: CommandItem,
 ): Promise<string | undefined> {
-    const names = parsePlaceholders(item.command);
-    if (names.length === 0) { return item.command; }
+    return resolveText(item.command, item.placeholders);
+}
 
-    const placeholders = item.placeholders ?? {};
+/**
+ * Resolve every `<$name$>` placeholder in an arbitrary text body (a command
+ * string or a multi-line script), prompting the user for each one.
+ *
+ * Shares the exact prompting behaviour of {@link resolveCommand} — defaults are
+ * offered as selectable suggestions, Enter takes the highlighted item or the
+ * typed text, Ctrl+Enter always takes the typed text, Escape cancels.
+ *
+ * @returns The text with all placeholders substituted, or `undefined` if the
+ *          user cancelled (so callers can abort the run/copy).
+ */
+export async function resolveText(
+    text: string,
+    placeholders: Record<string, PlaceholderDef> | undefined,
+): Promise<string | undefined> {
+    const names = parsePlaceholders(text);
+    if (names.length === 0) { return text; }
+
+    const defs = placeholders ?? {};
     const values: Record<string, string> = {};
 
     for (const name of names) {
-        const def = placeholders[name];
-        const defaults = def?.defaults ?? [];
+        const defaults = defs[name]?.defaults ?? [];
 
         const value = await promptPlaceholder(name, defaults);
         if (value === undefined) { return undefined; }
@@ -55,7 +72,7 @@ export async function resolveCommand(
         values[name] = value;
     }
 
-    return applyPlaceholders(item.command, values);
+    return applyPlaceholders(text, values);
 }
 
 /**
