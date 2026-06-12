@@ -9,16 +9,21 @@
  */
 
 import * as vscode from 'vscode';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { JsonStore } from '../data/json-store';
 import { moveFlatFolder, moveFlatItem } from '../data/flat-folder-tree';
 import { generateId } from '../utils/id';
 import { stripTagFromAll, renameTagInAll } from '../data/tag-propagation';
 import { findNode, removeNode, moveNode } from '../data/link-tree';
+import { ScriptFileSystemProvider } from '../data/script-fs';
+import { parsePlaceholders } from '../utils/placeholder';
 import type { TulcaseSettings } from '../config';
 import type { TodoItem, TodoStore } from '../models/todo.model';
 import type { NoteItem, NoteFolder, NoteStore } from '../models/note.model';
 import type { LinkNode, LinkStore } from '../models/link.model';
 import type { CommandItem, CommandFolder, CommandStore } from '../models/command.model';
+import type { ScriptItem, ScriptFolder, ScriptStore } from '../models/script.model';
 import type { TagDef, TagStore } from '../models/tag.model';
 
 const store = new JsonStore();
@@ -54,6 +59,28 @@ function requireCommandFolder(data: CommandStore, folderId: string): void {
     if (folderId && !folders.some(folder => folder.id === folderId)) {
         throw new Error(`Command folder not found: ${folderId}. Use tulcase_list_commands to find valid folder IDs.`);
     }
+}
+
+function requireScriptFolder(data: ScriptStore, folderId: string): void {
+    if (folderId && !data.folders.some(folder => folder.id === folderId)) {
+        throw new Error(`Script folder not found: ${folderId}. Use tulcase_list_scripts to find valid folder IDs.`);
+    }
+}
+
+/** Read a script's backing .sh body from disk ('' if not yet created). */
+async function readScriptBody(settings: TulcaseSettings, id: string): Promise<string> {
+    try {
+        return await fs.readFile(ScriptFileSystemProvider.diskPath(settings, id), 'utf-8');
+    } catch {
+        return '';
+    }
+}
+
+/** Write a script's backing .sh body to disk, creating the directory if needed. */
+async function writeScriptBody(settings: TulcaseSettings, id: string, content: string): Promise<void> {
+    const filePath = ScriptFileSystemProvider.diskPath(settings, id);
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, content, 'utf-8');
 }
 
 // ── TODO Tools ───────────────────────────────────────────────────────────────
@@ -661,6 +688,207 @@ class MoveCommandEntryTool implements vscode.LanguageModelTool<MoveCommandEntryI
     }
 }
 
+// ── SCRIPT Tools ─────────────────────────────────────────────────────────────
+
+interface ListScriptsInput { tag?: string }
+
+class ListScriptsTool implements vscode.LanguageModelTool<ListScriptsInput> {
+    constructor(private settings: TulcaseSettings) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<ListScriptsInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        let items = data.items;
+        if (options.input.tag) {
+            const tag = options.input.tag.toLowerCase();
+            items = items.filter(s => s.tags.some(t => t.toLowerCase() === tag));
+        }
+        // Bodies live on disk; expose only metadata here. Use tulcase_read_script for content.
+        return json({ scripts: items, folders: data.folders });
+    }
+}
+
+interface ReadScriptInput { id: string }
+
+class ReadScriptTool implements vscode.LanguageModelTool<ReadScriptInput> {
+    constructor(private settings: TulcaseSettings) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<ReadScriptInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        const item = data.items.find(s => s.id === options.input.id);
+        if (!item) { throw new Error(`Script not found: ${options.input.id}. Use tulcase_list_scripts to find valid IDs.`); }
+        const content = await readScriptBody(this.settings, item.id);
+        return json({ script: item, content, placeholders: parsePlaceholders(content) });
+    }
+}
+
+interface AddScriptInput { label: string; content: string; description?: string; tags?: string[]; folder?: string }
+
+class AddScriptTool implements vscode.LanguageModelTool<AddScriptInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<AddScriptInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        const folderId = options.input.folder ?? '';
+        requireScriptFolder(data, folderId);
+
+        const now = new Date().toISOString().slice(0, 10);
+        const item: ScriptItem = {
+            id: generateId('sc'),
+            label: requireName(options.input.label, 'Script label'),
+            description: options.input.description?.trim() || undefined,
+            tags: options.input.tags ?? [],
+            folder: folderId,
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        await writeScriptBody(this.settings, item.id, options.input.content ?? '');
+        data.items.push(item);
+        await store.write(this.settings.scriptsFile, data);
+        this.refresh();
+        return json({ created: item });
+    }
+}
+
+interface EditScriptInput { id: string; label?: string; content?: string; description?: string; tags?: string[]; folder?: string }
+
+class EditScriptTool implements vscode.LanguageModelTool<EditScriptInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<EditScriptInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        const item = data.items.find(s => s.id === options.input.id);
+        if (!item) { throw new Error(`Script not found: ${options.input.id}. Use tulcase_list_scripts to find valid IDs.`); }
+
+        if (options.input.label !== undefined) { item.label = options.input.label; }
+        if (options.input.description !== undefined) { item.description = options.input.description.trim() || undefined; }
+        if (options.input.tags !== undefined) { item.tags = options.input.tags; }
+        if (options.input.folder !== undefined) {
+            requireScriptFolder(data, options.input.folder);
+            item.folder = options.input.folder;
+        }
+        if (options.input.content !== undefined) {
+            await writeScriptBody(this.settings, item.id, options.input.content);
+        }
+
+        item.updatedAt = new Date().toISOString().slice(0, 10);
+        await store.write(this.settings.scriptsFile, data);
+        this.refresh();
+        return json({ updated: item });
+    }
+}
+
+interface DeleteScriptInput { id: string }
+
+class DeleteScriptTool implements vscode.LanguageModelTool<DeleteScriptInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<DeleteScriptInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        const item = data.items.find(s => s.id === options.input.id);
+        if (!item) { throw new Error(`Script not found: ${options.input.id}. Use tulcase_list_scripts to find valid IDs.`); }
+
+        data.items = data.items.filter(s => s.id !== item.id);
+        await store.write(this.settings.scriptsFile, data);
+        try {
+            await fs.unlink(ScriptFileSystemProvider.diskPath(this.settings, item.id));
+        } catch {
+            // .sh file may not exist — ignore.
+        }
+        this.refresh();
+        return json({ deleted: { id: item.id, label: item.label } });
+    }
+}
+
+interface ManageScriptFolderInput {
+    action: 'create' | 'rename' | 'delete';
+    id?: string;
+    name?: string;
+    parentId?: string;
+}
+
+class ManageScriptFolderTool implements vscode.LanguageModelTool<ManageScriptFolderInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<ManageScriptFolderInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        const { action, id, name, parentId } = options.input;
+
+        switch (action) {
+            case 'create': {
+                const folderName = requireName(name, 'Folder name');
+                const parent = parentId ?? '';
+                requireScriptFolder(data, parent);
+                const folder: ScriptFolder = { id: generateId('sf'), name: folderName, parent };
+                data.folders.push(folder);
+                await store.write(this.settings.scriptsFile, data);
+                this.refresh();
+                return json({ created: folder });
+            }
+            case 'rename': {
+                if (!id) { throw new Error('Folder id is required for rename.'); }
+                const folder = data.folders.find(entry => entry.id === id);
+                if (!folder) { throw new Error(`Script folder not found: ${id}. Use tulcase_list_scripts to find valid folder IDs.`); }
+                folder.name = requireName(name, 'Folder name');
+                await store.write(this.settings.scriptsFile, data);
+                this.refresh();
+                return json({ renamed: folder });
+            }
+            case 'delete': {
+                if (!id) { throw new Error('Folder id is required for delete.'); }
+                const folder = data.folders.find(entry => entry.id === id);
+                if (!folder) { throw new Error(`Script folder not found: ${id}. Use tulcase_list_scripts to find valid folder IDs.`); }
+                const scriptsInFolder = data.items.filter(item => item.folder === id);
+                const subFolders = data.folders.filter(entry => entry.parent === id);
+                for (const item of scriptsInFolder) { item.folder = folder.parent; }
+                for (const entry of subFolders) { entry.parent = folder.parent; }
+                data.folders = data.folders.filter(entry => entry.id !== id);
+                await store.write(this.settings.scriptsFile, data);
+                this.refresh();
+                return json({
+                    deleted: { id: folder.id, name: folder.name },
+                    rehomedToParent: { scripts: scriptsInFolder.length, folders: subFolders.length, parentId: folder.parent },
+                });
+            }
+        }
+    }
+}
+
+interface MoveScriptEntryInput {
+    id: string;
+    targetFolderId?: string;
+}
+
+class MoveScriptEntryTool implements vscode.LanguageModelTool<MoveScriptEntryInput> {
+    constructor(private settings: TulcaseSettings, private refresh: Refresher) {}
+
+    async invoke(options: vscode.LanguageModelToolInvocationOptions<MoveScriptEntryInput>) {
+        const data = await store.read<ScriptStore>(this.settings.scriptsFile, { items: [], folders: [] });
+        const targetFolderId = options.input.targetFolderId ?? '';
+        const item = data.items.find(entry => entry.id === options.input.id);
+
+        if (item) {
+            if (!moveFlatItem(data.items, data.folders, item.id, targetFolderId)) {
+                throw new Error(`Unable to move script ${item.id} to folder ${targetFolderId || '(root)'}.`);
+            }
+            await store.write(this.settings.scriptsFile, data);
+            this.refresh();
+            return json({ moved: { kind: 'script', id: item.id, targetFolderId } });
+        }
+
+        const folder = data.folders.find(entry => entry.id === options.input.id);
+        if (!folder) {
+            throw new Error(`Script entry not found: ${options.input.id}. Use tulcase_list_scripts to find valid script and folder IDs.`);
+        }
+        if (!moveFlatFolder(data.folders, folder.id, targetFolderId)) {
+            throw new Error(`Unable to move script folder ${folder.id} to folder ${targetFolderId || '(root)'}.`);
+        }
+        await store.write(this.settings.scriptsFile, data);
+        this.refresh();
+        return json({ moved: { kind: 'folder', id: folder.id, targetFolderId } });
+    }
+}
+
 // ── TAG Tools ────────────────────────────────────────────────────────────────
 
 class ListTagsTool implements vscode.LanguageModelTool<Record<string, never>> {
@@ -776,6 +1004,14 @@ export function registerChatTools(
         vscode.lm.registerTool('tulcase_edit_command', new EditCommandTool(settings, refresh)),
         vscode.lm.registerTool('tulcase_manage_command_folder', new ManageCommandFolderTool(settings, refresh)),
         vscode.lm.registerTool('tulcase_move_command_entry', new MoveCommandEntryTool(settings, refresh)),
+        // Scripts
+        vscode.lm.registerTool('tulcase_list_scripts', new ListScriptsTool(settings)),
+        vscode.lm.registerTool('tulcase_read_script', new ReadScriptTool(settings)),
+        vscode.lm.registerTool('tulcase_add_script', new AddScriptTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_edit_script', new EditScriptTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_delete_script', new DeleteScriptTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_manage_script_folder', new ManageScriptFolderTool(settings, refresh)),
+        vscode.lm.registerTool('tulcase_move_script_entry', new MoveScriptEntryTool(settings, refresh)),
         // Tags
         vscode.lm.registerTool('tulcase_list_tags', new ListTagsTool(settings)),
         vscode.lm.registerTool('tulcase_add_tag', new AddTagTool(settings, refresh)),
