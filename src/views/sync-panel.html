@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'nonce-{{NONCE}}'; script-src 'nonce-{{NONCE}}';">
+<style nonce="{{NONCE}}">
+{{STYLE}}
+</style>
+</head>
+<body class="sidebar-mode">
+
+<div class="sync-scroll-container">
+
+  <!-- ── Status ─────────────────────────────────────── -->
+  <div class="sync-section">
+    <div class="sync-status">
+      <span class="sync-status-dot not-configured" id="statusDot"></span>
+      <span class="sync-status-text" id="statusText">Not configured.</span>
+    </div>
+    <div class="sync-status-time" id="statusTime"></div>
+  </div>
+
+  <!-- ── Actions ────────────────────────────────────── -->
+  <div class="sync-section">
+    <div class="sync-actions">
+      <button class="sync-btn sync-btn-secondary" id="btnCommit" disabled>Commit</button>
+      <button class="sync-btn sync-btn-secondary" id="btnPush" disabled>Push</button>
+      <button class="sync-btn sync-btn-secondary" id="btnPull" disabled>Pull</button>
+      <button class="sync-btn sync-btn-primary" id="btnFullSync" disabled>Full Sync</button>
+    </div>
+  </div>
+
+  <hr class="sync-divider">
+
+  <!-- ── Auto-sync ──────────────────────────────────── -->
+  <div class="sync-section">
+    <label class="sync-slider-label">
+      <span class="sync-slider-track" id="autoSyncTrack">
+        <input type="checkbox" id="autoSync" checked>
+        <span class="sync-slider-thumb"></span>
+      </span>
+      Auto-sync
+    </label>
+  </div>
+
+  <hr class="sync-divider">
+
+  <!-- ── Setup ──────────────────────────────────────── -->
+  <div class="sync-section">
+    <button class="sync-btn sync-btn-secondary" id="btnSetup" style="width:100%;">
+      Setup…
+    </button>
+  </div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  var vscode = acquireVsCodeApi();
+
+  // ── DOM refs ────────────────────────────────────────
+  var statusDot   = document.getElementById('statusDot');
+  var statusText  = document.getElementById('statusText');
+  var statusTime  = document.getElementById('statusTime');
+  var btnCommit   = document.getElementById('btnCommit');
+  var btnPush     = document.getElementById('btnPush');
+  var btnPull     = document.getElementById('btnPull');
+  var btnFullSync = document.getElementById('btnFullSync');
+  var btnSetup    = document.getElementById('btnSetup');
+  var autoSyncEl  = document.getElementById('autoSync');
+
+  // ── Action buttons ──────────────────────────────────
+  btnCommit.addEventListener('click',   function () { vscode.postMessage({ type: 'commit' }); });
+  btnPush.addEventListener('click',     function () { vscode.postMessage({ type: 'push' }); });
+  btnPull.addEventListener('click',     function () { vscode.postMessage({ type: 'pull' }); });
+  btnFullSync.addEventListener('click', function () { vscode.postMessage({ type: 'fullSync' }); });
+  btnSetup.addEventListener('click',    function () { vscode.postMessage({ type: 'openSetup' }); });
+
+  // ── Auto-sync toggle ───────────────────────────────
+  autoSyncEl.addEventListener('change', function () {
+    vscode.postMessage({ type: 'setAutoSync', enabled: autoSyncEl.checked });
+  });
+
+  // ── State update from extension ─────────────────────
+  function updateUI(state) {
+    statusDot.className = 'sync-status-dot ' + (state.status || 'not-configured');
+    statusText.textContent = state.message || '';
+
+    if (state.lastSync) {
+      try {
+        var d = new Date(state.lastSync);
+        statusTime.textContent = 'Last sync: ' + d.toLocaleString();
+      } catch (e) {
+        statusTime.textContent = '';
+      }
+    } else {
+      statusTime.textContent = '';
+    }
+
+    var configured = state.status !== 'not-configured' && state.status !== 'no-git';
+    var busy       = state.status === 'syncing';
+    btnCommit.disabled   = !configured || busy;
+    btnPush.disabled     = !configured || busy;
+    btnPull.disabled     = !configured || busy;
+    btnFullSync.disabled = !configured || busy;
+  }
+
+  // ── Message handler ─────────────────────────────────
+  window.addEventListener('message', function (e) {
+    var msg = e.data;
+    if (msg.type === 'updateState') {
+      updateUI(msg.state);
+    }
+    if (msg.type === 'updateConfig') {
+      autoSyncEl.checked = msg.autoSync !== false;
+    }
+  });
+
+  // Request initial data
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

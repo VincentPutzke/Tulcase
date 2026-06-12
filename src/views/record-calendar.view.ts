@@ -248,9 +248,14 @@ export class RecordCalendarViewProvider implements vscode.WebviewViewProvider {
             path.join(outDir, 'record-calendar.css'), 'utf-8',
         );
 
-        return htmlTemplate
+        let html = htmlTemplate
             .replace(/\{\{NONCE\}\}/g, nonce)
             .replace('{{STYLE}}', css);
+
+        // Always inject sidebar-mode — records lives in the activity bar
+        html = html.replace('<body>', '<body class="sidebar-mode">');
+
+        return html;
     }
 }
 

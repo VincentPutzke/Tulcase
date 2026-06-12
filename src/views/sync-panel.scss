@@ -1,0 +1,174 @@
+// Sync panel – extends the shared design system
+@use 'shared' as *;
+
+// Override body overflow so the sync panel can scroll
+body {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+}
+
+.sync-scroll-container {
+  padding: 0;
+}
+
+// ── Config form ───────────────────────────────────────────────────────────────
+.sync-section {
+  margin-bottom: 14px;
+}
+
+.sync-section-title {
+  font-size      : 11px;
+  font-weight    : 700;
+  letter-spacing : 0.04em;
+  text-transform : uppercase;
+  margin-bottom  : 8px;
+  color          : var(--vscode-foreground);
+  opacity        : 0.8;
+}
+
+// ── Status area ───────────────────────────────────────────────────────────────
+.sync-status {
+  display     : flex;
+  align-items : center;
+  gap         : 8px;
+  padding     : 6px 8px;
+  background  : $card-bg;
+  border      : 1px solid $card-border;
+  border-radius: 5px;
+  font-size   : 12px;
+  margin-bottom: 6px;
+}
+
+.sync-status-dot {
+  width        : 8px;
+  height       : 8px;
+  border-radius: 50%;
+  flex-shrink  : 0;
+
+  &.idle      { background: $green; }
+  &.syncing   { background: $yellow; animation: pulse 1s infinite; }
+  &.error     { background: $red; }
+  &.not-configured { background: rgba(128, 128, 128, 0.4); }
+  &.no-git    { background: rgba(128, 128, 128, 0.4); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.sync-status-text {
+  flex     : 1;
+  min-width: 0;
+}
+
+.sync-status-time {
+  font-size: 10px;
+  opacity  : 0.6;
+}
+
+// ── Action buttons ────────────────────────────────────────────────────────────
+.sync-actions {
+  display   : flex;
+  flex-wrap : wrap;
+  gap       : 6px;
+}
+
+.sync-btn {
+  flex          : 1 1 45%;
+  padding       : 6px 10px;
+  background    : $btn-bg;
+  color         : $btn-fg;
+  border        : none;
+  border-radius : 4px;
+  font-family   : inherit;
+  font-size     : 12px;
+  font-weight   : 600;
+  cursor        : pointer;
+  transition    : opacity 0.12s;
+  text-align    : center;
+  min-width     : 90px;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor : not-allowed;
+  }
+
+  &.sync-btn-primary {
+    flex: 1 1 100%;
+  }
+}
+
+.sync-btn-secondary {
+  background  : transparent;
+  color       : var(--vscode-foreground);
+  border      : 1px solid $card-border;
+
+  &:hover {
+    background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.25));
+    opacity: 1;
+  }
+}
+
+// ── Slider toggle ─────────────────────────────────────────────────────────────
+.sync-slider-label {
+  display     : flex;
+  align-items : center;
+  gap         : 10px;
+  font-size   : 12px;
+  cursor      : pointer;
+  user-select : none;
+}
+
+.sync-slider-track {
+  position      : relative;
+  display       : inline-block;
+  width         : 36px;
+  height        : 20px;
+  background    : rgba(128, 128, 128, 0.35);
+  border-radius : 10px;
+  transition    : background 0.2s;
+  flex-shrink   : 0;
+
+  input[type="checkbox"] {
+    opacity  : 0;
+    width    : 0;
+    height   : 0;
+    position : absolute;
+
+    &:checked + .sync-slider-thumb {
+      transform: translateX(16px);
+    }
+
+    &:checked ~ & {
+      // handled below
+    }
+  }
+
+  &:has(input:checked) {
+    background: $btn-bg;
+  }
+}
+
+.sync-slider-thumb {
+  position      : absolute;
+  top           : 2px;
+  left          : 2px;
+  width         : 16px;
+  height        : 16px;
+  background    : #fff;
+  border-radius : 50%;
+  transition    : transform 0.2s;
+  box-shadow    : 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+// ── Divider ───────────────────────────────────────────────────────────────────
+.sync-divider {
+  border     : none;
+  border-top : 1px solid $grid-line;
+  margin     : 10px 0;
+}

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { buildSettings, ensureInitialized } from './config';
+import { buildSettings, ensureDatabase, ensureInitialized } from './config';
 import { syncRecurringTodos } from './data/recurring-sync';
 
 // Suppress benign Node.js deprecation / experimental warnings that appear in
@@ -40,6 +40,12 @@ import { registerRecordCommands } from './commands/record-commands';
 import { registerDbCommands } from './commands/db-commands';
 import { registerPlaceholderCommands } from './utils/placeholder-resolve';
 import { StatusBar } from './views/status-bar';
+import { SyncService } from './sync/sync-service';
+import { SyncPanelViewProvider } from './views/sync-panel.view';
+import { AutoSync } from './sync/auto-sync';
+import { registerChatTools } from './chat/tools';
+import { registerPipeChatTools } from './chat/pipe-tools';
+import { PipeFeature } from './pipe/pipe-feature';
 
 export function activate(context: vscode.ExtensionContext): void {
     // 1. Initialise database layout + resolve settings
@@ -47,6 +53,8 @@ export function activate(context: vscode.ExtensionContext): void {
     ensureInitialized(settings.rootDir);
     // Re-derive paths in case migration changed the active db
     Object.assign(settings, buildSettings(settings.rootDir));
+    // Seed any stores added after the database was first created (idempotent)
+    ensureDatabase(settings.baseDir);
 
     // 2. Initialize providers (tagTree first — todoList uses it for colour lookups)
     const tagTree     = new TagTreeProvider(settings);
@@ -59,6 +67,20 @@ export function activate(context: vscode.ExtensionContext): void {
     const noteDecorator = new NoteTagDecorator(tagTree);
     // Records uses a webview calendar instead of a plain tree
     const recordCalendar = new RecordCalendarViewProvider(settings);
+
+    // Sync panel
+    const syncService = new SyncService(settings, context.secrets);
+    const syncPanel   = new SyncPanelViewProvider(syncService, context.secrets);
+
+    // File watcher for cross-instance sync (created early so the pipe
+    // feature can suppress watcher echoes of its own writes)
+    const watcher = new DataFileWatcher(settings);
+
+    // Tulcase Pipe — GitLab pipelines, scopes, job logs
+    const pipe = new PipeFeature(context, settings, tagTree, {
+        markSelfWrite: filePath => watcher.markSelfWrite(filePath),
+    });
+    context.subscriptions.push(pipe);
 
     // 3. Register tree views + webview views
     context.subscriptions.push(
@@ -98,6 +120,11 @@ export function activate(context: vscode.ExtensionContext): void {
             recordCalendar,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
+        vscode.window.registerWebviewViewProvider(
+            SyncPanelViewProvider.viewType,
+            syncPanel,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
     );
 
     // 4. Refresh all providers helper
@@ -109,8 +136,16 @@ export function activate(context: vscode.ExtensionContext): void {
         linkList.refresh();
         noteList.refresh();
         recordCalendar.refresh();
+        pipe.refresh();
         statusBar.update();
     };
+
+    // Refresh views after sync pulls in new data
+    syncService.onStateChanged(state => {
+        if (state.status === 'idle' && state.lastSync) {
+            refreshAll();
+        }
+    });
 
     // 5. Register commands
     registerPlaceholderCommands(context);
@@ -122,16 +157,41 @@ export function activate(context: vscode.ExtensionContext): void {
     registerRecordCommands(context, settings, recordCalendar);
     registerDbCommands(context, settings, refreshAll);
 
+    // 5b. Register Language Model tools for AI agents
+    registerChatTools(context, settings, refreshAll);
+    registerPipeChatTools(context, pipe);
+
     context.subscriptions.push(
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
+        vscode.commands.registerCommand('tulcase.sync.commit', () => syncService.commit()),
+        vscode.commands.registerCommand('tulcase.sync.push', () => syncService.push()),
+        vscode.commands.registerCommand('tulcase.sync.pull', () => syncService.pull()),
+        vscode.commands.registerCommand('tulcase.sync.fullSync', async () => {
+            const ok = await syncService.setup();
+            if (ok) { await syncService.fullSync(); }
+        }),
+        vscode.commands.registerCommand('tulcase.sync.resetToRemote', async () => {
+            const confirm = await vscode.window.showWarningMessage(
+                'This will delete ALL local Tulcase data and replace it with the remote repository. Continue?',
+                { modal: true },
+                'Reset to Remote',
+            );
+            if (confirm === 'Reset to Remote') {
+                await syncService.resetToRemote();
+            }
+        }),
+        syncService,
     );
+
+    // Auto-sync: pull on activation, push on data changes
+    const autoSync = new AutoSync(syncService, context.secrets, settings.rootDir);
+    context.subscriptions.push(autoSync);
 
     // 6. Status bar
     const statusBar = new StatusBar(todoList, settings);
     context.subscriptions.push(statusBar);
 
-    // 7. File watcher for cross-instance sync
-    const watcher = new DataFileWatcher(settings);
+    // 7. File watcher bindings for cross-instance sync (watcher created in step 2)
     watcher.onTodosChanged(() => { todoList.refresh(); statusBar.update(); });
     watcher.onTagsChanged(() => { tagTree.refresh(); tagList.refresh(); });
     watcher.onCommandsChanged(() => commandList.refresh());
@@ -140,6 +200,7 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher.onRecordsChanged(() => recordCalendar.refresh());
     watcher.onTagsChanged(() => noteDecorator.refreshAll());
     watcher.onRecurringChanged(() => todoList.refresh());
+    watcher.onPipeScopesChanged(() => pipe.onScopesFileChanged());
     context.subscriptions.push(watcher);
 
     // 8. Auto-save notes on tab close

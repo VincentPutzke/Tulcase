@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-run" title="Trigger a new pipeline">▶ Run Pipeline</button>
+    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-refresh" title="Refresh now"></button>
+    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-scopes" title="Manage scopes"></button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="filter-text"
+      type="text"
+      placeholder="Filter branch, author, sha…"
+      spellcheck="false"
+    >
+    <select class="status-select" id="filter-status" title="Filter by status">
+      <option value="">All</option>
+      <option value="running">Running</option>
+      <option value="pending">Pending</option>
+      <option value="success">Success</option>
+      <option value="failed">Failed</option>
+      <option value="canceled">Canceled</option>
+      <option value="manual">Manual</option>
+      <option value="skipped">Skipped</option>
+    </select>
+  </div>
+</div>
+
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane">
+  <div id="banner-host"></div>
+  <div id="tree-content"></div>
+</div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── Persisted view-state ─────────────────────────────────
+  const saved = vscode.getState() || {};
+  const collapsedScopes = saved.collapsedScopes || {};  // scopeId → bool
+  const collapsed       = saved.collapsed       || {};  // pipelineId/bridgeKey → bool (default collapsed)
+  let   filter          = saved.filter || { text: '', status: '' };
+
+  function persist() {
+    vscode.setState({ collapsedScopes: collapsedScopes, collapsed: collapsed, filter: filter });
+  }
+
+  // ── Reactive state ───────────────────────────────────────
+  let scopes      = [];
+  let hasToken    = false;
+  let totalScopes = 0;
+  let gotData     = false;
+  let bannerMsg   = null;
+
+  // ── DOM refs ─────────────────────────────────────────────
+  const tree     = document.getElementById('tree-content');
+  const banner   = document.getElementById('banner-host');
+  const elText   = document.getElementById('filter-text');
+  const elStatus = document.getElementById('filter-status');
+  elText.value   = filter.text || '';
+  elStatus.value = filter.status || '';
+
+  // ── Utility ──────────────────────────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── SVG icons (inline, stroke-based, currentColor) ───────
+  const ICONS = {
+    refresh:  '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    gear:     '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    play:     '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><polygon points="6 3 20 12 6 21 6 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    retry:    '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    cancel:   '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 8l8 8M16 8l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    external: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    copy:     '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8"/></svg>',
+    download: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bell:     '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bellOn:   '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    pipeEmpty:'<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="6" y1="8.5" x2="12" y2="15.5"/><line x1="18" y1="8.5" x2="12" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/></svg>',
+  };
+  document.getElementById('btn-refresh').innerHTML = ICONS.refresh;
+  document.getElementById('btn-scopes').innerHTML  = ICONS.gear;
+
+  // ── Status + time helpers ────────────────────────────────
+  function statusBadge(status) {
+    const map = {
+      running:  ['◐', 'status-running'],
+      pending:  ['◌', 'status-pending'],
+      created:  ['◌', 'status-pending'],
+      preparing:['◌', 'status-pending'],
+      waiting_for_resource: ['◌', 'status-pending'],
+      success:  ['✔', 'status-success'],
+      failed:   ['✘', 'status-failed'],
+      canceled: ['⊘', 'status-canceled'],
+      skipped:  ['↪', 'status-skipped'],
+      manual:   ['▶', 'status-manual'],
+      scheduled:['⏱', 'status-pending'],
+    };
+    const entry = map[status] || ['•', 'status-pending'];
+    return '<span class="status-badge ' + entry[1] + '" title="' + esc(status) + '">' + entry[0] + '</span>';
+  }
+
+  function timeAgo(iso) {
+    if (!iso) { return ''; }
+    const diff = Date.now() - Date.parse(iso);
+    if (isNaN(diff)) { return ''; }
+    const s = Math.round(diff / 1000);
+    if (s < 60)    { return s + 's ago'; }
+    if (s < 3600)  { return Math.round(s / 60) + 'm ago'; }
+    if (s < 86400) { return Math.round(s / 3600) + 'h ago'; }
+    return Math.round(s / 86400) + 'd ago';
+  }
+
+  function durationStr(secs) {
+    if (!secs && secs !== 0) { return ''; }
+    secs = Math.round(secs);
+    if (secs < 60) { return secs + 's'; }
+    const m = Math.floor(secs / 60), s = secs % 60;
+    return m + 'm ' + (s < 10 ? '0' : '') + s + 's';
+  }
+
+  function ci(s, needle) {
+    return String(s || '').toLowerCase().indexOf(String(needle || '').toLowerCase()) !== -1;
+  }
+
+  // Queued-family statuses all render with the pending badge — the
+  // "Pending" filter matches the whole family.
+  const PENDING_FAMILY = ['pending', 'created', 'preparing', 'waiting_for_resource', 'scheduled'];
+
+  function pipelineMatches(p) {
+    if (filter.status) {
+      const matches = filter.status === 'pending'
+        ? PENDING_FAMILY.indexOf(p.status) !== -1
+        : p.status === filter.status;
+      if (!matches) { return false; }
+    }
+    if (filter.text) {
+      const t = filter.text;
+      if (!ci(p.ref, t) && !ci(p.user, t) && !ci(p.sha, t) && !ci(p.projectPath, t)) { return false; }
+    }
+    return true;
+  }
+
+  function sectionCounts(pipes) {
+    let running = 0, success = 0, failed = 0, other = 0;
+    for (const p of pipes) {
+      if      (p.status === 'running') { running++; }
+      else if (p.status === 'success') { success++; }
+      else if (p.status === 'failed')  { failed++;  }
+      else                             { other++;   }
+    }
+    let out = '';
+    if (running > 0) { out += '<span class="section-badge running">' + running + '</span>'; }
+    if (success > 0) { out += '<span class="section-badge success">' + success + '</span>'; }
+    if (failed  > 0) { out += '<span class="section-badge failed">'  + failed  + '</span>'; }
+    if (other   > 0 || (!running && !success && !failed)) {
+      out += '<span class="section-badge">' + other + '</span>';
+    }
+    return out;
+  }
+
+  // ── Context menu ─────────────────────────────────────────
+  // All state-changing actions (run / play / retry / cancel) live here so
+  // they cannot be clicked accidentally from hover buttons.
+  const ctxHost = document.createElement('div');
+  document.body.appendChild(ctxHost);
+  let ctxItems = [];
+
+  function closeCtx() {
+    ctxHost.innerHTML = '';
+    ctxItems = [];
+  }
+
+  function showCtx(x, y, items) {
+    closeCtx();
+    ctxItems = items.filter(it => it !== 'sep');
+    let html = '<div class="ctx-menu">';
+    let idx = 0;
+    for (const it of items) {
+      if (it === 'sep') { html += '<div class="ctx-sep"></div>'; continue; }
+      html += '<button class="ctx-item" data-ctx="' + (idx++) + '">'
+        + (it.icon || '') + '<span>' + esc(it.label) + '</span></button>';
+    }
+    html += '</div>';
+    ctxHost.innerHTML = html;
+    const menu = ctxHost.firstElementChild;
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = Math.max(2, Math.min(x, window.innerWidth - rect.width - 4)) + 'px';
+    menu.style.top  = Math.max(2, Math.min(y, window.innerHeight - rect.height - 4)) + 'px';
+    menu.querySelectorAll('[data-ctx]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const item = ctxItems[Number(btn.getAttribute('data-ctx'))];
+        closeCtx();
+        if (item) { item.run(); }
+      });
+    });
+  }
+
+  window.addEventListener('click', closeCtx);
+  window.addEventListener('blur', closeCtx);
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtx(); } });
+  document.querySelector('.tree-pane').addEventListener('scroll', closeCtx, { passive: true });
+
+  function findJobById(id) {
+    for (const s of scopes) {
+      for (const p of (s.pipelines || [])) {
+        const found = findInJobs(p.jobs || [], id);
+        if (found) { return found; }
+      }
+    }
+    return null;
+    function findInJobs(jobs, jobId) {
+      for (const j of jobs) {
+        if (j.id === jobId) { return j; }
+        if (j.children) {
+          const sub = findInJobs(j.children, jobId);
+          if (sub) { return sub; }
+        }
+      }
+      return null;
+    }
+  }
+
+  function findPipelineById(id) {
+    for (const s of scopes) {
+      const hit = (s.pipelines || []).find(p => p.id === id);
+      if (hit) { return hit; }
+    }
+    return null;
+  }
+
+  function showScopeMenu(x, y, scope) {
+    const items = [
+      { icon: ICONS.play, label: 'Run Pipeline…', run: () =>
+          vscode.postMessage({ type: 'runPipeline', project: scope.runProject }) },
+      { icon: scope.follow ? ICONS.bell : ICONS.bellOn,
+        label: scope.follow ? 'Unfollow' : 'Follow (notify on finish)',
+        run: () => vscode.postMessage({ type: 'toggleFollow', scopeId: scope.id }) },
+      'sep',
+      { icon: ICONS.gear, label: 'Manage Scopes…', run: () =>
+          vscode.postMessage({ type: 'openScopes' }) },
+    ];
+    showCtx(x, y, items);
+  }
+
+  function showPipelineMenu(x, y, p) {
+    const items = [];
+    if (p.canRetry)  { items.push({ icon: ICONS.retry,  label: 'Retry Pipeline',  run: () => vscode.postMessage({ type: 'pipeAction', action: 'retry',  pipelineId: p.id }) }); }
+    if (p.canCancel) { items.push({ icon: ICONS.cancel, label: 'Cancel Pipeline', run: () => vscode.postMessage({ type: 'pipeAction', action: 'cancel', pipelineId: p.id }) }); }
+    if (items.length) { items.push('sep'); }
+    items.push(
+      { icon: ICONS.external, label: 'Open in GitLab', run: () => vscode.postMessage({ type: 'pipeAction', action: 'browser', pipelineId: p.id }) },
+      { icon: ICONS.copy,     label: 'Copy URL',       run: () => vscode.postMessage({ type: 'pipeAction', action: 'copy',    pipelineId: p.id }) },
+    );
+    showCtx(x, y, items);
+  }
+
+  function showJobMenu(x, y, j) {
+    const items = [];
+    if (!j.isBridge) {
+      items.push(
+        { icon: ICONS.external, label: 'Open Log',            run: () => vscode.postMessage({ type: 'openJob', jobId: j.id, newTab: false }) },
+        { icon: ICONS.external, label: 'Open Log in New Tab', run: () => vscode.postMessage({ type: 'openJob', jobId: j.id, newTab: true }) },
+      );
+    }
+    const actions = [];
+    if (j.canPlay)   { actions.push({ icon: ICONS.play,   label: 'Run Manual Job', run: () => vscode.postMessage({ type: 'jobAction', action: 'play',   jobId: j.id }) }); }
+    if (j.canRetry)  { actions.push({ icon: ICONS.retry,  label: 'Retry Job',      run: () => vscode.postMessage({ type: 'jobAction', action: 'retry',  jobId: j.id }) }); }
+    if (j.canCancel) { actions.push({ icon: ICONS.cancel, label: 'Cancel Job',     run: () => vscode.postMessage({ type: 'jobAction', action: 'cancel', jobId: j.id }) }); }
+    if (items.length && actions.length) { items.push('sep'); }
+    items.push(...actions);
+    if (items.length) { items.push('sep'); }
+    items.push(
+      { icon: ICONS.external, label: 'Open in GitLab', run: () => vscode.postMessage({ type: 'jobAction', action: 'browser', jobId: j.id }) },
+      { icon: ICONS.copy,     label: 'Copy URL',       run: () => vscode.postMessage({ type: 'jobAction', action: 'copy',    jobId: j.id }) },
+    );
+    if (j.hasArtifacts) {
+      items.push({ icon: ICONS.download, label: 'Download Artifacts', run: () => vscode.postMessage({ type: 'jobAction', action: 'artifacts', jobId: j.id }) });
+    }
+    showCtx(x, y, items);
+  }
+
+  // ── Banner ───────────────────────────────────────────────
+  function renderBanner() {
+    if (!bannerMsg) { banner.innerHTML = ''; return; }
+    const cls = bannerMsg.kind === 'info' ? 'banner banner-info' : 'banner';
+    banner.innerHTML =
+      '<div class="' + cls + '">'
+      + '<span>' + esc(bannerMsg.text) + '</span>'
+      + '<button class="banner-close" id="banner-close" title="Dismiss">×</button>'
+      + '</div>';
+    const btn = document.getElementById('banner-close');
+    if (btn) { btn.addEventListener('click', () => { bannerMsg = null; renderBanner(); }); }
+  }
+
+  // ── Render ───────────────────────────────────────────────
+  function render() {
+    if (!gotData) {
+      tree.innerHTML = '<div class="empty-state">Loading…</div>';
+      return;
+    }
+    if (!hasToken) {
+      tree.innerHTML =
+        '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.pipeEmpty + '</div>'
+        + 'Connect to GitLab to see your pipelines.<br><br>'
+        + '<button class="add-btn empty-state-btn" data-empty-action="setToken">Set GitLab Token</button>'
+        + '</div>';
+      bindEmpty();
+      return;
+    }
+    if (totalScopes === 0) {
+      tree.innerHTML =
+        '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.pipeEmpty + '</div>'
+        + 'No scopes yet. A scope defines which projects and pipelines to show.<br><br>'
+        + '<button class="add-btn empty-state-btn" data-empty-action="openScopes">Create a Scope</button>'
+        + '</div>';
+      bindEmpty();
+      return;
+    }
+    if (scopes.length === 0) {
+      tree.innerHTML =
+        '<div class="empty-state">All scopes are disabled. Enable one in the Pipe Scopes view.<br><br>'
+        + '<button class="add-btn empty-state-btn" data-empty-action="openScopes">Open Pipe Scopes</button>'
+        + '</div>';
+      bindEmpty();
+      return;
+    }
+
+    let html = '';
+    for (const s of scopes) {
+      const isCollapsed = !!collapsedScopes[s.id];
+      const visible = (s.pipelines || []).filter(pipelineMatches);
+
+      html += '<div class="section">';
+      html += '<div class="section-header" data-toggle-scope="' + esc(s.id) + '" title="Right-click for actions">';
+      html += '<span class="section-chevron' + (isCollapsed ? ' collapsed' : '') + '">▾</span>';
+      html += '<button class="action-btn scope-bell' + (s.follow ? ' bell-on' : '') + '" data-follow="' + esc(s.id) + '" title="'
+            + (s.follow ? 'Following — notifications on pipeline finish (click to unfollow)' : 'Follow — notify when a pipeline finishes')
+            + '">' + (s.follow ? ICONS.bellOn : ICONS.bell) + '</button>';
+      html += '<span class="section-label" title="' + esc(s.projects.join(', ')) + '">' + esc(s.label) + '</span>';
+      if (s.tags && s.tags.length) {
+        html += '<span class="scope-tags">';
+        for (const t of s.tags) {
+          html += '<span class="tree-item-tag" style="color:' + esc(t.color) + ';">' + esc(t.name) + '</span>';
+        }
+        html += '</span>';
+      }
+      html += sectionCounts(visible);
+      html += '</div>';
+      html += '<div class="section-body' + (isCollapsed ? ' collapsed' : '') + '">';
+      if (visible.length === 0) {
+        html += '<div class="no-results">' + (s.pipelines.length === 0
+          ? 'No pipelines fetched yet.'
+          : 'No pipelines match the current filter.') + '</div>';
+      } else {
+        for (const p of visible) { html += renderPipeline(p); }
+      }
+      html += '</div></div>';
+    }
+    tree.innerHTML = html;
+    bind();
+  }
+
+  function renderPipeline(p) {
+    const isCollapsed = collapsed[p.id] !== false; // default collapsed
+    let html = '<div class="pipeline">';
+    html += '<div class="pipeline-header" data-toggle="' + p.id + '" title="Right-click for actions">';
+    html += '<span class="section-chevron' + (isCollapsed ? ' collapsed' : '') + '">▾</span>';
+    html += statusBadge(p.status);
+    html += '<span class="pipeline-ref" title="' + esc(p.projectPath) + '">' + esc(p.ref) + '</span>';
+    html += '<span class="pipeline-time">' + esc(timeAgo(p.updatedAt)) + '</span>';
+    html += '<span class="tree-item-actions">';
+    html += '<span class="pipeline-detail">#' + esc(p.iid || p.id);
+    if (p.user) { html += ' · @' + esc(p.user); }
+    html += ' · ' + esc(String(p.sha || '').slice(0, 8)) + '</span>';
+    html += '<button class="action-btn btn-edit" data-pipe-action="browser" data-id="' + p.id + '" title="Open in GitLab">' + ICONS.external + '</button>';
+    html += '<button class="action-btn btn-copy" data-pipe-action="copy"    data-id="' + p.id + '" title="Copy URL">'       + ICONS.copy     + '</button>';
+    html += '</span>';
+    html += '</div>';
+    html += '<div class="pipeline-body' + (isCollapsed ? ' collapsed' : '') + '">';
+    if (!p.jobs || p.jobs.length === 0) {
+      html += '<div class="no-results">No jobs.</div>';
+    } else {
+      html += renderJobTree(p.jobs, 0);
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  // ── Recursive job tree ───────────────────────────────────
+  function renderJobTree(jobs, depth) {
+    const byStage = {};
+    const stageOrder = [];
+    for (const j of jobs) {
+      if (!byStage[j.stage]) { byStage[j.stage] = []; stageOrder.push(j.stage); }
+      byStage[j.stage].push(j);
+    }
+    let html = '';
+    for (const stage of stageOrder) {
+      html += '<div class="stage-header">' + esc(stage) + '</div>';
+      for (const j of byStage[stage]) { html += renderJob(j, depth); }
+    }
+    return html;
+  }
+
+  function renderJob(j, depth) {
+    const hasSub = j.isBridge && j.children && j.children.length > 0;
+    const subKey = 'bridge-' + j.id;
+    let html = '<div class="tree-item job-item">';
+    html += '<div class="tree-item-row" data-open-job="' + j.id + '" title="'
+          + (j.isBridge ? 'Trigger job · Right-click for actions' : 'Click: open log · Ctrl+Click: new tab · Right-click: actions') + '">';
+    if (hasSub) {
+      const subCollapsed = collapsed[subKey] !== false;
+      html += '<span class="section-chevron sub-chevron' + (subCollapsed ? ' collapsed' : '') + '" data-toggle-bridge="' + subKey + '">▾</span>';
+    }
+    html += '<span class="tree-item-icon">' + statusBadge(j.status) + '</span>';
+    html += '<div class="tree-item-content">';
+    html += '<div class="tree-item-label">' + esc(j.name) + '</div>';
+    html += '<div class="tree-item-meta">';
+    if (j.duration)     { html += '<span class="tree-item-detail">' + esc(durationStr(j.duration)) + '</span>'; }
+    if (j.allowFailure) { html += '<span class="tree-item-detail dim">allow_failure</span>'; }
+    if (j.isBridge)     { html += '<span class="tree-item-detail dim">trigger' + (j.hasDownstream ? '' : ' (pending)') + '</span>'; }
+    html += '</div></div>';
+    html += '<div class="tree-item-actions">';
+    html += '<button class="action-btn btn-edit" data-job-action="browser" data-id="' + j.id + '" title="Open in GitLab">' + ICONS.external + '</button>';
+    html += '<button class="action-btn btn-copy" data-job-action="copy"    data-id="' + j.id + '" title="Copy URL">'       + ICONS.copy     + '</button>';
+    if (j.hasArtifacts) {
+      html += '<button class="action-btn btn-add" data-job-action="artifacts" data-id="' + j.id + '" title="Download artifacts">' + ICONS.download + '</button>';
+    }
+    html += '</div>';
+    html += '</div>';
+    if (hasSub) {
+      const subCollapsed = collapsed[subKey] !== false;
+      html += '<div class="downstream-body depth-' + Math.min(depth + 1, 4) + (subCollapsed ? ' collapsed' : '') + '">';
+      html += renderJobTree(j.children, depth + 1);
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // ── Event binding ────────────────────────────────────────
+  function bindEmpty() {
+    tree.querySelectorAll('[data-empty-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        vscode.postMessage({ type: btn.getAttribute('data-empty-action') });
+      });
+    });
+  }
+
+  function bind() {
+    tree.querySelectorAll('[data-toggle-scope]').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('[data-follow]')) { return; }
+        const id = el.getAttribute('data-toggle-scope');
+        collapsedScopes[id] = !collapsedScopes[id];
+        persist();
+        render();
+      });
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const scope = scopes.find(s => s.id === el.getAttribute('data-toggle-scope'));
+        if (scope) { showScopeMenu(e.clientX, e.clientY, scope); }
+      });
+    });
+
+    tree.querySelectorAll('[data-follow]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        vscode.postMessage({ type: 'toggleFollow', scopeId: btn.getAttribute('data-follow') });
+      });
+    });
+
+    tree.querySelectorAll('[data-toggle]').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('[data-pipe-action]')) { return; }
+        const id = Number(el.getAttribute('data-toggle'));
+        collapsed[id] = !(collapsed[id] !== false);
+        persist();
+        render();
+      });
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const p = findPipelineById(Number(el.getAttribute('data-toggle')));
+        if (p) { showPipelineMenu(e.clientX, e.clientY, p); }
+      });
+    });
+
+    tree.querySelectorAll('[data-open-job]').forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('[data-job-action]')) { return; }
+        const bridgeToggle = e.target.closest('[data-toggle-bridge]');
+        if (bridgeToggle) {
+          const key = bridgeToggle.getAttribute('data-toggle-bridge');
+          collapsed[key] = !(collapsed[key] !== false);
+          persist();
+          render();
+          return;
+        }
+        vscode.postMessage({
+          type: 'openJob',
+          jobId: Number(el.getAttribute('data-open-job')),
+          newTab: e.ctrlKey || e.metaKey,
+        });
+      });
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const j = findJobById(Number(el.getAttribute('data-open-job')));
+        if (j) { showJobMenu(e.clientX, e.clientY, j); }
+      });
+    });
+
+    tree.querySelectorAll('[data-job-action]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: 'jobAction',
+          action: btn.getAttribute('data-job-action'),
+          jobId: Number(btn.getAttribute('data-id')),
+        });
+      });
+    });
+
+    tree.querySelectorAll('[data-pipe-action]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: 'pipeAction',
+          action: btn.getAttribute('data-pipe-action'),
+          pipelineId: Number(btn.getAttribute('data-id')),
+        });
+      });
+    });
+  }
+
+  // ── Top bar ──────────────────────────────────────────────
+  document.getElementById('btn-run').addEventListener('click', () => {
+    vscode.postMessage({ type: 'runPipeline' });
+  });
+  document.getElementById('btn-refresh').addEventListener('click', () => {
+    vscode.postMessage({ type: 'refresh' });
+  });
+  document.getElementById('btn-scopes').addEventListener('click', () => {
+    vscode.postMessage({ type: 'openScopes' });
+  });
+
+  function applyFilter() {
+    filter = { text: elText.value.trim(), status: elStatus.value };
+    persist();
+    render();
+  }
+  elText.addEventListener('input', applyFilter);
+  elStatus.addEventListener('change', applyFilter);
+
+  // Cap the persisted collapse state: once it grows past the threshold,
+  // drop entries for pipelines/bridges not present in the current data.
+  // (Not run on every update — early empty snapshots must not wipe
+  // remembered expansion state.)
+  function pruneCollapsed() {
+    if (Object.keys(collapsed).length <= 500) { return; }
+    const live = {};
+    for (const s of scopes) {
+      for (const p of (s.pipelines || [])) {
+        live[p.id] = true;
+        collectBridges(p.jobs || []);
+      }
+    }
+    function collectBridges(jobs) {
+      for (const j of jobs) {
+        if (j.isBridge) { live['bridge-' + j.id] = true; }
+        if (j.children) { collectBridges(j.children); }
+      }
+    }
+    for (const key of Object.keys(collapsed)) {
+      if (!live[key]) { delete collapsed[key]; }
+    }
+    persist();
+  }
+
+  // ── Inbound messages ─────────────────────────────────────
+  window.addEventListener('message', event => {
+    const msg = event.data;
+    if (msg.type === 'updateData') {
+      scopes      = msg.scopes || [];
+      hasToken    = !!msg.hasToken;
+      totalScopes = msg.totalScopes || 0;
+      gotData     = true;
+      pruneCollapsed();
+      render();
+    } else if (msg.type === 'banner') {
+      bannerMsg = msg.text ? { text: msg.text, kind: msg.kind || 'error' } : null;
+      renderBanner();
+    } else if (msg.type === 'clearBanner') {
+      bannerMsg = null;
+      renderBanner();
+    }
+  });
+
+  // Refresh relative timestamps once a minute (skip while the view is hidden).
+  setInterval(() => {
+    if (!document.hidden && gotData && scopes.length) { render(); }
+  }, 60000);
+
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

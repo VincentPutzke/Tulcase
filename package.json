@@ -1,8 +1,8 @@
 {
   "name": "vscode-tulcase",
   "displayName": "Tulcase",
-  "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, and tags — all inside your editor.",
-  "version": "1.6.0",
+  "description": "A native VS Code productivity suite — TODOs, time records, bookmarks, commands, lists, tags, and GitLab pipelines — all inside your editor.",
+  "version": "1.8.0",
   "publisher": "codewerk",
   "license": "MIT",
   "repository": {
@@ -20,7 +20,10 @@
     "todo",
     "bookmarks",
     "time-tracking",
-    "snippets"
+    "snippets",
+    "gitlab",
+    "pipelines",
+    "ci"
   ],
   "activationEvents": [
     "onView:tulcase.todos",
@@ -28,7 +31,10 @@
     "onView:tulcase.links",
     "onView:tulcase.lists",
     "onView:tulcase.tags",
-    "onView:tulcase.records"
+    "onView:tulcase.records",
+    "onView:tulcase.sync",
+    "onView:tulcase.pipePipelines",
+    "onView:tulcase.pipeScopes"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -39,6 +45,50 @@
           "type": "string",
           "default": "",
           "description": "Path to the Tulcase data directory. Leave empty to use the default (~/.tulcase)."
+        },
+        "tulcase.sync.repoUrl": {
+          "type": "string",
+          "default": "",
+          "description": "HTTPS URL of the git repository used to sync Tulcase data (e.g. https://github.com/user/tulcase-data.git)."
+        },
+        "tulcase.sync.autoSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically pull on activation and push after data changes."
+        },
+        "tulcase.pipe.url": {
+          "type": "string",
+          "default": "https://gitlab.com",
+          "description": "GitLab base URL (e.g. https://gitlab.com or your self-hosted instance). The /api/v4 suffix is stripped automatically."
+        },
+        "tulcase.pipe.pollIntervalSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "description": "Seconds between pipeline-list refreshes."
+        },
+        "tulcase.pipe.logPollIntervalSeconds": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "description": "Seconds between log refreshes for an open running job."
+        },
+        "tulcase.pipe.maxConcurrentRequests": {
+          "type": "number",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Maximum concurrent GitLab requests during a poll cycle."
+        },
+        "tulcase.pipe.notifyOnFinish": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a notification when a job whose log you opened finishes. (Followed scopes always notify.)"
+        },
+        "tulcase.pipe.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the latest pipeline status for the current Git branch in the status bar."
         }
       }
     },
@@ -48,6 +98,16 @@
           "id": "tulcase",
           "title": "Tulcase",
           "icon": "media/icon.svg"
+        },
+        {
+          "id": "tulcase-pipe",
+          "title": "Tulcase Pipe",
+          "icon": "media/pipe-icon.svg"
+        },
+        {
+          "id": "tulcase-pipe-scopes",
+          "title": "Pipe Scopes",
+          "icon": "media/pipe-scopes-icon.svg"
         }
       ],
       "panel": [
@@ -79,6 +139,11 @@
           "id": "tulcase.links",
           "name": "Links",
           "type": "webview"
+        },
+        {
+          "id": "tulcase.sync",
+          "name": "Git Sync",
+          "type": "webview"
         }
       ],
       "tulcase-panel": [
@@ -90,6 +155,20 @@
         {
           "id": "tulcase.records",
           "name": "Records",
+          "type": "webview"
+        }
+      ],
+      "tulcase-pipe": [
+        {
+          "id": "tulcase.pipePipelines",
+          "name": "Pipelines",
+          "type": "webview"
+        }
+      ],
+      "tulcase-pipe-scopes": [
+        {
+          "id": "tulcase.pipeScopes",
+          "name": "Pipe Scopes",
           "type": "webview"
         }
       ]
@@ -200,6 +279,130 @@
         "title": "Update Database",
         "category": "Tulcase",
         "icon": "$(sync)"
+      },
+      {
+        "command": "tulcase.sync.commit",
+        "title": "Sync: Commit",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.push",
+        "title": "Sync: Push",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.pull",
+        "title": "Sync: Pull",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.fullSync",
+        "title": "Sync: Full Sync",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.resetToRemote",
+        "title": "Sync: Use Remote (Reset Local)",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.runPipeline",
+        "title": "Pipe: Run Pipeline",
+        "category": "Tulcase",
+        "icon": "$(play)"
+      },
+      {
+        "command": "tulcase.pipe.refresh",
+        "title": "Pipe: Refresh Pipelines",
+        "category": "Tulcase",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "tulcase.pipe.setToken",
+        "title": "Pipe: Set GitLab Token",
+        "category": "Tulcase",
+        "icon": "$(shield)"
+      },
+      {
+        "command": "tulcase.pipe.clearToken",
+        "title": "Pipe: Clear GitLab Token",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.editScopesJson",
+        "title": "Pipe: Edit Scopes (JSON)",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.importScopes",
+        "title": "Pipe: Import Scopes from Tulcase Pipe Extension",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.saveOpenLog",
+        "title": "Pipe: Save Job Log",
+        "category": "Tulcase",
+        "icon": "$(save-as)"
+      },
+      {
+        "command": "tulcase.pipe.openJobLog",
+        "title": "Pipe: Open Job Log",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.openJobInBrowser",
+        "title": "Pipe: Open Job in Browser",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.openPipelineInBrowser",
+        "title": "Pipe: Open Pipeline in Browser",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.copyJobUrl",
+        "title": "Pipe: Copy Job URL",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.copyPipelineUrl",
+        "title": "Pipe: Copy Pipeline URL",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.downloadArtifacts",
+        "title": "Pipe: Download Artifacts",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.saveJobLog",
+        "title": "Pipe: Save Job Log to File",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.retryPipeline",
+        "title": "Pipe: Retry Pipeline",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.cancelPipeline",
+        "title": "Pipe: Cancel Pipeline",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.retryJob",
+        "title": "Pipe: Retry Job",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.cancelJob",
+        "title": "Pipe: Cancel Job",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.pipe.playJob",
+        "title": "Pipe: Run Manual Job",
+        "category": "Tulcase"
       }
     ],
     "menus": {
@@ -215,8 +418,25 @@
           "group": "navigation"
         },
         {
+          "command": "tulcase.pipe.runPipeline",
+          "when": "view == tulcase.pipePipelines",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tulcase.pipe.refresh",
+          "when": "view == tulcase.pipePipelines",
+          "group": "navigation@2"
+        },
+        {
           "command": "tulcase.refresh",
-          "when": "view =~ /^tulcase\\./",
+          "when": "view =~ /^tulcase\\./ && view != tulcase.pipePipelines && view != tulcase.pipeScopes",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "tulcase.pipe.saveOpenLog",
+          "when": "resourceScheme == tulcase-pipe-log",
           "group": "navigation"
         }
       ],
@@ -236,9 +456,67 @@
         {
           "command": "tulcase.refresh",
           "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.openJobLog",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.openJobInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.openPipelineInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.copyJobUrl",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.copyPipelineUrl",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.downloadArtifacts",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.saveJobLog",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.retryPipeline",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.cancelPipeline",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.retryJob",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.cancelJob",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.playJob",
+          "when": "false"
+        },
+        {
+          "command": "tulcase.pipe.saveOpenLog",
+          "when": "resourceScheme == tulcase-pipe-log"
         }
       ]
     },
+    "jsonValidation": [
+      {
+        "fileMatch": "**/pipe_db/scopes.json",
+        "url": "./schemas/pipe-scopes.schema.json"
+      }
+    ],
     "keybindings": [
       {
         "command": "tulcase.todo.quickAdd",
@@ -250,6 +528,824 @@
         "key": "ctrl+enter",
         "mac": "cmd+enter",
         "when": "inQuickOpen"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "tulcase_list_todos",
+        "displayName": "Tulcase: List TODOs",
+        "toolReferenceName": "tulcase_list_todos",
+        "icon": "$(checklist)",
+        "userDescription": "List your Tulcase TODOs with optional filters (all, open, done, overdue, today) and tag filtering.",
+        "modelDescription": "List Tulcase TODO items. Supports filtering by status (all/open/done/overdue/today) and by tag name. Returns an array of todo items with id, note, date, done, and tags fields.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "type": "string",
+              "enum": [
+                "all",
+                "done",
+                "open",
+                "overdue",
+                "today"
+              ],
+              "description": "Filter todos by status. Default: all."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Filter todos to only those with this tag."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_add_todo",
+        "displayName": "Tulcase: Add TODO",
+        "toolReferenceName": "tulcase_add_todo",
+        "icon": "$(add)",
+        "userDescription": "Add a new TODO to Tulcase.",
+        "modelDescription": "Create a new Tulcase TODO item. Requires a note (text). Optionally set a date (YYYY-MM-DD, defaults to today) and tags (array of tag names).",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "note": {
+              "type": "string",
+              "description": "The TODO text."
+            },
+            "date": {
+              "type": "string",
+              "description": "Due date in YYYY-MM-DD format. Defaults to today."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            }
+          },
+          "required": [
+            "note"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_update_todo",
+        "displayName": "Tulcase: Update TODO",
+        "toolReferenceName": "tulcase_update_todo",
+        "icon": "$(edit)",
+        "userDescription": "Update an existing Tulcase TODO (mark done, change text, date, or tags).",
+        "modelDescription": "Update a Tulcase TODO item by ID. Can change done status, note text, date, or tags. Use tulcase_list_todos first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The todo ID."
+            },
+            "done": {
+              "type": "boolean",
+              "description": "Mark as done or not done."
+            },
+            "note": {
+              "type": "string",
+              "description": "New text for the todo."
+            },
+            "date": {
+              "type": "string",
+              "description": "New date in YYYY-MM-DD format."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_delete_todo",
+        "displayName": "Tulcase: Delete TODO",
+        "toolReferenceName": "tulcase_delete_todo",
+        "icon": "$(trash)",
+        "userDescription": "Delete a Tulcase TODO by ID.",
+        "modelDescription": "Permanently delete a Tulcase TODO item by its ID. Use tulcase_list_todos first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The todo ID to delete."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_list_notes",
+        "displayName": "Tulcase: List Notes",
+        "toolReferenceName": "tulcase_list_notes",
+        "icon": "$(note)",
+        "userDescription": "List all Tulcase notes and folders, with optional tag filtering.",
+        "modelDescription": "List all Tulcase notes and their folder structure. Optionally filter by tag. Returns notes (id, label, content, tags, folder, createdAt, updatedAt) and folders (id, name, parent).",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "Filter notes to only those with this tag."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_read_note",
+        "displayName": "Tulcase: Read Note",
+        "toolReferenceName": "tulcase_read_note",
+        "icon": "$(open-preview)",
+        "userDescription": "Read the full content of a Tulcase note by ID.",
+        "modelDescription": "Read the full content and metadata of a Tulcase note by its ID. Use tulcase_list_notes first to find valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The note ID to read."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_add_note",
+        "displayName": "Tulcase: Add Note",
+        "toolReferenceName": "tulcase_add_note",
+        "icon": "$(new-file)",
+        "userDescription": "Create a new Tulcase note.",
+        "modelDescription": "Create a new Tulcase note. Requires a label. Optionally set content (markdown text), tags, and folder ID. Use tulcase_list_notes to see available folders.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "The note title."
+            },
+            "content": {
+              "type": "string",
+              "description": "The note content (markdown)."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Folder ID to place the note in. Empty string or omit for root."
+            }
+          },
+          "required": [
+            "label"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_edit_note",
+        "displayName": "Tulcase: Edit Note",
+        "toolReferenceName": "tulcase_edit_note",
+        "icon": "$(edit)",
+        "userDescription": "Edit an existing Tulcase note (label, content, tags, or folder).",
+        "modelDescription": "Edit a Tulcase note by ID. Can change label, content, tags, or folder. Use tulcase_list_notes first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The note ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New title."
+            },
+            "content": {
+              "type": "string",
+              "description": "New content (markdown)."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Move to this folder ID."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_manage_note_folder",
+        "displayName": "Tulcase: Manage Note Folder",
+        "toolReferenceName": "tulcase_manage_note_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete note folders in Tulcase.",
+        "modelDescription": "Manage Tulcase note folders. Action create makes a folder optionally under parentId. Action rename changes a folder name by id. Action delete removes a folder by id and moves its direct child notes and direct subfolders to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_move_note_entry",
+        "displayName": "Tulcase: Move Note Entry",
+        "toolReferenceName": "tulcase_move_note_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a note or note folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase note entry by id. The id may belong to either a note or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The note or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_list_links",
+        "displayName": "Tulcase: List Links",
+        "toolReferenceName": "tulcase_list_links",
+        "icon": "$(link)",
+        "userDescription": "List all Tulcase bookmarks/links as a tree, with optional tag filtering.",
+        "modelDescription": "List the Tulcase link tree. Each node has id, type (link/folder), label, url (for links), tags, and children (for folders). Optionally filter by tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "Filter links to only those with this tag."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_add_link",
+        "displayName": "Tulcase: Add Link",
+        "toolReferenceName": "tulcase_add_link",
+        "icon": "$(add)",
+        "userDescription": "Add a new bookmark/link to Tulcase.",
+        "modelDescription": "Create a new Tulcase link (bookmark). Requires label and url. Optionally set tags and parentFolderId to place it inside a folder. Use tulcase_list_links to see folder IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "Display name for the link."
+            },
+            "url": {
+              "type": "string",
+              "description": "The URL."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "parentFolderId": {
+              "type": "string",
+              "description": "Folder ID to place the link in. Omit for root."
+            }
+          },
+          "required": [
+            "label",
+            "url"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_edit_link",
+        "displayName": "Tulcase: Edit Link",
+        "toolReferenceName": "tulcase_edit_link",
+        "icon": "$(edit)",
+        "userDescription": "Edit an existing Tulcase link (label, url, or tags).",
+        "modelDescription": "Edit a Tulcase link by ID. Can change label, url, or tags. Use tulcase_list_links first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The link ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New display name."
+            },
+            "url": {
+              "type": "string",
+              "description": "New URL."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_manage_link_folder",
+        "displayName": "Tulcase: Manage Link Folder",
+        "toolReferenceName": "tulcase_manage_link_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete bookmark folders in Tulcase.",
+        "modelDescription": "Manage Tulcase link folders. Action create makes a folder optionally under parentFolderId. Action rename changes a folder label by id. Action delete removes a folder by id and deletes its entire nested subtree.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentFolderId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_move_link_entry",
+        "displayName": "Tulcase: Move Link Entry",
+        "toolReferenceName": "tulcase_move_link_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a link or link folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase link entry by id. The id may belong to either a link or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The link or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_list_commands",
+        "displayName": "Tulcase: List Commands",
+        "toolReferenceName": "tulcase_list_commands",
+        "icon": "$(terminal)",
+        "userDescription": "List all Tulcase saved commands/snippets, with optional tag filtering.",
+        "modelDescription": "List Tulcase saved commands (shell snippets). Returns commands (id, label, command text, tags, folder) and folders. Optionally filter by tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "Filter commands to only those with this tag."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_add_command",
+        "displayName": "Tulcase: Add Command",
+        "toolReferenceName": "tulcase_add_command",
+        "icon": "$(add)",
+        "userDescription": "Save a new command/snippet to Tulcase.",
+        "modelDescription": "Create a new Tulcase saved command. Requires label and command text. Optionally set tags and folder ID.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "Display name for the command."
+            },
+            "command": {
+              "type": "string",
+              "description": "The shell command or snippet text."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Folder ID. Omit for root."
+            }
+          },
+          "required": [
+            "label",
+            "command"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_edit_command",
+        "displayName": "Tulcase: Edit Command",
+        "toolReferenceName": "tulcase_edit_command",
+        "icon": "$(edit)",
+        "userDescription": "Edit an existing Tulcase command (label, command text, or tags).",
+        "modelDescription": "Edit a Tulcase saved command by ID. Can change label, command text, or tags. Use tulcase_list_commands first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The command ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New display name."
+            },
+            "command": {
+              "type": "string",
+              "description": "New command text."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Move to this folder ID. Use an empty string for root."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_manage_command_folder",
+        "displayName": "Tulcase: Manage Command Folder",
+        "toolReferenceName": "tulcase_manage_command_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete command folders in Tulcase.",
+        "modelDescription": "Manage Tulcase command folders. Action create makes a folder optionally under parentId. Action rename changes a folder name by id. Action delete removes a folder by id and reparents its direct child commands and direct subfolders to the deleted folder's parent.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_move_command_entry",
+        "displayName": "Tulcase: Move Command Entry",
+        "toolReferenceName": "tulcase_move_command_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a command or command folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase command entry by id. The id may belong to either a command or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The command or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_list_tags",
+        "displayName": "Tulcase: List Tags",
+        "toolReferenceName": "tulcase_list_tags",
+        "icon": "$(tag)",
+        "userDescription": "List all Tulcase tags with their colors and categories.",
+        "modelDescription": "List all defined Tulcase tags. Returns tag name, hex color, and category for each tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "tulcase_add_tag",
+        "displayName": "Tulcase: Add Tag",
+        "toolReferenceName": "tulcase_add_tag",
+        "icon": "$(add)",
+        "userDescription": "Create a new Tulcase tag with optional color and category.",
+        "modelDescription": "Create a new Tulcase tag. Requires a name. Optionally set a hex color (default: #8b8fa3) and category (default: general).",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The tag name."
+            },
+            "color": {
+              "type": "string",
+              "description": "Hex color (e.g. #ff5c5c). Default: #8b8fa3."
+            },
+            "category": {
+              "type": "string",
+              "description": "Category grouping. Default: general."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_manage_tag",
+        "displayName": "Tulcase: Manage Tag",
+        "toolReferenceName": "tulcase_manage_tag",
+        "icon": "$(gear)",
+        "userDescription": "Rename, recolor, recategorize, or delete a Tulcase tag.",
+        "modelDescription": "Manage a Tulcase tag: rename it, change its color, change its category, or delete it. Deletion also removes the tag from all items. Use tulcase_list_tags to see existing tags.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The current tag name."
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "rename",
+                "recolor",
+                "recategorize",
+                "delete"
+              ],
+              "description": "What to do with the tag."
+            },
+            "newValue": {
+              "type": "string",
+              "description": "New name (rename), hex color (recolor), or category (recategorize). Not needed for delete."
+            }
+          },
+          "required": [
+            "name",
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_pipe_list_scopes",
+        "displayName": "Tulcase Pipe: List Scopes",
+        "toolReferenceName": "tulcase_pipe_list_scopes",
+        "icon": "$(filter)",
+        "userDescription": "List the configured GitLab pipeline scopes.",
+        "modelDescription": "List all Tulcase Pipe scopes (GitLab pipeline watch configurations). Returns id, label, projects, filters, enabled/follow flags, tags, and attached log rules per scope.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "tulcase_pipe_status",
+        "displayName": "Tulcase Pipe: Pipeline Status",
+        "toolReferenceName": "tulcase_pipe_status",
+        "icon": "$(rocket)",
+        "userDescription": "Get the current GitLab pipeline status per scope, including jobs.",
+        "modelDescription": "Get current GitLab pipelines per Tulcase Pipe scope, including their jobs (id, name, stage, status, duration). Optionally filter by scope label, pipeline status, limit results, or force a fresh poll with refresh:true. Job ids can be used with tulcase_pipe_job_log.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "description": "Only this scope (label or id). Default: all enabled scopes."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "created",
+                "waiting_for_resource",
+                "preparing",
+                "pending",
+                "running",
+                "success",
+                "failed",
+                "canceled",
+                "skipped",
+                "manual",
+                "scheduled"
+              ],
+              "description": "Only pipelines with this status."
+            },
+            "refresh": {
+              "type": "boolean",
+              "description": "Force a fresh GitLab poll before answering. Default: only when no data is cached."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max pipelines per scope (1-50, default 10)."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_pipe_job_log",
+        "displayName": "Tulcase Pipe: Read Job Log",
+        "toolReferenceName": "tulcase_pipe_job_log",
+        "icon": "$(output)",
+        "userDescription": "Read the log of a GitLab CI job (great for analyzing failures).",
+        "modelDescription": "Fetch the trace/log of a GitLab CI job by job id (ANSI codes stripped). Returns the last N lines (default 200). Use tulcase_pipe_status first to find job ids — especially useful for analyzing failed jobs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "jobId": {
+              "type": "number",
+              "description": "The GitLab job id."
+            },
+            "tailLines": {
+              "type": "number",
+              "description": "How many trailing lines to return (10-2000, default 200)."
+            }
+          },
+          "required": [
+            "jobId"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_pipe_trigger_pipeline",
+        "displayName": "Tulcase Pipe: Run Pipeline",
+        "toolReferenceName": "tulcase_pipe_trigger_pipeline",
+        "icon": "$(play)",
+        "userDescription": "Trigger a new GitLab pipeline (asks for confirmation).",
+        "modelDescription": "Trigger a new GitLab pipeline on a project and ref, optionally with CI/CD variables. The user is asked to confirm before anything runs. Returns the new pipeline id, status, and web URL.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "project": {
+              "type": "string",
+              "description": "Project path (group/project) or numeric id."
+            },
+            "ref": {
+              "type": "string",
+              "description": "Branch or tag to run on."
+            },
+            "variables": {
+              "type": "array",
+              "description": "CI/CD variables to pass.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ]
+              }
+            }
+          },
+          "required": [
+            "project",
+            "ref"
+          ]
+        }
       }
     ]
   },
@@ -270,6 +1366,7 @@
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.24.0",
     "eslint": "^9.0.0",
+    "jsonc-parser": "^3.3.1",
     "prettier": "^3.2.0",
     "sass": "^1.98.0",
     "typescript": "^5.5.0",

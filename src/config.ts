@@ -25,6 +25,7 @@ const EMPTY_DB_STORES: Record<string, string> = {
     [path.join('commands_db', 'commands.json')]: '{"items":[]}',
     [path.join('links_db', 'links.json')]:    '{"root":[]}',
     [path.join('lists_db', 'lists.json')]:    '{"notes":[],"folders":[]}',
+    [path.join('pipe_db', 'scopes.json')]:    '{"scopes":[],"logRules":[]}',
     [path.join('notes', 'todos.md')]:         '',
 };
 
@@ -49,6 +50,7 @@ export interface TulcaseSettings {
     listsFile: string;
     recordsDir: string;
     todoPage: string;
+    pipeScopesFile: string;
 }
 
 // ── Root directory resolution ──────────────────────────────────────────────────
@@ -167,6 +169,7 @@ function derivePaths(rootDir: string, dbName: string) {
         listsFile:     path.join(base, 'lists_db', 'lists.json'),
         recordsDir:    path.join(base, 'records_db'),
         todoPage:      path.join(base, 'notes', 'todos.md'),
+        pipeScopesFile: path.join(base, 'pipe_db', 'scopes.json'),
     };
 }
 

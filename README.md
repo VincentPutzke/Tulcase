@@ -44,6 +44,8 @@ Tulcase provides these core modules inside VS Code:
 - Tags with global color/category management and propagation
 - Records with a calendar-style time logging view
 - Databases with import, export, switching, and update commands
+- Pipe: GitLab pipelines with live job logs, run/retry/cancel actions, form-based
+  scopes with follow notifications, and regex log rules (see `docs/pipe.md`)
 
 ## Why It Exists
 
@@ -61,6 +63,8 @@ The product goal is simple:
 - Take lightweight project notes without switching tools.
 - Track time directly from the same environment where the work happened.
 - Maintain multiple Tulcase databases for different contexts.
+- Watch GitLab pipelines, stream job logs into the editor, and trigger or retry
+  pipelines without opening the browser.
 
 ## Docs
 
@@ -70,6 +74,7 @@ The repository includes a plain GitHub documentation set in `docs/`.
 - `docs/getting-started.md`
 - `docs/workflows-and-hacks.md`
 - `docs/architecture.md`
+- `docs/pipe.md`
 - `docs/roadmap.md`
 - `docs/releasing.md`
 

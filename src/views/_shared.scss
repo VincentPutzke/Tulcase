@@ -55,7 +55,19 @@ body {
   display        : flex;
   flex-direction : column;
   height         : 100%;
+  min-height     : 0;
   gap            : 0;
+}
+
+body.sidebar-mode .controls-pane {
+  flex-shrink   : 0;
+  margin-bottom : 2px;
+}
+
+body.sidebar-mode .tree-pane {
+  flex       : 1 1 0;
+  overflow-y : auto;
+  overflow-x : hidden;
 }
 
 // Wide layout: horizontal split
@@ -308,6 +320,64 @@ body {
   position    : relative;
 }
 
+.tree-pane {
+  position: relative;
+  min-height: 0;
+}
+
+.tree-content {
+  min-height: 0;
+}
+
+.root-drop-zone {
+  display        : none;
+  position       : static;
+  margin-top     : 8px;
+  padding        : 8px 10px;
+  border         : 1px dashed $input-border;
+  border-radius  : 6px;
+  background     : $view-bg;
+  color          : var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.8));
+  font-size      : 11px;
+  text-align     : center;
+}
+
+body.drag-active .root-drop-zone {
+  display: block;
+}
+
+body.drag-armed,
+body.drag-active,
+body.drag-armed *,
+body.drag-active * {
+  user-select         : none;
+  -webkit-user-select : none;
+}
+
+body.drag-armed,
+body.drag-active {
+  cursor: grabbing;
+}
+
+.drag-source {
+  opacity: 0.55;
+}
+
+.drag-source,
+.drag-press-active {
+  cursor: grabbing !important;
+}
+
+.drop-target-active:not(.section) {
+  border-color: var(--vscode-focusBorder) !important;
+  background  : var(--vscode-list-dropBackground, rgba(14, 99, 156, 0.14)) !important;
+}
+
+.section.drop-target-active > .section-header {
+  border-color: var(--vscode-focusBorder) !important;
+  background  : var(--vscode-list-dropBackground, rgba(14, 99, 156, 0.14)) !important;
+}
+
 .tree-item-icon {
   flex-shrink : 0;
   display     : flex;
@@ -437,4 +507,36 @@ body {
   padding    : 16px 12px;
   color      : var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.6));
   font-size  : 12px;
+}
+
+// ── Inline banner (error / info) ──────────────────────────────────────────────
+.banner {
+  background    : var(--vscode-inputValidation-errorBackground, rgba(244, 67, 54, 0.18));
+  color         : var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
+  border        : 1px solid var(--vscode-inputValidation-errorBorder, rgba(244, 67, 54, 0.45));
+  border-radius : 4px;
+  padding       : 6px 8px;
+  margin        : 0 0 8px 0;
+  font-size     : 11.5px;
+  display       : flex;
+  align-items   : center;
+  gap           : 8px;
+  word-break    : break-word;
+
+  &.banner-info {
+    background   : rgba(76, 175, 80, 0.10);
+    border-color : rgba(76, 175, 80, 0.45);
+    color        : var(--vscode-foreground);
+  }
+}
+
+.banner-close {
+  margin-left : auto;
+  background  : transparent;
+  border      : none;
+  color       : inherit;
+  cursor      : pointer;
+  font-size   : 14px;
+  padding     : 0 2px;
+  flex-shrink : 0;
 }

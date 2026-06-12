@@ -24,6 +24,11 @@ export async function renameTagInAll(oldName: string, newName: string, settings:
 
 // --- Internal ---
 
+/** Pre-v1 command stores kept a dict of label → entry. */
+interface LegacyCommandShape {
+    commands?: Record<string, { tags?: string[] } | string>;
+}
+
 type TagTransform = (tags: string[], tagName: string, newName?: string) => string[];
 
 function runStrip(tags: string[], tagName: string): string[] {
@@ -52,12 +57,19 @@ async function applyToAllStores(
         await store.write(settings.recurringFile, recurringData);
     }
 
-    // Commands (dict of label → entry)
-    const commandsData = await store.read<CommandStore>(settings.commandsFile, { commands: {} });
+    // Commands — current format ({ items: [...] }); legacy dict still handled
+    const commandsData = await store.read<CommandStore & LegacyCommandShape>(
+        settings.commandsFile, { items: [] },
+    );
     let commandsChanged = false;
-    for (const val of Object.values(commandsData.commands)) {
-        if (typeof val === 'object' && val !== null && applyTagToSingle(fn, val, tagName, newName)) {
-            commandsChanged = true;
+    if (Array.isArray(commandsData.items)) {
+        commandsChanged = applyTagToItems(fn, commandsData.items, tagName, newName);
+    }
+    if (commandsData.commands && typeof commandsData.commands === 'object') {
+        for (const val of Object.values(commandsData.commands)) {
+            if (typeof val === 'object' && val !== null && applyTagToSingle(fn, val, tagName, newName)) {
+                commandsChanged = true;
+            }
         }
     }
     if (commandsChanged) {

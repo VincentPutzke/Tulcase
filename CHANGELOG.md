@@ -5,6 +5,45 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.0] - 2026-06-12
+
+### Summary
+Tulcase Pipe: the standalone GitLab-pipelines extension is now a fully integrated Tulcase feature — with pipeline actions, form-based scopes, follow notifications, and a refined job-log experience. See `docs/pipe.md`.
+
+### Added
+- **Pipelines view** (new activity bar container): scopes → pipelines → stages → jobs tree with nested downstream pipelines, persisted filters (text + status), per-scope counts, tag chips, and empty-state actions.
+- **Pipeline actions** from the view and the command palette: guided *Run Pipeline* flow (project picker with GitLab search, live branch picker, CI/CD variables, file variables, and `spec:inputs`), retry/cancel pipeline, play/retry/cancel job, download artifacts, copy URLs.
+- **Pipe Scopes view** (own activity bar container): full visual scope editor — project search, status chips, log-rule chips, Tulcase tag picker, enable switch, follow bell, duplicate/reorder/delete. Scopes are stored per-database (`pipe_db/scopes.json`), sync via Git Sync, and validate against a shipped JSON schema when edited as raw JSON.
+- **Follow**: mark a scope with the bell and get VS Code notifications when its pipelines finish (error on failed, warning on canceled, info on passed) — including in the background while the views are closed.
+- **Job logs in the editor**: plain click opens a job log in a single reusable "switch" tab (click another job to swap in place); Ctrl/Cmd+click pins an extra tab. Logs are read-only-in-session, stream live with ANSI colors as decorations, auto-follow the tail, and clean up their polling when closed. Editor-title save button included.
+- **Log rules**: pre-shipped regex filters (strip timestamps, GitLab section markers, runner noise, progress bars, debug lines, redact secrets, shorten SHAs) plus custom rules with a live regex preview editor. Custom rules can override built-ins; deleting the override restores the original.
+- **Status bar**: latest pipeline status for the current Git branch (remote-aware), click to open in GitLab.
+- **AI tools**: `tulcase_pipe_list_scopes`, `tulcase_pipe_status`, `tulcase_pipe_job_log`, and `tulcase_pipe_trigger_pipeline` (with confirmation).
+- One-command migration from the standalone extension: *Pipe: Import Scopes from Tulcase Pipe Extension* (reads `scopes.jsonc`).
+- Settings under `tulcase.pipe.*` (GitLab URL, poll intervals, concurrency, notifications, status bar).
+
+### Fixed
+- Tag rename/delete now propagates into saved commands again (the propagation helper still read the pre-v1 command store format and skipped current-format files).
+
+### Changed
+- Database seeding now also creates `pipe_db/scopes.json`; existing databases are seeded on activation (idempotent).
+- Removed the dead pre-webview `command-tree.provider.ts`.
+
+## [1.7.4] - 2026-06-04
+
+### Summary
+Patch release: add Tulcase AI tools for chat agents and complete folder-aware management for notes, links, commands, todos, and tags.
+
+### Added
+- `contributes.languageModelTools` registrations in `package.json` so VS Code agents can call Tulcase tools directly.
+- `src/chat/tools.ts` with AI tools for listing, creating, updating, and deleting TODOs.
+- AI tools for listing, reading, creating, and editing notes, links, commands, and tags.
+- Dedicated AI tools for creating, renaming, deleting, and moving note folders, link folders, and command folders.
+
+### Changed
+- AI edits now validate folder targets for notes and commands instead of allowing invalid folder IDs.
+- Folder operations exposed to agents now follow the same re-parenting rules as the existing Tulcase webviews.
+
 ## [1.4.1] – 2026-04-20
 
 ### Summary
