@@ -606,6 +606,13 @@ function friendlyStoreName(file: string): string {
     const database = dataIndex >= 0 ? parts[dataIndex + 1] : undefined;
     const store = dataIndex >= 0 ? parts[dataIndex + 2] : undefined;
 
+    // Per-script .sh files: disambiguate by filename so multiple conflicting
+    // scripts are distinguishable in the resolver list.
+    if (store === 'scripts_db' && parts[dataIndex + 3] === 'files') {
+        const label = `Script file "${path.basename(normalized)}"`;
+        return database ? `${label} - database "${database}"` : label;
+    }
+
     const label = storeName(store, path.basename(normalized));
     return database ? `${label} - database "${database}"` : label;
 }
@@ -614,6 +621,7 @@ function storeName(store: string | undefined, fallback: string): string {
     switch (store) {
         case 'todo_db': return 'Todos';
         case 'commands_db': return 'Commands';
+        case 'scripts_db': return 'Scripts';
         case 'lists_db': return 'Notes';
         case 'links_db': return 'Links';
         case 'tags_db': return 'Tags';
