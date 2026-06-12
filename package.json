@@ -301,6 +301,11 @@
         "category": "Tulcase"
       },
       {
+        "command": "tulcase.sync.resolveConflicts",
+        "title": "Sync: Resolve Conflicts",
+        "category": "Tulcase"
+      },
+      {
         "command": "tulcase.sync.resetToRemote",
         "title": "Sync: Use Remote (Reset Local)",
         "category": "Tulcase"

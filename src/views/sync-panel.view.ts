@@ -66,16 +66,20 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
                 break;
 
             case 'pull':
-                await this.syncService.pull();
+                await this.syncService.pull({ interactive: true });
                 break;
 
             case 'fullSync': {
                 const ok = await this.syncService.setup();
                 if (ok) {
-                    await this.syncService.fullSync();
+                    await this.syncService.fullSync({ interactive: true });
                 }
                 break;
             }
+
+            case 'resolveConflicts':
+                await vscode.commands.executeCommand('tulcase.sync.resolveConflicts');
+                break;
 
             case 'openSetup':
                 await this._runSetupWizard();
@@ -142,7 +146,7 @@ export class SyncPanelViewProvider implements vscode.WebviewViewProvider {
         } else {
             const ok = await this.syncService.setup();
             if (ok) {
-                await this.syncService.fullSync();
+                await this.syncService.fullSync({ interactive: true });
             }
         }
 
