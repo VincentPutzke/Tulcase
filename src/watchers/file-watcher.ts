@@ -14,6 +14,7 @@ export class DataFileWatcher implements vscode.Disposable {
     private readonly _onTodosChanged = new vscode.EventEmitter<void>();
     private readonly _onTagsChanged = new vscode.EventEmitter<void>();
     private readonly _onCommandsChanged = new vscode.EventEmitter<void>();
+    private readonly _onScriptsChanged = new vscode.EventEmitter<void>();
     private readonly _onLinksChanged = new vscode.EventEmitter<void>();
     private readonly _onListsChanged = new vscode.EventEmitter<void>();
     private readonly _onRecordsChanged = new vscode.EventEmitter<void>();
@@ -23,6 +24,7 @@ export class DataFileWatcher implements vscode.Disposable {
     readonly onTodosChanged = this._onTodosChanged.event;
     readonly onTagsChanged = this._onTagsChanged.event;
     readonly onCommandsChanged = this._onCommandsChanged.event;
+    readonly onScriptsChanged = this._onScriptsChanged.event;
     readonly onLinksChanged = this._onLinksChanged.event;
     readonly onListsChanged = this._onListsChanged.event;
     readonly onRecordsChanged = this._onRecordsChanged.event;
@@ -52,8 +54,8 @@ export class DataFileWatcher implements vscode.Disposable {
         this.disposables.push(watcher);
         this.disposables.push(
             this._onTodosChanged, this._onTagsChanged, this._onCommandsChanged,
-            this._onLinksChanged, this._onListsChanged, this._onRecordsChanged,
-            this._onRecurringChanged, this._onPipeScopesChanged
+            this._onScriptsChanged, this._onLinksChanged, this._onListsChanged,
+            this._onRecordsChanged, this._onRecurringChanged, this._onPipeScopesChanged
         );
     }
 
@@ -100,6 +102,8 @@ export class DataFileWatcher implements vscode.Disposable {
             this._onTagsChanged.fire();
         } else if (normalized.includes('/commands_db/')) {
             this._onCommandsChanged.fire();
+        } else if (normalized.includes('/scripts_db/')) {
+            this._onScriptsChanged.fire();
         } else if (normalized.includes('/links_db/')) {
             this._onLinksChanged.fire();
         } else if (normalized.includes('/lists_db/')) {

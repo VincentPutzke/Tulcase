@@ -44,12 +44,16 @@ const CORE_FILES = [
     path.join('todo_db', 'recurring.json'),
     path.join('tags_db', 'tags.json'),
     path.join('commands_db', 'commands.json'),
+    path.join('scripts_db', 'scripts.json'),
     path.join('links_db', 'links.json'),
     path.join('lists_db', 'lists.json'),
     path.join('notes', 'todos.md'),
 ] as const;
 
 const RECORDS_DIR = 'records_db';
+
+/** Directory of per-script `.sh` files, walked recursively like records. */
+const SCRIPT_FILES_DIR = path.join('scripts_db', 'files');
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
@@ -104,6 +108,16 @@ async function collectFiles(root: string): Promise<Record<string, string>> {
         const content = await safeRead(path.join(recDir, rel));
         if (content !== undefined) {
             const key = path.join(RECORDS_DIR, rel).split(path.sep).join('/');
+            files[key] = content;
+        }
+    }
+
+    // Per-script .sh files (one file per script entry)
+    const scriptFilesDir = path.join(root, SCRIPT_FILES_DIR);
+    for (const rel of await walkDir(scriptFilesDir)) {
+        const content = await safeRead(path.join(scriptFilesDir, rel));
+        if (content !== undefined) {
+            const key = path.join(SCRIPT_FILES_DIR, rel).split(path.sep).join('/');
             files[key] = content;
         }
     }

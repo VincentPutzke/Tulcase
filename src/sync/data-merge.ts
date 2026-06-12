@@ -99,6 +99,9 @@ function pickMerger(path: string): Merger | undefined {
     if (path.endsWith('/commands_db/commands.json')) {
         return makeStoreMerger({ items: byIdOrValue, folders: byIdOrValue });
     }
+    if (path.endsWith('/scripts_db/scripts.json')) {
+        return makeStoreMerger({ items: byIdOrValue, folders: byIdOrValue });
+    }
     if (path.endsWith('/lists_db/lists.json')) {
         return makeStoreMerger({ notes: byIdOrValue, folders: byIdOrValue, lists: byIdOrValue });
     }
