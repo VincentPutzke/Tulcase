@@ -5,6 +5,22 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Summary
+Scripts: a full reusable-script tool alongside Commands, in a new dedicated activity-bar tab.
+
+### Added
+- **Commands & Scripts activity-bar container**: the Commands view is relocated out of the main Tulcase sidebar into its own tab, now sharing it with the new Scripts view.
+- **Scripts view**: organize reusable shell scripts in recursive folders with tags and `<$name$>` placeholders — the same model as Commands. Each script is backed by a **real `.sh` file on disk** (`scripts_db/files/<id>.sh`) that you edit in a normal editor tab (shell-script highlighting, no-prompt auto-save), just like Notes.
+- **Run scripts in the terminal**: the ▶ action (and the *Run Script* palette picker) resolves placeholders, then runs the script via a configurable interpreter (`tulcase.scripts.interpreter`, default `bash`). Scripts with placeholders run from a resolved temp copy so the saved file keeps its tokens.
+- **Run confirmation with trust marker**: running a script asks for confirmation unless its body contains a `# tulcase: no-confirm` comment line.
+- **Palette commands**: *Add Script*, *Open Script*, *Run Script* (the open/run pickers are folder-grouped and searchable).
+- **AI tools**: `tulcase_list_scripts`, `tulcase_read_script`, `tulcase_add_script`, `tulcase_edit_script`, `tulcase_delete_script`, `tulcase_manage_script_folder`, `tulcase_move_script_entry` — agents can fully manage scripts, folders, and `.sh` bodies.
+- Scripts (metadata + every `.sh` file) are carried by database export/import and reconciled by Git Sync's semantic three-way merge.
+
+---
+
 ## [1.8.1] - 2026-06-12
 
 ### Summary

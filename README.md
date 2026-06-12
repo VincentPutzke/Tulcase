@@ -7,6 +7,7 @@ Instead of spreading work across browser tabs, sticky notes, temporary files, an
 - todos
 - notes
 - saved commands
+- reusable shell scripts
 - links
 - tags
 - time records
@@ -40,6 +41,7 @@ Tulcase provides these core modules inside VS Code:
 - TODOs with date buckets, quick add, tagging, postpone, and done flows
 - Notes with folders, metadata editing, markdown editing, and tag decorations
 - Commands with saved snippets, copy, and terminal insertion
+- Scripts with real editable `.sh` files, folders, tags, placeholders, and one-click run
 - Links with nested folders and inline open/edit actions
 - Tags with global color/category management and propagation
 - Records with a calendar-style time logging view
@@ -59,6 +61,7 @@ The product goal is simple:
 
 - Capture todos without leaving the editor.
 - Keep reusable shell commands where you can copy or insert them in seconds.
+- Save longer shell scripts as real `.sh` files, organize them in folders, and run them in one click (with placeholder prompts and an opt-in safety confirmation).
 - Store links that belong to the codebase you are working on.
 - Take lightweight project notes without switching tools.
 - Track time directly from the same environment where the work happened.

@@ -18,20 +18,11 @@ import * as os from 'os';
 import * as path from 'path';
 import { ScriptFileSystemProvider } from './script-fs';
 import { resolveText } from '../utils/placeholder-resolve';
+import { isTrustedScript } from '../utils/script-trust';
 import type { TulcaseSettings } from '../config';
 import type { ScriptItem } from '../models/script.model';
 
-/**
- * Trust marker: a comment line containing `tulcase: no-confirm` (hyphen
- * optional) anywhere in the script tells the runner to skip the safety prompt.
- * Example first line: `# tulcase: no-confirm`
- */
-const TRUST_MARKER = /^[ \t]*#.*\btulcase:\s*no-?confirm\b/im;
-
-/** Whether a script body opts out of the run-confirmation prompt. */
-export function isTrustedScript(content: string): boolean {
-    return TRUST_MARKER.test(content);
-}
+export { isTrustedScript } from '../utils/script-trust';
 
 /** Counter to keep generated temp filenames unique within a session. */
 let tempCounter = 0;
