@@ -42,6 +42,7 @@ import { registerPlaceholderCommands } from './utils/placeholder-resolve';
 import { StatusBar } from './views/status-bar';
 import { SyncService } from './sync/sync-service';
 import { SyncPanelViewProvider } from './views/sync-panel.view';
+import { openSyncConflictResolver } from './views/sync-conflict-resolver';
 import { AutoSync } from './sync/auto-sync';
 import { registerChatTools } from './chat/tools';
 import { registerPipeChatTools } from './chat/pipe-tools';
@@ -70,6 +71,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Sync panel
     const syncService = new SyncService(settings, context.secrets);
+    syncService.setConflictResolver(openSyncConflictResolver);
     const syncPanel   = new SyncPanelViewProvider(syncService, context.secrets);
 
     // File watcher for cross-instance sync (created early so the pipe
@@ -165,10 +167,14 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
         vscode.commands.registerCommand('tulcase.sync.commit', () => syncService.commit()),
         vscode.commands.registerCommand('tulcase.sync.push', () => syncService.push()),
-        vscode.commands.registerCommand('tulcase.sync.pull', () => syncService.pull()),
+        vscode.commands.registerCommand('tulcase.sync.pull', () => syncService.pull({ interactive: true })),
         vscode.commands.registerCommand('tulcase.sync.fullSync', async () => {
             const ok = await syncService.setup();
-            if (ok) { await syncService.fullSync(); }
+            if (ok) { await syncService.fullSync({ interactive: true }); }
+        }),
+        vscode.commands.registerCommand('tulcase.sync.resolveConflicts', async () => {
+            const ok = await syncService.setup({ interactive: true });
+            if (ok) { await syncService.fullSync({ interactive: true }); }
         }),
         vscode.commands.registerCommand('tulcase.sync.resetToRemote', async () => {
             const confirm = await vscode.window.showWarningMessage(

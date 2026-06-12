@@ -9,8 +9,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as git from './git-cli';
+import { mergeStoreFile } from './data-merge';
 import { getRepoUrl, getPat } from './sync-config';
-import { DATABASES_ROOT, readActiveDb, writeActiveDb, type TulcaseSettings } from '../config';
+import { DATABASES_ROOT, writeActiveDb, type TulcaseSettings } from '../config';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ export type SyncStatus =
     | 'no-git'
     | 'idle'
     | 'syncing'
+    | 'conflict'
     | 'error';
 
 export interface SyncState {
@@ -26,6 +28,33 @@ export interface SyncState {
     lastSync?: string;       // ISO timestamp
     message?: string;        // Human-readable status text
     hasChanges?: boolean;
+}
+
+/** A conflicted file handed to the interactive resolver. */
+export interface ConflictFile {
+    /** Repo-relative path. */
+    path: string;
+    /** Friendly display name, e.g. `Notes · database "default"`. */
+    label: string;
+    base?: string;
+    ours?: string;
+    theirs?: string;
+}
+
+export type ConflictChoice = 'ours' | 'theirs';
+
+/**
+ * Interactive resolver delegate (the conflict panel).  Returns a decision
+ * per file, or undefined when the user cancelled.
+ */
+export type ConflictResolver = (
+    files: ConflictFile[],
+) => Promise<Map<string, ConflictChoice> | undefined>;
+
+/** How an integrate step should handle conflicts it cannot auto-merge. */
+export interface SyncOptions {
+    /** true: open the resolver UI; false: back off and notify (auto-sync). */
+    interactive?: boolean;
 }
 
 // ── Service ────────────────────────────────────────────────────────────────────
@@ -47,8 +76,18 @@ export class SyncService implements vscode.Disposable {
 
     get state(): SyncState { return { ...this._state }; }
 
+    /** True while a sync operation holds the lock (auto-sync skips then). */
+    get busy(): boolean { return this._lock; }
+
     /** The directory that is synced (rootDir itself). */
     private get dir(): string { return this.settings.rootDir; }
+
+    /** Interactive conflict resolver (wired to the conflict panel). */
+    private _resolver: ConflictResolver | undefined;
+
+    setConflictResolver(resolver: ConflictResolver): void {
+        this._resolver = resolver;
+    }
 
     dispose(): void {
         this._onStateChanged.dispose();
@@ -58,7 +97,7 @@ export class SyncService implements vscode.Disposable {
     // ── Public operations ──────────────────────────────────────────────────────
 
     /** Ensure the data dir is a git repo with origin set.  Returns false on failure. */
-    async setup(): Promise<boolean> {
+    async setup(opts: SyncOptions = {}): Promise<boolean> {
         return this._run('Setting up…', async (url, pat) => {
             // 1. Ensure git is available
             if (!(await git.gitAvailable())) {
@@ -91,13 +130,10 @@ export class SyncService implements vscode.Disposable {
                 await git.gitCommit(this.dir, this._autoMessage());
             }
 
-            // 7. If remote has commits, pull them in
+            // 7. If remote has commits, integrate them (auto-merging conflicts)
             if (await git.remoteHasCommits(this.dir, url, pat)) {
-                const pull = await git.gitPullRebase(this.dir, url, pat);
-                if (pull.code !== 0) {
-                    this._fail('Initial pull failed — the remote may have conflicts. ' + pull.stderr);
-                    return false;
-                }
+                const merged = await this._integrateRemote(url, pat, opts);
+                if (!merged) { return false; }
             }
 
             return true;
@@ -138,19 +174,19 @@ export class SyncService implements vscode.Disposable {
         });
     }
 
-    /** Fetch and pull (fast-forward only). */
-    async pull(): Promise<boolean> {
+    /**
+     * Pull remote changes.  Local commits are preserved (the remote is merged
+     * in), JSON store conflicts auto-merge semantically, and anything left
+     * over goes through the conflict resolver UI.
+     */
+    async pull(opts: SyncOptions = {}): Promise<boolean> {
         return this._run('Pulling…', async (url, pat) => {
-            const r = await git.gitPull(this.dir, url, pat);
-            if (r.code !== 0) {
-                // Distinguish between "already up to date" and real errors
-                if (r.stderr.includes('Not possible to fast-forward') || r.stderr.includes('CONFLICT')) {
-                    this._fail('Pull failed — remote has diverged. Please resolve manually.');
-                    return false;
-                }
-                this._fail('Pull failed: ' + r.stderr);
-                return false;
+            // Local edits must be committed before a merge can run safely.
+            if (await git.hasChanges(this.dir)) {
+                await git.gitAdd(this.dir);
+                await git.gitCommit(this.dir, this._autoMessage());
             }
+            if (!(await this._integrateRemote(url, pat, opts))) { return false; }
             this._setState({
                 status: 'idle',
                 message: 'Pulled successfully.',
@@ -160,8 +196,8 @@ export class SyncService implements vscode.Disposable {
         });
     }
 
-    /** Full sync: commit local changes → pull → push. */
-    async fullSync(): Promise<boolean> {
+    /** Full sync: commit local changes → integrate remote → push (with retry). */
+    async fullSync(opts: SyncOptions = {}): Promise<boolean> {
         return this._run('Syncing…', async (url, pat) => {
             // 1. Commit local changes
             if (await git.hasChanges(this.dir)) {
@@ -173,28 +209,9 @@ export class SyncService implements vscode.Disposable {
                 }
             }
 
-            // 2. Pull with rebase (handles the case where both sides have new commits)
-            if (await git.remoteHasCommits(this.dir, url, pat)) {
-                const p = await git.gitPullRebase(this.dir, url, pat);
-                if (p.code !== 0) {
-                    if (p.stderr.includes('CONFLICT')) {
-                        this._fail('Sync failed — conflicts detected. Please resolve manually.');
-                    } else if (!p.stderr.includes('up to date')) {
-                        this._fail('Pull failed: ' + p.stderr);
-                    }
-                    // If "up to date", that's fine — continue to push
-                    if (p.code !== 0 && !p.stderr.includes('up to date')) {
-                        return false;
-                    }
-                }
-            }
-
-            // 3. Push
-            const push = await git.gitPush(this.dir, url, pat);
-            if (push.code !== 0) {
-                this._fail('Push failed: ' + push.stderr);
-                return false;
-            }
+            // 2. Integrate remote (merge + auto-resolve), 3. push — retried
+            // once when another machine pushes between our merge and push.
+            if (!(await this._syncAndPush(url, pat, opts))) { return false; }
 
             this._setState({
                 status: 'idle',
@@ -202,6 +219,184 @@ export class SyncService implements vscode.Disposable {
                 lastSync: new Date().toISOString(),
             });
             return true;
+        });
+    }
+
+    // ── Remote integration (merge + conflict resolution) ──────────────────────
+
+    /** Integrate + push with retry on push races.  Expects a clean worktree. */
+    private async _syncAndPush(url: string, pat: string, opts: SyncOptions): Promise<boolean> {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (!(await this._integrateRemote(url, pat, opts))) { return false; }
+
+            if (!(await git.remoteHasCommits(this.dir, url, pat)) || (await git.aheadCount(this.dir)) > 0) {
+                const push = await git.gitPush(this.dir, url, pat);
+                if (push.code === 0) { return true; }
+                const raced = /fetch first|non-fast-forward|rejected/i.test(push.stderr);
+                if (!raced || attempt === 2) {
+                    this._fail('Push failed: ' + push.stderr);
+                    return false;
+                }
+                this._log.appendLine('[sync] Push raced with another machine — re-integrating…');
+                continue;
+            }
+            return true;  // nothing to push
+        }
+        return false;
+    }
+
+    /**
+     * Bring `origin/main` into the local branch.
+     *
+     *   - clean worktree assumed (callers commit first)
+     *   - fast-forwards when possible,
+     *   - merges otherwise,
+     *   - conflicted data stores merge semantically (see data-merge.ts),
+     *   - leftovers go to the resolver UI (interactive) or back off with a
+     *     "Resolve…" notification (auto-sync).
+     */
+    private async _integrateRemote(url: string, pat: string, opts: SyncOptions): Promise<boolean> {
+        // Recover from a merge a previous crash left behind.
+        if (await git.isMergeInProgress(this.dir)) {
+            this._log.appendLine('[sync] Aborting stale in-progress merge.');
+            await git.gitMergeAbort(this.dir);
+        }
+
+        if (!(await git.remoteHasCommits(this.dir, url, pat))) { return true; }
+
+        const fetch = await git.gitFetchMain(this.dir, url, pat);
+        if (fetch.code !== 0) {
+            this._fail('Fetch failed: ' + fetch.stderr);
+            return false;
+        }
+
+        const behind = await git.behindCount(this.dir);
+        if (behind === 0) { return true; }
+
+        const ahead = await git.aheadCount(this.dir);
+        if (ahead === 0) {
+            const ff = await git.gitMergeFfOnly(this.dir, 'origin/main');
+            if (ff.code !== 0) {
+                this._fail('Pull failed: ' + ff.stderr);
+                return false;
+            }
+            return true;
+        }
+
+        // Both sides moved — merge.
+        this._log.appendLine(`[sync] Diverged (ahead ${ahead}, behind ${behind}) — merging origin/main.`);
+        const merge = await git.gitMerge(this.dir, 'origin/main');
+        if (merge.code === 0) { return true; }
+
+        const conflicted = await git.listConflictedFiles(this.dir);
+        if (conflicted.length === 0) {
+            // Merge failed for a non-conflict reason.
+            await git.gitMergeAbort(this.dir);
+            this._fail('Merge failed: ' + (merge.stderr || merge.stdout));
+            return false;
+        }
+
+        // Pass 1: semantic auto-merge of known data stores.
+        const remaining = await this._autoResolveConflicts(conflicted);
+
+        // Pass 2: interactive resolution (or back off for auto-sync).
+        if (remaining.length > 0) {
+            if (!isInteractive(opts) || !this._resolver) {
+                await git.gitMergeAbort(this.dir);
+                this._enterConflictState(remaining);
+                return false;
+            }
+            const resolved = await this._resolveInteractively(remaining);
+            if (!resolved) {
+                await git.gitMergeAbort(this.dir);
+                this._setState({ status: 'idle', message: 'Sync cancelled — no changes applied.' });
+                return false;
+            }
+        }
+
+        const commit = await git.gitCommitMerge(this.dir, this._autoMessage() + ' (merge)');
+        if (commit.code !== 0) {
+            await git.gitMergeAbort(this.dir);
+            this._fail('Could not finish the merge: ' + commit.stderr);
+            return false;
+        }
+        this._log.appendLine('[sync] Merge completed.');
+        return true;
+    }
+
+    /** Try the semantic merger on every conflicted file; returns the leftovers. */
+    private async _autoResolveConflicts(conflicted: string[]): Promise<ConflictFile[]> {
+        const remaining: ConflictFile[] = [];
+
+        for (const file of conflicted) {
+            const [base, ours, theirs] = await Promise.all([
+                git.getStageContent(this.dir, file, 1),
+                git.getStageContent(this.dir, file, 2),
+                git.getStageContent(this.dir, file, 3),
+            ]);
+
+            // Modify/delete conflicts: the edited side wins (matches the
+            // item-level "edit beats delete" rule).
+            if (ours === undefined || theirs === undefined) {
+                const survivor = ours ?? theirs;
+                if (survivor !== undefined) {
+                    fs.mkdirSync(path.dirname(path.join(this.dir, file)), { recursive: true });
+                    fs.writeFileSync(path.join(this.dir, file), survivor, 'utf-8');
+                }
+                await git.stageFile(this.dir, file);
+                this._log.appendLine(`[sync] Auto-resolved (edit beats delete): ${file}`);
+                continue;
+            }
+
+            const merged = mergeStoreFile(file, base, ours, theirs);
+            if (merged) {
+                fs.writeFileSync(path.join(this.dir, file), merged.text, 'utf-8');
+                await git.stageFile(this.dir, file);
+                this._log.appendLine(
+                    `[sync] Auto-merged ${file}` +
+                    (merged.softConflicts > 0
+                        ? ` (${merged.softConflicts} double edit(s) resolved by newest change)`
+                        : ''),
+                );
+                continue;
+            }
+
+            remaining.push({ path: file, label: friendlyStoreName(file), base, ours, theirs });
+        }
+
+        return remaining;
+    }
+
+    /** Hand the leftovers to the resolver UI and apply the user's choices. */
+    private async _resolveInteractively(files: ConflictFile[]): Promise<boolean> {
+        this._setState({ status: 'conflict', message: 'Waiting for conflict resolution…' });
+        const choices = await this._resolver!(files);
+        if (!choices) { return false; }
+
+        for (const file of files) {
+            const side = choices.get(file.path) ?? 'ours';
+            await git.takeConflictSide(this.dir, file.path, side);
+            this._log.appendLine(`[sync] Resolved ${file.path} → ${side === 'ours' ? 'local' : 'remote'}`);
+        }
+        this._setState({ status: 'syncing', message: 'Finishing merge…' });
+        return true;
+    }
+
+    /** Auto-sync hit unresolvable conflicts: notify with a resolve action. */
+    private _enterConflictState(files: ConflictFile[]): void {
+        const names = files.slice(0, 3).map(f => f.label).join(', ')
+            + (files.length > 3 ? ` and ${files.length - 3} more` : '');
+        this._setState({
+            status: 'conflict',
+            message: `Sync conflict in ${names}. Run "Resolve Conflicts" to choose a version.`,
+        });
+        void vscode.window.showWarningMessage(
+            `Tulcase Sync: conflicting changes in ${names}.`,
+            'Resolve Conflicts',
+        ).then(pick => {
+            if (pick === 'Resolve Conflicts') {
+                void vscode.commands.executeCommand('tulcase.sync.resolveConflicts');
+            }
         });
     }
 
@@ -317,6 +512,14 @@ export class SyncService implements vscode.Disposable {
             return;
         }
 
+        if (await git.isMergeInProgress(this.dir)) {
+            this._setState({
+                status: 'conflict',
+                message: 'A merge is in progress. Run "Resolve Conflicts" to choose a version.',
+            });
+            return;
+        }
+
         const changes = await git.hasChanges(this.dir);
         const lastCommit = await git.lastCommitTime(this.dir);
 
@@ -389,5 +592,33 @@ export class SyncService implements vscode.Disposable {
             if (existing === desired) { return; }
         } catch { /* does not exist */ }
         fs.writeFileSync(gitignorePath, desired, 'utf-8');
+    }
+}
+
+function isInteractive(opts: SyncOptions): boolean {
+    return opts.interactive !== false;
+}
+
+function friendlyStoreName(file: string): string {
+    const normalized = file.replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    const dataIndex = parts.indexOf(DATABASES_ROOT);
+    const database = dataIndex >= 0 ? parts[dataIndex + 1] : undefined;
+    const store = dataIndex >= 0 ? parts[dataIndex + 2] : undefined;
+
+    const label = storeName(store, path.basename(normalized));
+    return database ? `${label} - database "${database}"` : label;
+}
+
+function storeName(store: string | undefined, fallback: string): string {
+    switch (store) {
+        case 'todo_db': return 'Todos';
+        case 'commands_db': return 'Commands';
+        case 'lists_db': return 'Notes';
+        case 'links_db': return 'Links';
+        case 'tags_db': return 'Tags';
+        case 'records_db': return 'Records';
+        case 'pipe_db': return 'Pipe scopes';
+        default: return fallback || 'Data file';
     }
 }

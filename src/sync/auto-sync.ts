@@ -8,7 +8,7 @@
  */
 import * as vscode from 'vscode';
 import { SyncService } from './sync-service';
-import { getAutoSync, getRepoUrl, getPat, isConfigured } from './sync-config';
+import { getAutoSync, isConfigured } from './sync-config';
 
 const DEBOUNCE_MS = 5_000;
 
@@ -47,11 +47,12 @@ export class AutoSync implements vscode.Disposable {
     private async _initialPull(): Promise<void> {
         if (!getAutoSync()) { return; }
         if (!(await isConfigured(this.secrets))) { return; }
+        if (this.syncService.busy) { return; }
 
         try {
             this._selfWrite = true;
-            await this.syncService.setup();
-            await this.syncService.pull();
+            await this.syncService.setup({ interactive: false });
+            await this.syncService.pull({ interactive: false });
         } catch {
             // Network errors are non-fatal on startup
         } finally {
@@ -72,11 +73,12 @@ export class AutoSync implements vscode.Disposable {
 
     private async _autoCommitPush(): Promise<void> {
         if (!(await isConfigured(this.secrets))) { return; }
+        if (this.syncService.busy) { return; }
 
         try {
             this._selfWrite = true;
-            await this.syncService.setup();
-            await this.syncService.fullSync();
+            await this.syncService.setup({ interactive: false });
+            await this.syncService.fullSync({ interactive: false });
         } catch {
             // Network errors are non-fatal for auto-sync
         } finally {

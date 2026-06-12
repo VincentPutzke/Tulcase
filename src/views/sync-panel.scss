@@ -47,6 +47,7 @@ body {
 
   &.idle      { background: $green; }
   &.syncing   { background: $yellow; animation: pulse 1s infinite; }
+  &.conflict  { background: $yellow; }
   &.error     { background: $red; }
   &.not-configured { background: rgba(128, 128, 128, 0.4); }
   &.no-git    { background: rgba(128, 128, 128, 0.4); }
