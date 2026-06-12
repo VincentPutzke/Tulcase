@@ -36,6 +36,7 @@ import { RecordCalendarViewProvider } from './views/record-calendar.view';
 import { registerTodoCommands } from './commands/todo-commands';
 import { registerTagCommands } from './commands/tag-commands';
 import { registerCommandCommands } from './commands/command-commands';
+import { registerScriptCommands } from './commands/script-commands';
 import { registerLinkCommands } from './commands/link-commands';
 import { registerListCommands } from './commands/list-commands';
 import { registerRecordCommands } from './commands/record-commands';
@@ -165,6 +166,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerTodoCommands(context, settings, todoList, tagTree);
     registerTagCommands(context, settings, tagList, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);
+    registerScriptCommands(context, settings, scriptList, tagTree);
     registerLinkCommands(context, settings, linkList);
     registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);

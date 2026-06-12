@@ -228,6 +228,24 @@
         "icon": "$(terminal)"
       },
       {
+        "command": "tulcase.script.add",
+        "title": "Add Script",
+        "category": "Tulcase",
+        "icon": "$(add)"
+      },
+      {
+        "command": "tulcase.script.open",
+        "title": "Open Script",
+        "category": "Tulcase",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "tulcase.script.run",
+        "title": "Run Script",
+        "category": "Tulcase",
+        "icon": "$(play)"
+      },
+      {
         "command": "tulcase.link.add",
         "title": "Add Link",
         "category": "Tulcase",
@@ -430,6 +448,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "tulcase.script.add",
+          "when": "view == tulcase.scripts",
+          "group": "navigation@1"
+        },
         {
           "command": "tulcase.tag.add",
           "when": "view == tulcase.tags",
