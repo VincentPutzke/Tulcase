@@ -41,6 +41,11 @@ export class PipeStatusBar implements vscode.Disposable {
         void this._refreshScopesFlag();
     }
 
+    /** Re-read scope presence (also for external file changes / DB switches). */
+    async refreshScopes(): Promise<void> {
+        await this._refreshScopesFlag();
+    }
+
     private async _refreshScopesFlag(): Promise<void> {
         this._hasScopes = (await this.scopes.listScopes()).some(s => s.enabled);
         this.update();

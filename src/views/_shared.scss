@@ -508,3 +508,35 @@ body.drag-active {
   color      : var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.6));
   font-size  : 12px;
 }
+
+// ── Inline banner (error / info) ──────────────────────────────────────────────
+.banner {
+  background    : var(--vscode-inputValidation-errorBackground, rgba(244, 67, 54, 0.18));
+  color         : var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
+  border        : 1px solid var(--vscode-inputValidation-errorBorder, rgba(244, 67, 54, 0.45));
+  border-radius : 4px;
+  padding       : 6px 8px;
+  margin        : 0 0 8px 0;
+  font-size     : 11.5px;
+  display       : flex;
+  align-items   : center;
+  gap           : 8px;
+  word-break    : break-word;
+
+  &.banner-info {
+    background   : rgba(76, 175, 80, 0.10);
+    border-color : rgba(76, 175, 80, 0.45);
+    color        : var(--vscode-foreground);
+  }
+}
+
+.banner-close {
+  margin-left : auto;
+  background  : transparent;
+  border      : none;
+  color       : inherit;
+  cursor      : pointer;
+  font-size   : 14px;
+  padding     : 0 2px;
+  flex-shrink : 0;
+}

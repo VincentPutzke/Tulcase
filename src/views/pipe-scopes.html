@@ -574,6 +574,13 @@
     if (!form || !scopeForm) { return; }
     const d = scopeForm.draft;
 
+    // Keep the draft current on every keystroke so re-renders (chip clicks,
+    // picker roundtrips, data refreshes) never lose typed text.
+    ['sf-label', 'sf-branch', 'sf-user', 'sf-contains', 'sf-lastn', 'sf-since'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.addEventListener('input', syncScopeDraft); }
+    });
+
     function addProjectFromInput() {
       const input = document.getElementById('sf-project-input');
       const v = input.value.trim();
@@ -758,7 +765,9 @@
       tagMap       = msg.tagMap || {};
       hasToken     = !!msg.hasToken;
       gotData      = true;
-      render();
+      // Never re-render over an open editor form — the fresh state is
+      // applied when the form closes (save/cancel both re-render).
+      if (!scopeForm && !ruleForm) { render(); }
     } else if (msg.type === 'toast') {
       showToast(msg.text, msg.kind);
     } else if (msg.type === 'projectPicked') {

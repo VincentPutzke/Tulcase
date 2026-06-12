@@ -22,6 +22,13 @@ export class LogDocumentProvider
         );
     }
 
+    /** Inverse of `uriFor` — extract the job id, or undefined for foreign URIs. */
+    static jobIdFromUri(uri: vscode.Uri): number | undefined {
+        if (uri.scheme !== LogDocumentProvider.scheme) { return undefined; }
+        const jobId = Number(uri.path.split('/')[2]);
+        return Number.isFinite(jobId) ? jobId : undefined;
+    }
+
     provideTextDocumentContent(uri: vscode.Uri): string {
         return this._buffers.get(uri.toString()) ?? '';
     }

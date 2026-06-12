@@ -23,13 +23,13 @@ import type { TagDef, TagStore } from '../models/tag.model';
 
 const store = new JsonStore();
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers (shared with pipe-tools.ts) ──────────────────────────────────────
 
-function text(value: string): vscode.LanguageModelToolResult {
+export function text(value: string): vscode.LanguageModelToolResult {
     return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(value)]);
 }
 
-function json(value: unknown): vscode.LanguageModelToolResult {
+export function json(value: unknown): vscode.LanguageModelToolResult {
     return text(JSON.stringify(value, null, 2));
 }
 

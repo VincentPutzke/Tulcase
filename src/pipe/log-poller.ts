@@ -46,6 +46,10 @@ export class JobLogSession {
     private _disposed = false;
     private _inFlight = false;
     private _buffer = '';
+    /** Held-back partial last line (rules are line-based; trace chunks split
+     *  mid-line, so incomplete lines wait for their newline — or the final
+     *  flush — before rules run). Only used when rules are active. */
+    private _pendingTail = '';
     private _terminalSeen = false;
     private _finalFlushDone = false;
     private readonly _rules: CompiledRule[];
@@ -93,15 +97,7 @@ export class JobLogSession {
             const chunk = await this.client.getJobTrace(
                 this.job.projectId, this.job.id, this._offset, this._abort.signal,
             );
-            if (chunk.replace) {
-                const transformed = LogRuleEngine.apply(chunk.text, this._rules);
-                this._buffer = transformed;
-                this._onLogChunk.fire({ jobId: this.job.id, text: transformed, replace: true });
-            } else if (chunk.text.length > 0) {
-                const transformed = LogRuleEngine.apply(chunk.text, this._rules);
-                this._buffer += transformed;
-                this._onLogChunk.fire({ jobId: this.job.id, text: transformed });
-            }
+            this._consume(chunk.text, Boolean(chunk.replace));
             this._offset = chunk.nextOffset;
         } catch (err) {
             if (!isAbort(err)) {
@@ -124,8 +120,50 @@ export class JobLogSession {
                 // Schedule one final flush (next tick) before declaring done.
             } else if (!this._finalFlushDone) {
                 this._finalFlushDone = true;
+                this._flushTail();
                 this._onLogChunk.fire({ jobId: this.job.id, text: '', isFinal: true });
             }
+        }
+    }
+
+    /** Apply rules and append/replace, holding back the trailing partial line. */
+    private _consume(text: string, replace: boolean): void {
+        if (this._rules.length === 0) {
+            // No transformation — no need to delay partial lines.
+            if (replace) {
+                this._buffer = text;
+                this._onLogChunk.fire({ jobId: this.job.id, text, replace: true });
+            } else if (text.length > 0) {
+                this._buffer += text;
+                this._onLogChunk.fire({ jobId: this.job.id, text });
+            }
+            return;
+        }
+
+        if (replace) { this._pendingTail = ''; }
+        const combined = this._pendingTail + text;
+        const cut = combined.lastIndexOf('\n');
+        const complete = cut >= 0 ? combined.slice(0, cut + 1) : '';
+        this._pendingTail = cut >= 0 ? combined.slice(cut + 1) : combined;
+
+        const transformed = complete ? LogRuleEngine.apply(complete, this._rules) : '';
+        if (replace) {
+            this._buffer = transformed;
+            this._onLogChunk.fire({ jobId: this.job.id, text: transformed, replace: true });
+        } else if (transformed.length > 0) {
+            this._buffer += transformed;
+            this._onLogChunk.fire({ jobId: this.job.id, text: transformed });
+        }
+    }
+
+    /** Run rules over a held-back final partial line (job finished without newline). */
+    private _flushTail(): void {
+        if (!this._pendingTail) { return; }
+        const transformed = LogRuleEngine.apply(this._pendingTail, this._rules);
+        this._pendingTail = '';
+        if (transformed.length > 0) {
+            this._buffer += transformed;
+            this._onLogChunk.fire({ jobId: this.job.id, text: transformed });
         }
     }
 

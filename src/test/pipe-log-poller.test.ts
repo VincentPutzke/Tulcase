@@ -85,11 +85,11 @@ describe('JobLogSession', () => {
         expect(session.snapshot()).toBe('rewritten');
     });
 
-    it('applies log rules to chunks', async () => {
+    it('applies log rules to complete lines', async () => {
         const { job, store } = makeJob('running');
         const client = {
             getJobTrace: vi.fn(async () => ({
-                text: '2026-01-01T00:00:00Z npm ok', nextOffset: 1, complete: false,
+                text: '2026-01-01T00:00:00Z npm ok\n', nextOffset: 1, complete: false,
             })),
         } as unknown as GitLabClient;
 
@@ -99,6 +99,32 @@ describe('JobLogSession', () => {
         );
         await session.start();
         session.dispose();
-        expect(session.snapshot()).toBe('npm ok');
+        expect(session.snapshot()).toBe('npm ok\n');
+    });
+
+    it('holds back partial lines so rules never see split lines', async () => {
+        const { job, store } = makeJob('success');
+        // The timestamp is split across two chunks — a per-chunk transform
+        // would treat each half as its own line and mangle it.
+        const chunks = ['2026-01-01T00:0', '0:00Z keep me\ntail without newline'];
+        let call = 0;
+        const client = {
+            getJobTrace: vi.fn(async () => ({
+                text: chunks[call++] ?? '', nextOffset: call, complete: false,
+            })),
+        } as unknown as GitLabClient;
+
+        const session = new JobLogSession(
+            job, client, () => ({ logPollIntervalSeconds: 0.01 }), store,
+            [{ regex: /\d{4}-\d{2}-\d{2}T[\d:.]+Z ?/g, mode: 'remove', replacement: '' }],
+        );
+        await session.start();
+        await new Promise(r => setTimeout(r, 200));
+        session.dispose();
+
+        // Line 1 transformed once it completed; the trailing partial line
+        // was flushed (and transformed) on the final flush.
+        expect(session.snapshot()).toBe('keep me\ntail without newline');
+        expect(session.isComplete).toBe(true);
     });
 });

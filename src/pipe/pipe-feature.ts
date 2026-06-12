@@ -55,6 +55,7 @@ export class PipeFeature implements vscode.Disposable {
 
     private _viewVisible = false;
     private _hasFollowed = false;
+    private _lastScopesPath: string | undefined;
 
     constructor(
         context: vscode.ExtensionContext,
@@ -135,36 +136,54 @@ export class PipeFeature implements vscode.Disposable {
 
         // ── Reactions ─────────────────────────────────────────────────────
         this._subs.push(
-            // Scope changes (UI edits or git sync) refresh follow state + data.
+            // Scope changes (UI edits) refresh follow state + data.  The
+            // tick runs even in mode 'off' so the store reflects the edit
+            // immediately (the poller only schedules when active).
             this.scopeStore.onDidChange(() => {
-                void this._refreshFollowFlag().then(() => {
-                    if (this.poller.mode !== 'off') { void this.poller.tickNow(); }
-                });
+                void this._refreshFollowFlag().then(() => this.poller.tickNow());
             }),
         );
         this._disposables.push(
             onPipeConfigChange(() => {
                 this.statusBar.update();
-                if (this.poller.mode !== 'off') { void this.poller.tickNow(); }
+                void this.poller.tickNow();
             }),
+        );
+
+        // Everything constructed above is disposed together.
+        this._disposables.push(
+            this.poller, this.logPoller, this.logLens, this.logDoc, this.ansi,
+            this.notifier, this.statusBar, this.pipelinesView, this.scopesView,
+            this.pipelineStore, this.scopeStore, this.secrets,
         );
 
         // Initial follow state (enables background polling without the view).
         void this._refreshFollowFlag();
     }
 
-    /** Re-read scopes and push fresh data into both views (e.g. on DB switch). */
+    /**
+     * Re-read scopes and push fresh data into both views.  Called from
+     * refreshAll (sync cycles, DB commands) — polling is only forced when
+     * the scope source actually moved (database switch), otherwise the
+     * active poll schedule handles it.
+     */
     refresh(): void {
         this.pipelinesView.refresh();
         this.scopesView.refresh();
-        this.statusBar.update();
+        void this.statusBar.refreshScopes();
+        const pathChanged = this._lastScopesPath !== undefined
+            && this._lastScopesPath !== this.scopeStore.filePath;
+        this._lastScopesPath = this.scopeStore.filePath;
         void this._refreshFollowFlag().then(() => {
-            if (this.poller.mode !== 'off') { void this.poller.tickNow(); }
+            if (pathChanged || this.poller.mode !== 'off') {
+                void this.poller.tickNow();
+            }
         });
     }
 
     /** The scopes file changed on disk (git sync / external edit). */
     onScopesFileChanged(): void {
+        this.scopeStore.invalidate();
         this.refresh();
     }
 
@@ -182,17 +201,5 @@ export class PipeFeature implements vscode.Disposable {
     dispose(): void {
         for (const s of this._subs) { s.dispose(); }
         for (const d of this._disposables) { d.dispose(); }
-        this.poller.dispose();
-        this.logPoller.dispose();
-        this.logLens.dispose();
-        this.logDoc.dispose();
-        this.ansi.dispose();
-        this.notifier.dispose();
-        this.statusBar.dispose();
-        this.pipelinesView.dispose();
-        this.scopesView.dispose();
-        this.pipelineStore.dispose();
-        this.scopeStore.dispose();
-        this.secrets.dispose();
     }
 }

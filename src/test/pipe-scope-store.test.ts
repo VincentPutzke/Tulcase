@@ -119,6 +119,47 @@ describe('PipeScopeStore — custom rules', () => {
     });
 });
 
+describe('PipeScopeStore — id stability', () => {
+    it('persists generated ids for hand-written scopes (stable across reads)', async () => {
+        // Simulate "Edit as JSON" output without ids.
+        fs.writeFileSync(
+            path.join(dir, 'scopes.json'),
+            JSON.stringify({ scopes: [{ label: 'Hand', projects: ['g/p'] }], logRules: [] }),
+            'utf-8',
+        );
+        const first = await store.listScopes();
+        // Fresh store instance = no cache: ids must come from the repaired file.
+        const second = await new PipeScopeStore({ pipeScopesFile: path.join(dir, 'scopes.json') })
+            .listScopes();
+        expect(first[0].id).toBeTruthy();
+        expect(second[0].id).toBe(first[0].id);
+    });
+
+    it('does not rewrite the file when entries were dropped (hand-edit in progress)', async () => {
+        const payload = JSON.stringify({
+            scopes: [
+                { label: 'NoId', projects: ['g/p'] },
+                { label: 'Broken', projects: [] },
+            ],
+            logRules: [],
+        });
+        fs.writeFileSync(path.join(dir, 'scopes.json'), payload, 'utf-8');
+        await store.listScopes();
+        expect(fs.readFileSync(path.join(dir, 'scopes.json'), 'utf-8')).toBe(payload);
+    });
+
+    it('serves cached reads and invalidates on demand', async () => {
+        await store.upsertScope(scope({ label: 'Cached' }));
+        const a = await store.read();
+        const b = await store.read();
+        expect(b).toBe(a);  // same snapshot object — no disk re-read
+        store.invalidate();
+        const c = await store.read();
+        expect(c).not.toBe(a);
+        expect(c.scopes[0].label).toBe('Cached');
+    });
+});
+
 describe('PipeScopeStore — legacy import', () => {
     it('imports the legacy flat-array format', async () => {
         const result = await store.importLegacy([

@@ -19,7 +19,12 @@
 
 import * as vscode from 'vscode';
 import { LogDocumentProvider } from './log-document';
-import { AnsiDecorationManager, parseAnsi, type SpanInfo } from './ansi';
+import {
+    AnsiDecorationManager,
+    parseAnsi,
+    type AnsiParseState,
+    type SpanInfo,
+} from './ansi';
 import type { LogPoller } from './log-poller';
 import type { Job } from './models';
 import type { Subscription } from './events';
@@ -30,10 +35,16 @@ export class LogLens implements vscode.Disposable {
     /** The single reusable "switch" slot (plain-click opens). */
     private _switchUri: string | undefined;
 
-    /** Per-document state, keyed by uri.toString(). */
+    /** Logs the user pinned via ctrl/cmd-click — never auto-closed. */
+    private readonly _pinned = new Set<string>();
+
+    /** Per-document state, keyed by uri.toString().  `clean`/`parse` carry
+     *  the incrementally parsed buffer so chunks don't re-parse the whole log. */
     private readonly _docs = new Map<string, {
         jobId: number;
         spans: SpanInfo[];
+        clean: string;
+        parse: AnsiParseState;
         lineCount: number;
         chunkSub: Subscription;
     }>();
@@ -77,23 +88,54 @@ export class LogLens implements vscode.Disposable {
         const initial = parseAnsi(session.snapshot());
         this.logDoc.setLog(uri, initial.clean);
 
-        // Subscribe once per document to live chunks.
+        // Subscribe once per document to live chunks.  Chunks are parsed
+        // incrementally — only `replace` chunks re-parse from scratch.
         if (!this._docs.has(key)) {
-            const chunkSub = session.onLogChunk(() => {
-                const full = parseAnsi(session.snapshot());
+            const chunkSub = session.onLogChunk(evt => {
                 const state = this._docs.get(key);
-                if (state) { state.spans = full.spans; }
+                if (!state) { return; }
+                if (evt.replace) {
+                    const full = parseAnsi(session.snapshot());
+                    state.spans = full.spans;
+                    state.clean = full.clean;
+                    state.parse = full.state;
+                } else if (evt.text) {
+                    const part = parseAnsi(evt.text, state.parse);
+                    state.spans.push(...part.spans);
+                    state.clean += part.clean;
+                    state.parse = part.state;
+                } else {
+                    return;  // final-flush marker without text
+                }
                 // Triggers onDidChangeTextDocument → decorations + tail follow.
-                this.logDoc.setLog(uri, full.clean);
+                this.logDoc.setLog(uri, state.clean);
             });
-            this._docs.set(key, { jobId: job.id, spans: initial.spans, lineCount: 0, chunkSub });
+            this._docs.set(key, {
+                jobId: job.id,
+                spans: initial.spans,
+                clean: initial.clean,
+                parse: initial.state,
+                lineCount: 0,
+                chunkSub,
+            });
         } else {
             const state = this._docs.get(key)!;
             state.spans = initial.spans;
+            state.clean = initial.clean;
+            state.parse = initial.state;
         }
 
+        // Pinning: ctrl/cmd-click marks the log as pinned; pinned logs are
+        // never used as (or closed by) the switch slot.
+        if (opts.newTab) {
+            this._pinned.add(key);
+            if (this._switchUri === key) { this._switchUri = undefined; }
+        }
+        const isPinned = this._pinned.has(key);
+
         const previousSwitch = this._switchUri;
-        const reuseSlot = !opts.newTab && previousSwitch !== undefined && previousSwitch !== key;
+        const reuseSlot = !opts.newTab && !isPinned
+            && previousSwitch !== undefined && previousSwitch !== key;
 
         // Open in the column of the previous switch tab so the "slot" stays put.
         const slotColumn = reuseSlot ? findTab(previousSwitch!)?.group.viewColumn : undefined;
@@ -110,7 +152,7 @@ export class LogLens implements vscode.Disposable {
         this._applyDecorations(editor);
         this._revealTail(editor);
 
-        if (!opts.newTab) {
+        if (!opts.newTab && !isPinned) {
             this._switchUri = key;
             // Context switch: close the previous switch-slot tab.
             if (reuseSlot) {
@@ -142,6 +184,7 @@ export class LogLens implements vscode.Disposable {
                 this._docs.delete(key);
             }
             this.logDoc.forget(uri);
+            this._pinned.delete(key);
             if (this._switchUri === key) {
                 this._switchUri = undefined;
             }

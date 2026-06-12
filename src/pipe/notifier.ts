@@ -88,8 +88,19 @@ export class PipeNotifier implements vscode.Disposable {
 
     private _pruneOpenedJobs(): void {
         if (this.openedJobs.size === 0) { return; }
+        // One walk over the store instead of a full findJob scan per entry.
+        const live = new Set<number>();
+        const collect = (jobs: ReadonlyArray<{ id: number; children?: ReadonlyArray<unknown> }>): void => {
+            for (const j of jobs) {
+                live.add(j.id);
+                if (j.children) { collect(j.children as typeof jobs); }
+            }
+        };
+        for (const { pipelines } of this.store.snapshot()) {
+            for (const p of pipelines) { collect(p.jobs); }
+        }
         for (const id of Array.from(this.openedJobs)) {
-            if (!this.store.findJob(id)) { this.openedJobs.delete(id); }
+            if (!live.has(id)) { this.openedJobs.delete(id); }
         }
     }
 

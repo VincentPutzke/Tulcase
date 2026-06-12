@@ -37,6 +37,23 @@ export class GitLabSecrets implements vscode.Disposable {
         await this.secrets.delete(PIPE_SECRET_KEY);
     }
 
+    /**
+     * Gate an action on a stored token: when none exists, offer to set one.
+     * Returns true when a token is available afterwards.
+     */
+    async ensureToken(actionDescription: string): Promise<boolean> {
+        if (await this.getToken()) { return true; }
+        const pick = await vscode.window.showWarningMessage(
+            `${actionDescription} requires a GitLab token.`,
+            'Set Token',
+        );
+        if (pick === 'Set Token') {
+            await vscode.commands.executeCommand('tulcase.pipe.setToken');
+            return Boolean(await this.getToken());
+        }
+        return false;
+    }
+
     /** Prompt the user for a token via input box and persist it. */
     async promptAndStore(): Promise<string | undefined> {
         const value = await vscode.window.showInputBox({

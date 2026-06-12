@@ -105,6 +105,27 @@ export function mergeRuleDefinitions(
     return [...BUILTIN_LOG_RULES, ...custom];
 }
 
+/**
+ * Coerce an untyped object into a `LogRuleDefinition`.
+ * Returns `undefined` when name or pattern are unusable.  The single home
+ * for rule coercion — file reads, form saves, and legacy imports all use it.
+ */
+export function normalizeRule(raw: unknown): LogRuleDefinition | undefined {
+    if (!raw || typeof raw !== 'object') { return undefined; }
+    const r = raw as Record<string, unknown>;
+    if (typeof r.name !== 'string' || !r.name.trim()) { return undefined; }
+    if (typeof r.pattern !== 'string' || !r.pattern) { return undefined; }
+    const def: LogRuleDefinition = {
+        name: r.name,
+        pattern: r.pattern,
+        mode: r.mode === 'replace' ? 'replace' : 'remove',
+    };
+    if (typeof r.flags === 'string' && r.flags.trim())             { def.flags = r.flags.trim(); }
+    if (typeof r.replacement === 'string')                         { def.replacement = r.replacement; }
+    if (typeof r.description === 'string' && r.description.trim()) { def.description = r.description.trim(); }
+    return def;
+}
+
 /** Validate a rule definition; returns an error message or undefined. */
 export function validateRule(rule: Partial<LogRuleDefinition>): string | undefined {
     if (!rule.name || !rule.name.trim()) { return 'Rule name is required.'; }

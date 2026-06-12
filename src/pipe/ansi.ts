@@ -58,7 +58,21 @@ function styleKey(s: Style): string {
     return `${s.fg || ''}|${s.bg || ''}|${s.bold ? 'B' : ''}|${s.dim ? 'D' : ''}|${s.italic ? 'I' : ''}|${s.underline ? 'U' : ''}`;
 }
 
-const CSI_REGEX = new RegExp(`${ESC}\\[([0-9;]*)m`, 'g');
+const BEL = String.fromCharCode(7);
+
+/**
+ * Matches every ANSI escape sequence:
+ *   - CSI sequences (group 1 = params, group 2 = intermediates+final byte;
+ *     only the SGR final byte `m` affects styling, the rest are stripped),
+ *   - OSC sequences (terminated by BEL or ST),
+ *   - other single-character Fe escapes.
+ */
+const ANSI_SEQ_REGEX = new RegExp(
+    `${ESC}\\[([0-9;?]*)([ -/]*[@-~])` +
+    `|${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)` +
+    `|${ESC}[@-Z\\\\^_]`,
+    'g',
+);
 
 export interface SpanInfo {
     /** 0-based line */
@@ -71,26 +85,44 @@ export interface SpanInfo {
 }
 
 /**
- * Parse text that still contains ANSI sequences and return:
- *   - `clean`: the text with all SGR sequences stripped.
- *   - `spans`: decoration ranges keyed by style.
+ * Carry-over state for incremental parsing: position and active style at the
+ * end of the previously parsed text.  Pass the returned `state` back in to
+ * parse only the newly appended chunk instead of the whole buffer.
  */
-export function parseAnsi(raw: string): { clean: string; spans: SpanInfo[] } {
+export interface AnsiParseState {
+    line: number;
+    col: number;
+    style: Style;
+}
+
+/**
+ * Parse text that still contains ANSI sequences and return:
+ *   - `clean`: the text with ALL ANSI sequences stripped,
+ *   - `spans`: decoration ranges keyed by style (line/col offsets continue
+ *     from `prior` when given),
+ *   - `state`: carry-over for the next incremental call.
+ */
+export function parseAnsi(
+    raw: string,
+    prior?: AnsiParseState,
+): { clean: string; spans: SpanInfo[]; state: AnsiParseState } {
     const spans: SpanInfo[] = [];
     let clean = '';
-    let line = 0;
-    let col = 0;
+    let line = prior?.line ?? 0;
+    let col = prior?.col ?? 0;
     let cursor = 0;
-    const current: Style = {};
+    const current: Style = prior ? { ...prior.style } : {};
 
-    for (const m of raw.matchAll(CSI_REGEX)) {
+    for (const m of raw.matchAll(ANSI_SEQ_REGEX)) {
         // Text before this escape sequence.
         const before = raw.slice(cursor, m.index);
         if (before.length > 0) {
             appendText(before, current);
         }
-        // Parse the SGR parameters.
-        parseSgr(m[1], current);
+        // Only SGR sequences change styling; everything else is stripped.
+        if (m[2] === 'm') {
+            parseSgr(m[1], current);
+        }
         cursor = m.index + m[0].length;
     }
     // Trailing text after last escape.
@@ -98,7 +130,7 @@ export function parseAnsi(raw: string): { clean: string; spans: SpanInfo[] } {
         appendText(raw.slice(cursor), current);
     }
 
-    return { clean, spans };
+    return { clean, spans, state: { line, col, style: { ...current } } };
 
     function appendText(text: string, style: Style): void {
         const hasStyle = style.fg || style.bg || style.bold || style.dim || style.italic || style.underline;

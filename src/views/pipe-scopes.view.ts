@@ -4,10 +4,9 @@ import type { TagTreeProvider } from '../providers/tag-tree.provider';
 import type { PipeScopeStore } from '../pipe/scope-store';
 import type { GitLabSecrets } from '../pipe/secrets';
 import type { GitLabClient } from '../pipe/gitlab-client';
-import { describeApiError } from '../pipe/gitlab-client';
+import { pickProjectViaSearch } from '../pipe/pickers';
 import { BUILTIN_LOG_RULES, validateRule, type LogRuleDefinition } from '../pipe/log-rules';
-import { normalizeScope, ALL_STATUSES } from '../pipe/models';
-import { generateId } from '../utils/id';
+import { ALL_STATUSES } from '../pipe/models';
 import { pickTags } from '../data/tag-picker';
 import type { Subscription } from '../pipe/events';
 import { BaseListViewProvider } from './base-list.view';
@@ -55,7 +54,6 @@ export class PipeScopesViewProvider extends BaseListViewProvider implements vsco
         direction?: string;
         value?: boolean;
         current?: string[];
-        requestId?: number;
     }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
@@ -98,10 +96,10 @@ export class PipeScopesViewProvider extends BaseListViewProvider implements vsco
 
             // ── Pickers (roundtrips into native QuickPicks) ───────────────
             case 'pickProject':
-                await this._pickProject(msg.requestId);
+                await this._pickProject();
                 break;
             case 'pickTagsForForm':
-                await this._pickTagsForForm(msg.current ?? [], msg.requestId);
+                await this._pickTagsForForm(msg.current ?? []);
                 break;
 
             // ── Misc ──────────────────────────────────────────────────────
@@ -109,10 +107,10 @@ export class PipeScopesViewProvider extends BaseListViewProvider implements vsco
                 await vscode.commands.executeCommand('tulcase.pipe.setToken');
                 break;
             case 'editJson':
-                await this._openJson();
+                await vscode.commands.executeCommand('tulcase.pipe.editScopesJson');
                 break;
             case 'importLegacy':
-                await this._importLegacy();
+                await vscode.commands.executeCommand('tulcase.pipe.importScopes');
                 break;
             case 'openPipelines':
                 await vscode.commands.executeCommand('tulcase.pipePipelines.focus');
@@ -145,14 +143,10 @@ export class PipeScopesViewProvider extends BaseListViewProvider implements vsco
     // ── Scope operations ───────────────────────────────────────────────────────
 
     private async _saveScope(raw: unknown): Promise<void> {
-        const scope = normalizeScope(raw, generateId('scope'));
-        if (!scope) {
-            this._toast('A scope needs at least one project.', 'error');
-            return;
-        }
         try {
-            await this.scopes.upsertScope(scope);
-            this._toast(`Scope "${scope.label}" saved.`);
+            // upsertScope is the single normalization/validation point.
+            const saved = await this.scopes.upsertScope(raw);
+            this._toast(`Scope "${saved.label}" saved.`);
         } catch (err) {
             this._toast(err instanceof Error ? err.message : String(err), 'error');
         }
@@ -197,63 +191,19 @@ export class PipeScopesViewProvider extends BaseListViewProvider implements vsco
     // ── Pickers ────────────────────────────────────────────────────────────────
 
     /** GitLab project search → QuickPick → send the chosen path to the form. */
-    private async _pickProject(requestId?: number): Promise<void> {
-        if (!(await this.secrets.getToken())) {
-            const pick = await vscode.window.showWarningMessage(
-                'Project search requires a GitLab token.', 'Set Token',
-            );
-            if (pick === 'Set Token') {
-                await vscode.commands.executeCommand('tulcase.pipe.setToken');
-            }
-            return;
-        }
-        const query = await vscode.window.showInputBox({
-            title: 'Search GitLab projects',
-            placeHolder: 'Part of the project name or path…',
-            ignoreFocusOut: true,
-        });
-        if (!query?.trim()) { return; }
-
-        try {
-            const hits = await vscode.window.withProgress(
-                { location: vscode.ProgressLocation.Notification, title: `Searching projects for "${query.trim()}"…` },
-                () => this.client.searchProjects(query.trim()),
-            );
-            if (hits.length === 0) {
-                vscode.window.showInformationMessage(`No projects found for "${query.trim()}".`);
-                return;
-            }
-            const picked = await vscode.window.showQuickPick(
-                hits.map(h => ({ label: h.pathWithNamespace, description: h.description })),
-                { title: 'Add project to scope', ignoreFocusOut: true },
-            );
-            if (picked) {
-                this._view?.webview.postMessage({
-                    type: 'projectPicked',
-                    requestId,
-                    path: picked.label,
-                });
-            }
-        } catch (err) {
-            this._toast(`Project search failed — ${describeApiError(err)}`, 'error');
+    private async _pickProject(): Promise<void> {
+        if (!(await this.secrets.ensureToken('Project search'))) { return; }
+        const path = await pickProjectViaSearch(this.client);
+        if (path) {
+            this._view?.webview.postMessage({ type: 'projectPicked', path });
         }
     }
 
     /** Tulcase tag picker → send the selection back to the form. */
-    private async _pickTagsForForm(current: string[], requestId?: number): Promise<void> {
+    private async _pickTagsForForm(current: string[]): Promise<void> {
         const picked = await pickTags(this.tagTree, current);
         if (picked === undefined) { return; }
-        this._view?.webview.postMessage({ type: 'tagsPicked', requestId, tags: picked });
-    }
-
-    // ── JSON escape hatch + legacy import (shared command implementations) ─────
-
-    private async _openJson(): Promise<void> {
-        await vscode.commands.executeCommand('tulcase.pipe.editScopesJson');
-    }
-
-    private async _importLegacy(): Promise<void> {
-        await vscode.commands.executeCommand('tulcase.pipe.importScopes');
+        this._view?.webview.postMessage({ type: 'tagsPicked', tags: picked });
     }
 
     private _toast(text: string, kind: 'info' | 'error' = 'info'): void {

@@ -10,14 +10,7 @@ import type { PipeFeature } from '../pipe/pipe-feature';
 import type { Job, Pipeline } from '../pipe/models';
 import { stripAnsi } from '../pipe/log-poller';
 import { describeApiError } from '../pipe/gitlab-client';
-
-function text(value: string): vscode.LanguageModelToolResult {
-    return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(value)]);
-}
-
-function json(value: unknown): vscode.LanguageModelToolResult {
-    return text(JSON.stringify(value, null, 2));
-}
+import { json, text } from './tools';
 
 // ── List scopes ──────────────────────────────────────────────────────────────
 

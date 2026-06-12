@@ -11,8 +11,9 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parse as parseJsonc } from 'jsonc-parser';
-import type { GitLabClient, PipelineVariable } from '../pipe/gitlab-client';
+import type { BranchHit, GitLabClient, PipelineVariable } from '../pipe/gitlab-client';
 import { describeApiError } from '../pipe/gitlab-client';
+import { pickProjectViaSearch } from '../pipe/pickers';
 import type { GitLabSecrets } from '../pipe/secrets';
 import type { PipelineStore } from '../pipe/pipeline-store';
 import type { PipeScopeStore } from '../pipe/scope-store';
@@ -76,7 +77,8 @@ export function registerPipeCommands(
     reg('tulcase.pipe.openJobLog', async (jobId?: number, opts?: { newTab?: boolean }) => {
         const job = resolveJob(deps.store, jobId);
         if (!job) { return; }
-        deps.openedJobs.add(job.id);
+        // Bridge jobs have no log — they must not enter the notification set.
+        if (!job.isBridge) { deps.openedJobs.add(job.id); }
         await deps.logLens.open(job, { newTab: Boolean(opts?.newTab) });
     });
 
@@ -91,13 +93,11 @@ export function registerPipeCommands(
     // Save the log of the currently focused log editor (editor title button).
     reg('tulcase.pipe.saveOpenLog', async () => {
         const uri = vscode.window.activeTextEditor?.document.uri;
-        if (!uri || uri.scheme !== LogDocumentProvider.scheme) {
+        const jobId = uri ? LogDocumentProvider.jobIdFromUri(uri) : undefined;
+        if (jobId === undefined) {
             vscode.window.showInformationMessage('Focus a Tulcase Pipe job log first.');
             return;
         }
-        // Path shape: /<projectId>/<jobId>/<name>.log
-        const jobId = Number(uri.path.split('/')[2]);
-        if (!Number.isFinite(jobId)) { return; }
         await saveLogForJob(deps, jobId);
     });
 
@@ -318,6 +318,16 @@ interface RunEntry {
     value: string;
 }
 
+interface RunMenuItem extends vscode.QuickPickItem {
+    /** Set on rows representing an existing entry — selecting removes it. */
+    removeIndex?: number;
+}
+
+/** Variables (env + file) share one key namespace on GitLab; inputs another. */
+function sameKeyNamespace(a: RunEntry['kind'], b: RunEntry['kind']): boolean {
+    return (a === 'input') === (b === 'input');
+}
+
 /**
  * Guided "Run Pipeline" flow:
  *   1. pick a project (scope projects + GitLab search),
@@ -326,16 +336,7 @@ interface RunEntry {
  *   4. trigger and offer to open the new pipeline.
  */
 async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): Promise<void> {
-    if (!(await deps.secrets.getToken())) {
-        const pick = await vscode.window.showWarningMessage(
-            'Running a pipeline requires a GitLab token with `api` scope.',
-            'Set Token',
-        );
-        if (pick === 'Set Token') {
-            await vscode.commands.executeCommand('tulcase.pipe.setToken');
-        }
-        return;
-    }
+    if (!(await deps.secrets.ensureToken('Running a pipeline'))) { return; }
 
     // 1. Project ─────────────────────────────────────────────────────────────
     let project = presetProject;
@@ -352,7 +353,7 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
         });
         if (!picked) { return; }
         project = picked.label === 'Search GitLab…'
-            ? await searchProjectFlow(deps)
+            ? await pickProjectViaSearch(deps.client)
             : picked.label;
         if (!project) { return; }
     }
@@ -365,7 +366,7 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
     const entries: RunEntry[] = [];
      
     while (true) {
-        const menu: vscode.QuickPickItem[] = [
+        const menu: RunMenuItem[] = [
             { label: '$(play) Run now', description: `${project} · ${ref}`, alwaysShow: true },
             { label: '$(add) Add variable', description: 'CI/CD variable (env_var)', alwaysShow: true },
             { label: '$(file-add) Add file variable', description: 'CI/CD variable (file)', alwaysShow: true },
@@ -373,13 +374,14 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
         ];
         if (entries.length > 0) {
             menu.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
-            for (const e of entries) {
+            entries.forEach((e, i) => {
                 menu.push({
                     label: `$(close) ${e.key}`,
                     description: `${e.kind} = ${e.value.length > 40 ? e.value.slice(0, 37) + '…' : e.value}`,
                     detail: 'Select to remove',
+                    removeIndex: i,
                 });
-            }
+            });
         }
         const choice = await vscode.window.showQuickPick(menu, {
             title: `Run Pipeline — ${project} · ${ref}`,
@@ -390,10 +392,8 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
 
         if (choice.label === '$(play) Run now') { break; }
 
-        if (choice.label.startsWith('$(close) ')) {
-            const key = choice.label.slice('$(close) '.length);
-            const idx = entries.findIndex(e => e.key === key);
-            if (idx >= 0) { entries.splice(idx, 1); }
+        if (choice.removeIndex !== undefined) {
+            entries.splice(choice.removeIndex, 1);
             continue;
         }
 
@@ -416,7 +416,11 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
         if (value === undefined) { continue; }
 
         const trimmedKey = key.trim();
-        const existing = entries.findIndex(e => e.key === trimmedKey && e.kind === kind);
+        // Replace an existing entry with the same key in the same namespace
+        // (GitLab rejects duplicate variable keys regardless of type).
+        const existing = entries.findIndex(
+            e => e.key === trimmedKey && sameKeyNamespace(e.kind, kind),
+        );
         if (existing >= 0) { entries.splice(existing, 1); }
         entries.push({ kind, key: trimmedKey, value });
     }
@@ -455,38 +459,9 @@ async function runPipelineFlow(deps: PipeCommandDeps, presetProject?: string): P
     }
 }
 
-/** Search GitLab for a project and return its path-with-namespace. */
-async function searchProjectFlow(deps: PipeCommandDeps): Promise<string | undefined> {
-    const query = await vscode.window.showInputBox({
-        title: 'Search GitLab projects',
-        placeHolder: 'Part of the project name or path…',
-        ignoreFocusOut: true,
-    });
-    if (!query?.trim()) { return undefined; }
-
-    try {
-        const hits = await vscode.window.withProgress(
-            { location: vscode.ProgressLocation.Notification, title: `Searching projects for "${query.trim()}"…` },
-            () => deps.client.searchProjects(query.trim()),
-        );
-        if (hits.length === 0) {
-            vscode.window.showInformationMessage(`No projects found for "${query.trim()}".`);
-            return undefined;
-        }
-        const picked = await vscode.window.showQuickPick(
-            hits.map(h => ({ label: h.pathWithNamespace, description: h.description })),
-            { title: 'Choose project', ignoreFocusOut: true },
-        );
-        return picked?.label;
-    } catch (err) {
-        vscode.window.showErrorMessage(`Tulcase Pipe: project search failed — ${describeApiError(err)}`);
-        return undefined;
-    }
-}
-
 /** Pick a branch from the API, or fall back to typing any ref. */
 async function pickRef(deps: PipeCommandDeps, project: string): Promise<string | undefined> {
-    let branches: Awaited<ReturnType<GitLabClient['listBranches']>> = [];
+    let branches: BranchHit[] = [];
     try {
         branches = await vscode.window.withProgress(
             { location: vscode.ProgressLocation.Notification, title: `Loading branches of ${project}…` },

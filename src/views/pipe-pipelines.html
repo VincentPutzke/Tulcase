@@ -148,8 +148,17 @@
     return String(s || '').toLowerCase().indexOf(String(needle || '').toLowerCase()) !== -1;
   }
 
+  // Queued-family statuses all render with the pending badge — the
+  // "Pending" filter matches the whole family.
+  const PENDING_FAMILY = ['pending', 'created', 'preparing', 'waiting_for_resource', 'scheduled'];
+
   function pipelineMatches(p) {
-    if (filter.status && p.status !== filter.status) { return false; }
+    if (filter.status) {
+      const matches = filter.status === 'pending'
+        ? PENDING_FAMILY.indexOf(p.status) !== -1
+        : p.status === filter.status;
+      if (!matches) { return false; }
+    }
     if (filter.text) {
       const t = filter.text;
       if (!ci(p.ref, t) && !ci(p.user, t) && !ci(p.sha, t) && !ci(p.projectPath, t)) { return false; }
@@ -271,7 +280,7 @@
     html += '<span class="pipeline-ref" title="' + esc(p.projectPath) + '">' + esc(p.ref) + '</span>';
     html += '<span class="pipeline-meta">#' + esc(p.iid || p.id);
     if (p.user) { html += ' · @' + esc(p.user); }
-    html += ' · ' + esc(p.sha) + ' · ' + esc(timeAgo(p.updatedAt)) + '</span>';
+    html += ' · ' + esc(String(p.sha || '').slice(0, 8)) + ' · ' + esc(timeAgo(p.updatedAt)) + '</span>';
     html += '<span class="tree-item-actions">';
     if (p.canRetry)  { html += '<button class="action-btn btn-run"    data-pipe-action="retry"   data-id="' + p.id + '" title="Retry pipeline">'  + ICONS.retry  + '</button>'; }
     if (p.canCancel) { html += '<button class="action-btn btn-delete" data-pipe-action="cancel"  data-id="' + p.id + '" title="Cancel pipeline">' + ICONS.cancel + '</button>'; }
@@ -450,6 +459,31 @@
   elText.addEventListener('input', applyFilter);
   elStatus.addEventListener('change', applyFilter);
 
+  // Cap the persisted collapse state: once it grows past the threshold,
+  // drop entries for pipelines/bridges not present in the current data.
+  // (Not run on every update — early empty snapshots must not wipe
+  // remembered expansion state.)
+  function pruneCollapsed() {
+    if (Object.keys(collapsed).length <= 500) { return; }
+    const live = {};
+    for (const s of scopes) {
+      for (const p of (s.pipelines || [])) {
+        live[p.id] = true;
+        collectBridges(p.jobs || []);
+      }
+    }
+    function collectBridges(jobs) {
+      for (const j of jobs) {
+        if (j.isBridge) { live['bridge-' + j.id] = true; }
+        if (j.children) { collectBridges(j.children); }
+      }
+    }
+    for (const key of Object.keys(collapsed)) {
+      if (!live[key]) { delete collapsed[key]; }
+    }
+    persist();
+  }
+
   // ── Inbound messages ─────────────────────────────────────
   window.addEventListener('message', event => {
     const msg = event.data;
@@ -458,6 +492,7 @@
       hasToken    = !!msg.hasToken;
       totalScopes = msg.totalScopes || 0;
       gotData     = true;
+      pruneCollapsed();
       render();
     } else if (msg.type === 'banner') {
       bannerMsg = msg.text ? { text: msg.text, kind: msg.kind || 'error' } : null;
@@ -468,8 +503,10 @@
     }
   });
 
-  // Refresh relative timestamps once a minute.
-  setInterval(() => { if (gotData && scopes.length) { render(); } }, 60000);
+  // Refresh relative timestamps once a minute (skip while the view is hidden).
+  setInterval(() => {
+    if (!document.hidden && gotData && scopes.length) { render(); }
+  }, 60000);
 
   vscode.postMessage({ type: 'requestData' });
 })();

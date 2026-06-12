@@ -15,6 +15,7 @@ export abstract class PollerBase {
     private _abort: AbortController | undefined;
     private _active = false;
     private _inFlight = false;
+    private _pendingTick = false;
     private _disposed = false;
 
     private readonly _onError = new Emitter<Error>();
@@ -43,7 +44,12 @@ export abstract class PollerBase {
 
     async tickNow(): Promise<void> {
         if (this._disposed) { return; }
-        if (this._inFlight) { return; }
+        if (this._inFlight) {
+            // A forced refresh during an in-flight tick must not be lost —
+            // queue exactly one follow-up tick so the caller sees fresh data.
+            this._pendingTick = true;
+            return;
+        }
         this._inFlight = true;
         this._abort?.abort();
         this._abort = new AbortController();
@@ -56,6 +62,10 @@ export abstract class PollerBase {
             }
         } finally {
             this._inFlight = false;
+        }
+        if (this._pendingTick && !this._disposed) {
+            this._pendingTick = false;
+            await this.tickNow();
         }
     }
 

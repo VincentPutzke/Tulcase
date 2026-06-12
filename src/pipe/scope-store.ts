@@ -15,6 +15,7 @@ import { Emitter } from './events';
 import { normalizeScope, type PipeScope } from './models';
 import {
     isBuiltinRule,
+    normalizeRule,
     validateRule,
     type LogRuleDefinition,
 } from './log-rules';
@@ -39,17 +40,46 @@ export class PipeScopeStore {
     /** Optional hook so self-writes don't bounce back via the file watcher. */
     markSelfWrite: ((filePath: string) => void) | undefined;
 
+    /** Normalized snapshot cache — read() is called on every poll tick and
+     *  view refresh; the file only changes via _write() or external edits
+     *  (invalidated through `invalidate()` by the file watcher). */
+    private _cache: { path: string; data: PipeScopeFile } | undefined;
+
     constructor(private readonly settings: ScopePathProvider) {}
 
     get filePath(): string {
         return this.settings.pipeScopesFile;
     }
 
+    /** Drop the cached snapshot (external file change or DB switch). */
+    invalidate(): void {
+        this._cache = undefined;
+    }
+
     // ── Read ─────────────────────────────────────────────────────────────────
 
     async read(): Promise<PipeScopeFile> {
-        const raw = await this._store.read<unknown>(this.filePath, EMPTY);
-        return normalizeScopeFile(raw);
+        const path = this.filePath;
+        if (this._cache && this._cache.path === path) {
+            return this._cache.data;
+        }
+        const raw = await this._store.read<unknown>(path, EMPTY);
+        let repaired = false;
+        let dropped = false;
+        const data = normalizeScopeFile(
+            raw,
+            () => { repaired = true; },
+            () => { dropped = true; },
+        );
+        this._cache = { path, data };
+        if (repaired && !dropped) {
+            // Persist generated/fixed scope ids so identity stays stable
+            // across reads (hand-written files may omit ids entirely).
+            // Skipped when entries were dropped — never rewrite a file the
+            // user may be hand-editing into shape.
+            await this._write(data);
+        }
+        return data;
     }
 
     async listScopes(): Promise<PipeScope[]> {
@@ -67,10 +97,20 @@ export class PipeScopeStore {
 
     // ── Scope mutations ──────────────────────────────────────────────────────
 
-    /** Insert or update a scope (matched by id). Returns the stored scope. */
-    async upsertScope(scope: PipeScope): Promise<PipeScope> {
+    /**
+     * Insert or update a scope (matched by id).  Accepts untyped input —
+     * this is the single normalization/validation point for scope saves.
+     * Returns the stored scope.
+     */
+    async upsertScope(scope: PipeScope | unknown): Promise<PipeScope> {
         const data = await this.read();
-        const normalized = normalizeScope(scope, scope.id || generateId('scope'));
+        const rawId = scope && typeof scope === 'object'
+            ? (scope as Record<string, unknown>).id
+            : undefined;
+        const fallbackId = typeof rawId === 'string' && rawId.trim()
+            ? rawId
+            : generateId('scope');
+        const normalized = normalizeScope(scope, fallbackId);
         if (!normalized) {
             throw new Error('A scope needs at least one project.');
         }
@@ -145,18 +185,15 @@ export class PipeScopeStore {
      * Throws on invalid definitions.
      */
     async upsertRule(rule: LogRuleDefinition): Promise<void> {
-        const error = validateRule(rule);
+        const clean = normalizeRule({ ...rule, name: rule.name?.trim() });
+        const error = validateRule(clean ?? rule);
         if (error) { throw new Error(error); }
-        const data = await this.read();
-        const clean: LogRuleDefinition = {
-            name: rule.name.trim(),
-            pattern: rule.pattern,
-            mode: rule.mode,
-        };
-        if (rule.flags?.trim())       { clean.flags = rule.flags.trim(); }
-        if (rule.mode === 'replace')  { clean.replacement = rule.replacement ?? ''; }
-        if (rule.description?.trim()) { clean.description = rule.description.trim(); }
+        if (!clean) { throw new Error('Rule name and pattern are required.'); }
+        if (clean.mode === 'replace' && clean.replacement === undefined) {
+            clean.replacement = '';
+        }
 
+        const data = await this.read();
         const idx = data.logRules.findIndex(r => r.name === clean.name);
         if (idx >= 0) { data.logRules[idx] = clean; }
         else          { data.logRules.push(clean); }
@@ -218,16 +255,8 @@ export class PipeScopeStore {
 
         let ruleCount = 0;
         for (const raw of rawRules) {
-            if (!raw || typeof raw !== 'object') { continue; }
-            const r = raw as Record<string, unknown>;
-            const candidate: LogRuleDefinition = {
-                name: typeof r.name === 'string' ? r.name : '',
-                pattern: typeof r.pattern === 'string' ? r.pattern : '',
-                mode: r.mode === 'replace' ? 'replace' : 'remove',
-            };
-            if (typeof r.flags === 'string')       { candidate.flags = r.flags; }
-            if (typeof r.replacement === 'string') { candidate.replacement = r.replacement; }
-            if (validateRule(candidate)) { continue; }
+            const candidate = normalizeRule(raw);
+            if (!candidate || validateRule(candidate)) { continue; }
             if (data.logRules.some(x => x.name === candidate.name)) { continue; }
             data.logRules.push(candidate);
             ruleCount++;
@@ -250,8 +279,10 @@ export class PipeScopeStore {
     }
 
     private async _write(data: PipeScopeFile): Promise<void> {
-        this.markSelfWrite?.(this.filePath);
-        await this._store.write(this.filePath, data);
+        const path = this.filePath;
+        this.markSelfWrite?.(path);
+        await this._store.write(path, data);
+        this._cache = { path, data };
         this._onDidChange.fire();
     }
 
@@ -262,7 +293,20 @@ export class PipeScopeStore {
 
 // ── File-level normalisation ────────────────────────────────────────────────
 
-export function normalizeScopeFile(raw: unknown): PipeScopeFile {
+/**
+ * Coerce a parsed scopes file into a valid `PipeScopeFile`.
+ *
+ * `onIdRepaired` fires when a scope was missing a usable id (or had a
+ * duplicate) and got a generated one — callers may persist the repair so
+ * scope identity stays stable across reads.  Repairs are NOT persisted by
+ * `read()` when entries were dropped (`onEntryDropped`), so a half-finished
+ * hand-edit is never silently rewritten on disk.
+ */
+export function normalizeScopeFile(
+    raw: unknown,
+    onIdRepaired?: () => void,
+    onEntryDropped?: () => void,
+): PipeScopeFile {
     if (!raw || typeof raw !== 'object') { return { scopes: [], logRules: [] }; }
     const obj = raw as Record<string, unknown>;
 
@@ -270,10 +314,18 @@ export function normalizeScopeFile(raw: unknown): PipeScopeFile {
     const seenIds = new Set<string>();
     if (Array.isArray(obj.scopes)) {
         for (const entry of obj.scopes) {
+            const rawId = entry && typeof entry === 'object'
+                ? (entry as Record<string, unknown>).id
+                : undefined;
             const scope = normalizeScope(entry, generateId('scope'));
-            if (!scope) { continue; }
+            if (!scope) {
+                onEntryDropped?.();
+                continue;
+            }
             // Guarantee id uniqueness even after careless hand-edits.
             if (seenIds.has(scope.id)) { scope.id = generateId('scope'); }
+            // Missing, invalid, or duplicate id → a fresh one was assigned.
+            if (scope.id !== rawId) { onIdRepaired?.(); }
             seenIds.add(scope.id);
             scopes.push(scope);
         }
@@ -283,19 +335,8 @@ export function normalizeScopeFile(raw: unknown): PipeScopeFile {
     const seenNames = new Set<string>();
     if (Array.isArray(obj.logRules)) {
         for (const entry of obj.logRules) {
-            if (!entry || typeof entry !== 'object') { continue; }
-            const r = entry as Record<string, unknown>;
-            if (typeof r.name !== 'string' || !r.name.trim()) { continue; }
-            if (typeof r.pattern !== 'string' || !r.pattern) { continue; }
-            if (seenNames.has(r.name)) { continue; }
-            const def: LogRuleDefinition = {
-                name: r.name,
-                pattern: r.pattern,
-                mode: r.mode === 'replace' ? 'replace' : 'remove',
-            };
-            if (typeof r.flags === 'string' && r.flags)             { def.flags = r.flags; }
-            if (typeof r.replacement === 'string')                  { def.replacement = r.replacement; }
-            if (typeof r.description === 'string' && r.description) { def.description = r.description; }
+            const def = normalizeRule(entry);
+            if (!def || seenNames.has(def.name)) { continue; }
             seenNames.add(def.name);
             logRules.push(def);
         }

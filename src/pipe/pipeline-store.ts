@@ -55,8 +55,13 @@ export class PipelineStore {
             this._firePipelineIfChanged(p);
             this._walkJobs(p.jobs);
         }
+        const previous = this._byScope.get(scopeId);
         this._byScope.set(scopeId, map);
-        this._pruneStatusMaps();
+        // Status-map pruning walks the whole store — only needed when this
+        // update actually evicted pipelines from the scope.
+        if (previous && !isSubset(previous, map)) {
+            this._pruneStatusMaps();
+        }
         this._onDidChange.fire();
     }
 
@@ -195,4 +200,12 @@ export class PipelineStore {
         this._onJobStatusChange.dispose();
         this._onPipelineStatusChange.dispose();
     }
+}
+
+/** True when every key of `prev` still exists in `next`. */
+function isSubset(prev: Map<number, unknown>, next: Map<number, unknown>): boolean {
+    for (const id of prev.keys()) {
+        if (!next.has(id)) { return false; }
+    }
+    return true;
 }

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { TulcaseSettings } from '../config';
+import { DEFAULT_TAG_COLOR } from '../models/tag.model';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 import type { PipelineStore } from '../pipe/pipeline-store';
 import type { PipeScopeStore } from '../pipe/scope-store';
@@ -25,6 +26,7 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
 
     private readonly _subs: Subscription[] = [];
     private readonly _vsDisposables: vscode.Disposable[] = [];
+    private _refreshTimer: NodeJS.Timeout | undefined;
 
     constructor(
         settings: TulcaseSettings,
@@ -38,14 +40,25 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
     ) {
         super(settings, tagTree);
         this._subs.push(
-            store.onDidChange(() => this.refresh()),
-            scopes.onDidChange(() => this.refresh()),
+            // The poller writes one store update per scope per tick —
+            // coalesce them into a single webview refresh.
+            store.onDidChange(() => this._refreshSoon()),
+            scopes.onDidChange(() => this._refreshSoon()),
             poller.onError(err => this._showBanner(err.message)),
             poller.onTickStart(() => this._clearBanner()),
         );
         this._vsDisposables.push(
             secrets.onDidChange(() => this.refresh()),
         );
+    }
+
+    /** Debounced refresh: batches the per-scope store updates of one tick. */
+    private _refreshSoon(): void {
+        if (this._refreshTimer) { clearTimeout(this._refreshTimer); }
+        this._refreshTimer = setTimeout(() => {
+            this._refreshTimer = undefined;
+            this.refresh();
+        }, 100);
     }
 
     override resolveWebviewView(
@@ -173,7 +186,7 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
             runProject: scope.projects.length === 1 ? scope.projects[0] : undefined,
             tags: scope.tags.map(name => ({
                 name,
-                color: tagMap[name]?.color ?? '#8b8fa3',
+                color: tagMap[name]?.color ?? DEFAULT_TAG_COLOR,
             })),
             pipelines: this.store.scopeSnapshot(scope.id).map(serializePipeline),
         };
@@ -189,6 +202,7 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
     }
 
     dispose(): void {
+        if (this._refreshTimer) { clearTimeout(this._refreshTimer); }
         for (const s of this._subs) { s.dispose(); }
         for (const d of this._vsDisposables) { d.dispose(); }
     }
@@ -222,7 +236,9 @@ function serializePipeline(p: Pipeline) {
         id: p.id,
         iid: p.iid,
         ref: p.ref,
-        sha: p.sha.slice(0, 8),
+        // Full SHA so pasted commit hashes match in the filter;
+        // the webview truncates for display.
+        sha: p.sha,
         status: p.status,
         source: p.source,
         updatedAt: p.updatedAt,
