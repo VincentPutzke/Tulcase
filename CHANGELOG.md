@@ -5,7 +5,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.8.0] - 2026-06-12
 
 ### Summary
 Tulcase Pipe: the standalone GitLab-pipelines extension is now a fully integrated Tulcase feature — with pipeline actions, form-based scopes, follow notifications, and a refined job-log experience. See `docs/pipe.md`.
