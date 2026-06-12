@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn" id="btn-add">+ Add Script</button>
+    <button class="add-btn add-btn-secondary" id="btn-add-folder">+ Folder</button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="search"
+      type="text"
+      placeholder="Search scripts and tags..."
+      spellcheck="false"
+    >
+  </div>
+</div>
+
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane">
+  <div class="tree-content" id="sections"></div>
+  <div class="root-drop-zone" id="root-drop-zone">Drop here to move to root</div>
+</div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+
+  const vscode = acquireVsCodeApi();
+
+  // ── State ───────────────────────────────────────────────
+  let scripts = [];       // ScriptItem[] (+ placeholderNames)
+  let folders = [];       // ScriptFolder[]
+  let tagMap  = {};       // Record<string, TagDef>
+  let query   = '';
+
+  const savedState = vscode.getState() || {};
+  const expandedFolders = savedState.expandedFolders || {};
+
+  function saveState() {
+    vscode.setState({ expandedFolders: expandedFolders });
+  }
+
+  // ── DOM refs ────────────────────────────────────────────
+  const searchEl   = document.getElementById('search');
+  const rootDropEl = document.getElementById('root-drop-zone');
+  const sectionsEl = document.getElementById('sections');
+  const treePaneEl = document.querySelector('.tree-pane');
+  let dragPayload  = null;
+  let pressState   = null;
+  let activeDropEl = null;
+  let suppressClick = false;
+
+  // ── Utility helpers ─────────────────────────────────────
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function clearDragClasses() {
+    document.querySelectorAll('.drag-source, .drag-press-active, .drop-target-active').forEach(function(el) {
+      el.classList.remove('drag-source', 'drag-press-active', 'drop-target-active');
+    });
+  }
+
+  function resetDragState() {
+    dragPayload = null;
+    pressState = null;
+    activeDropEl = null;
+    document.body.classList.remove('drag-armed');
+    document.body.classList.remove('drag-active');
+    clearDragClasses();
+  }
+
+  function consumeSuppressedClick() {
+    if (!suppressClick) { return false; }
+    suppressClick = false;
+    return true;
+  }
+
+  function getTargetId(targetEl) {
+    if (!targetEl || targetEl === rootDropEl) { return ''; }
+    return targetEl.getAttribute('data-drop-folder-id') || '';
+  }
+
+  function updateDropTarget(clientX, clientY) {
+    const hovered = document.elementFromPoint(clientX, clientY);
+    const target = hovered ? hovered.closest('[data-drop-folder-id], #root-drop-zone') : null;
+    if (activeDropEl === target) { return; }
+    clearDragClasses();
+    if (pressState && !dragPayload) {
+      pressState.sourceEl.classList.add('drag-press-active');
+    }
+    if (dragPayload && pressState) {
+      pressState.sourceEl.classList.add('drag-source');
+    }
+    activeDropEl = target;
+    if (activeDropEl) {
+      activeDropEl.classList.add('drop-target-active');
+    }
+  }
+
+  function beginDrag() {
+    if (!pressState) { return; }
+    dragPayload = { kind: pressState.kind, id: pressState.id };
+    document.body.classList.add('drag-active');
+    pressState.sourceEl.classList.remove('drag-press-active');
+    pressState.sourceEl.classList.add('drag-source');
+    updateDropTarget(pressState.startX, pressState.startY);
+  }
+
+  function markPressed(el, kind, id, clientX, clientY) {
+    clearPressed();
+    pressState = { kind, id, sourceEl: el, startX: clientX, startY: clientY };
+    document.body.classList.add('drag-armed');
+    const selection = window.getSelection();
+    if (selection) { selection.removeAllRanges(); }
+    el.classList.add('drag-press-active');
+  }
+
+  function clearPressed() {
+    document.querySelectorAll('.drag-press-active').forEach(function(el) {
+      el.classList.remove('drag-press-active');
+    });
+    if (!dragPayload) {
+      document.body.classList.remove('drag-armed');
+      pressState = null;
+    }
+  }
+
+  function postMove(targetId, payload) {
+    if (!payload) { return; }
+    if (targetId && payload.kind === 'folder') {
+      expandedFolders[targetId] = true;
+      saveState();
+    }
+    vscode.postMessage({ type: 'move', kind: payload.kind, id: payload.id, targetId: targetId });
+    resetDragState();
+  }
+
+  // ── SVG icons (inline, stroke-based, currentColor) ─────
+  const ICONS = {
+    open: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    run: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 4l14 8-14 8V4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    edit: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.83z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    delete: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folder: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v11z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    emptyState: '<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 7l4 5-4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 17h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    placeholder: '<svg class="icon" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M7 8l-4 4 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 8l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 4l-4 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  };
+
+  // ── Search / filter ─────────────────────────────────────
+  function matchesQuery(s) {
+    if (!query) { return true; }
+    const q = query.toLowerCase();
+    if (s.label.toLowerCase().includes(q)) { return true; }
+    if (s.description && s.description.toLowerCase().includes(q)) { return true; }
+    if (s.tags.some(function(t) { return t.toLowerCase().includes(q); })) { return true; }
+    if (s.folder) {
+      var f = folders.find(function(fld) { return fld.id === s.folder; });
+      if (f && f.name.toLowerCase().includes(q)) { return true; }
+    }
+    return false;
+  }
+
+  // ── Folder tree helpers ─────────────────────────────────
+  function buildFolderTree() {
+    var children = {};
+    for (var i = 0; i < folders.length; i++) {
+      var f = folders[i];
+      var pid = f.parent || '';
+      if (!children[pid]) { children[pid] = []; }
+      children[pid].push(f);
+    }
+    for (var key in children) {
+      children[key].sort(function(a, b) { return a.name.localeCompare(b.name); });
+    }
+    return children;
+  }
+
+  function scriptsInFolder(folderId) {
+    return scripts.filter(function(s) {
+      return (s.folder || '') === folderId;
+    }).filter(matchesQuery);
+  }
+
+  function folderHasMatch(folderId, folderTree) {
+    if (scriptsInFolder(folderId).length > 0) { return true; }
+    var children = folderTree[folderId] || [];
+    for (var i = 0; i < children.length; i++) {
+      if (folderHasMatch(children[i].id, folderTree)) { return true; }
+    }
+    return false;
+  }
+
+  // ── Rendering ───────────────────────────────────────────
+  function render() {
+    var folderTree = buildFolderTree();
+    var html = '';
+
+    var rootScripts = scriptsInFolder('');
+    rootScripts.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    for (var ri = 0; ri < rootScripts.length; ri++) {
+      html += renderItem(rootScripts[ri]);
+    }
+
+    var rootFolders = folderTree[''] || [];
+    for (var fi = 0; fi < rootFolders.length; fi++) {
+      html += renderFolderSection(rootFolders[fi], folderTree);
+    }
+
+    var totalVisible = rootScripts.length;
+    for (var ff = 0; ff < folders.length; ff++) {
+      totalVisible += scriptsInFolder(folders[ff].id).length;
+    }
+
+    if (totalVisible === 0 && scripts.length > 0) {
+      html = '<div class="no-results">No scripts match your search.</div>';
+    } else if (scripts.length === 0 && folders.length === 0) {
+      html = '<div class="empty-state">'
+        + '<div class="empty-state-icon">' + ICONS.emptyState + '</div>'
+        + 'No scripts yet. Click <strong>+ Add Script</strong> to get started!'
+        + '</div>';
+    }
+
+    sectionsEl.innerHTML = html;
+    bindEvents();
+  }
+
+  function renderFolderSection(folder, folderTree) {
+    if (query && !folderHasMatch(folder.id, folderTree)) { return ''; }
+
+    var isCollapsed = !expandedFolders[folder.id];
+    var chevronCls  = isCollapsed ? 'section-chevron collapsed' : 'section-chevron';
+    var bodyCls     = isCollapsed ? 'section-body collapsed' : 'section-body';
+
+    var childScripts = scriptsInFolder(folder.id);
+    childScripts.sort(function(a, b) { return a.label.localeCompare(b.label); });
+    var childFolders = folderTree[folder.id] || [];
+    var itemCount    = childScripts.length + childFolders.length;
+
+    var html = '<div class="section" data-folder-id="' + esc(folder.id) + '" data-drop-folder-id="' + esc(folder.id) + '">';
+    html += '<div class="section-header" data-toggle-folder="' + esc(folder.id) + '" data-drag-kind="folder" data-drag-id="' + esc(folder.id) + '">';
+    html += '  <span class="' + chevronCls + '">&#9660;</span>';
+    html += '  <span class="section-icon">' + ICONS.folder + '</span>';
+    html += '  <span class="section-label">' + esc(folder.name) + '</span>';
+    html += '  <span class="section-actions">';
+    html += '    <button class="action-btn btn-add" data-action="addScriptToFolder" data-id="' + esc(folder.id) + '" title="Add script to folder">' + ICONS.run + '</button>';
+    html += '    <button class="action-btn btn-add" data-action="addSubFolder" data-id="' + esc(folder.id) + '" title="Add sub-folder">' + ICONS.folder + '</button>';
+    html += '    <button class="action-btn btn-edit" data-action="renameFolder" data-id="' + esc(folder.id) + '" title="Rename folder">' + ICONS.edit + '</button>';
+    html += '    <button class="action-btn btn-delete" data-action="deleteFolder" data-id="' + esc(folder.id) + '" title="Delete folder">' + ICONS.delete + '</button>';
+    html += '  </span>';
+    html += '  <span class="section-badge">' + itemCount + '</span>';
+    html += '</div>';
+    html += '<div class="' + bodyCls + '">';
+
+    for (var ci = 0; ci < childScripts.length; ci++) {
+      html += renderItem(childScripts[ci]);
+    }
+    for (var fi = 0; fi < childFolders.length; fi++) {
+      html += renderFolderSection(childFolders[fi], folderTree);
+    }
+
+    html += '</div></div>';
+    return html;
+  }
+
+  function renderItem(item) {
+    var html = '<div class="tree-item" data-id="' + esc(item.id) + '">';
+    html += '<div class="tree-item-row" data-drag-kind="item" data-drag-id="' + esc(item.id) + '">';
+    html += '  <div class="tree-item-content" data-open="' + esc(item.id) + '" title="Open in editor">';
+    html += '    <div class="tree-item-label">' + esc(item.label) + '</div>';
+
+    if (item.description) {
+      html += '    <div class="tree-item-desc">' + esc(item.description) + '</div>';
+    }
+
+    html += '    <div class="tree-item-meta">';
+    if (item.tags && item.tags.length > 0) {
+      html += '<span class="tree-item-tags">';
+      for (var ti = 0; ti < item.tags.length; ti++) {
+        var tag   = item.tags[ti];
+        var def   = tagMap[tag];
+        var color = def ? def.color : '#8b8fa3';
+        html += '<span class="tree-item-tag" style="color:' + esc(color) + ';">' + esc(tag) + '</span>';
+      }
+      html += '</span>';
+    }
+    var names = item.placeholderNames || [];
+    if (names.length > 0) {
+      html += '<span class="tree-item-placeholders" title="Placeholders: ' + esc(names.join(', ')) + '">';
+      html += '<span class="placeholder-badge">' + ICONS.placeholder + ' ' + names.length + '</span>';
+      html += '</span>';
+    }
+    html += '    </div>';   // .tree-item-meta
+    html += '  </div>';     // .tree-item-content
+
+    html += '  <div class="tree-item-actions">';
+    html += '    <button class="action-btn btn-run" data-action="run" data-id="' + esc(item.id) + '" title="Run in terminal">' + ICONS.run + '</button>';
+    html += '    <button class="action-btn btn-open" data-action="open" data-id="' + esc(item.id) + '" title="Open in editor">' + ICONS.open + '</button>';
+    html += '    <button class="action-btn btn-edit" data-action="editMeta" data-id="' + esc(item.id) + '" title="Edit name / tags / folder">' + ICONS.edit + '</button>';
+    html += '    <button class="action-btn btn-delete" data-action="delete" data-id="' + esc(item.id) + '" title="Delete">' + ICONS.delete + '</button>';
+    html += '  </div>';
+    html += '</div>';       // .tree-item-row
+    html += '</div>';       // .tree-item
+    return html;
+  }
+
+  // ── Event binding ───────────────────────────────────────
+  function bindEvents() {
+    document.querySelectorAll('[data-toggle-folder]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (consumeSuppressedClick()) { return; }
+        if (e.target.closest('.action-btn')) { return; }
+        var id = el.getAttribute('data-toggle-folder');
+        expandedFolders[id] = !expandedFolders[id];
+        saveState();
+        render();
+      });
+    });
+
+    // Clicking a script's content opens it in the editor.
+    document.querySelectorAll('[data-open]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (consumeSuppressedClick()) { return; }
+        if (e.target.closest('.action-btn')) { return; }
+        vscode.postMessage({ type: 'open', id: el.getAttribute('data-open') });
+      });
+    });
+
+    document.querySelectorAll('[data-drag-kind]').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) {
+        if (e.button !== 0 || e.target.closest('.action-btn')) { return; }
+        e.preventDefault();
+        markPressed(el, el.getAttribute('data-drag-kind'), el.getAttribute('data-drag-id'), e.clientX, e.clientY);
+      });
+    });
+
+    document.querySelectorAll('[data-action]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        vscode.postMessage({ type: el.getAttribute('data-action'), id: el.getAttribute('data-id') });
+      });
+    });
+  }
+
+  // ── Search input ────────────────────────────────────────
+  searchEl.addEventListener('input', function() {
+    query = searchEl.value.trim();
+    render();
+  });
+
+  // ── Add buttons ─────────────────────────────────────────
+  document.getElementById('btn-add').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addScript' });
+  });
+  document.getElementById('btn-add-folder').addEventListener('click', function() {
+    vscode.postMessage({ type: 'addFolder' });
+  });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!pressState) { return; }
+    e.preventDefault();
+    if (!dragPayload) {
+      const deltaX = Math.abs(e.clientX - pressState.startX);
+      const deltaY = Math.abs(e.clientY - pressState.startY);
+      if (deltaX < 4 && deltaY < 4) { return; }
+      beginDrag();
+    }
+    updateDropTarget(e.clientX, e.clientY);
+    if (dragPayload && treePaneEl && e.clientY >= 0) {
+      const rect = treePaneEl.getBoundingClientRect();
+      if (e.clientY < rect.top + 24) {
+        treePaneEl.scrollTop -= 16;
+      } else if (e.clientY > rect.bottom - 24) {
+        treePaneEl.scrollTop += 16;
+      }
+    }
+  });
+
+  window.addEventListener('mouseup', function() {
+    if (dragPayload) {
+      const targetId = getTargetId(activeDropEl);
+      if (activeDropEl) {
+        suppressClick = true;
+        postMove(targetId, dragPayload);
+        return;
+      }
+      resetDragState();
+      return;
+    }
+    clearPressed();
+  });
+
+  window.addEventListener('blur', resetDragState);
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { resetDragState(); }
+  });
+
+  // ── Message handling from extension host ────────────────
+  window.addEventListener('message', function(e) {
+    var msg = e.data;
+    if (msg.type === 'updateData') {
+      scripts = msg.scripts || [];
+      folders = msg.folders || [];
+      tagMap  = msg.tagMap  || {};
+      render();
+    }
+  });
+
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

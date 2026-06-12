@@ -25,6 +25,8 @@ import { TodoListViewProvider } from './views/todo-list.view';
 import { TagTreeProvider } from './providers/tag-tree.provider';
 import { TagListViewProvider } from './views/tag-list.view';
 import { CommandListViewProvider } from './views/command-list.view';
+import { ScriptListViewProvider } from './views/script-list.view';
+import { ScriptFileSystemProvider } from './data/script-fs';
 import { LinkListViewProvider } from './views/link-list.view';
 import { NoteListViewProvider } from './views/note-list.view';
 import { NoteFileSystemProvider } from './data/note-fs';
@@ -62,6 +64,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const tagList     = new TagListViewProvider(settings, tagTree);
     const todoList    = new TodoListViewProvider(settings, tagTree);
     const commandList = new CommandListViewProvider(settings, tagTree);
+    const scriptList  = new ScriptListViewProvider(settings, tagTree);
+    const scriptFs    = new ScriptFileSystemProvider(settings);
     const linkList    = new LinkListViewProvider(settings, tagTree);
     const noteList    = new NoteListViewProvider(settings, tagTree);
     const noteFs      = new NoteFileSystemProvider(settings);
@@ -101,6 +105,12 @@ export function activate(context: vscode.ExtensionContext): void {
             commandList,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
+        vscode.workspace.registerFileSystemProvider(ScriptFileSystemProvider.scheme, scriptFs),
+        vscode.window.registerWebviewViewProvider(
+            ScriptListViewProvider.viewType,
+            scriptList,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
         vscode.window.registerWebviewViewProvider(
             LinkListViewProvider.viewType,
             linkList,
@@ -135,6 +145,7 @@ export function activate(context: vscode.ExtensionContext): void {
         tagTree.refresh();
         tagList.refresh();
         commandList.refresh();
+        scriptList.refresh();
         linkList.refresh();
         noteList.refresh();
         recordCalendar.refresh();
@@ -201,6 +212,7 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher.onTodosChanged(() => { todoList.refresh(); statusBar.update(); });
     watcher.onTagsChanged(() => { tagTree.refresh(); tagList.refresh(); });
     watcher.onCommandsChanged(() => commandList.refresh());
+    watcher.onScriptsChanged(() => scriptList.refresh());
     watcher.onLinksChanged(() => linkList.refresh());
     watcher.onListsChanged(() => { noteList.refresh(); noteDecorator.refreshAll(); });
     watcher.onRecordsChanged(() => recordCalendar.refresh());
@@ -212,21 +224,23 @@ export function activate(context: vscode.ExtensionContext): void {
     // 8. Auto-save notes on tab close
     context.subscriptions.push(
         vscode.workspace.onWillSaveTextDocument(e => {
-            // Ensure aplist documents are always saved (no dirty prompt)
-            if (e.document.uri.scheme === NoteFileSystemProvider.scheme) {
+            // Ensure note / script documents are always saved (no dirty prompt)
+            if (
+                e.document.uri.scheme === NoteFileSystemProvider.scheme ||
+                e.document.uri.scheme === ScriptFileSystemProvider.scheme
+            ) {
                 e.waitUntil(Promise.resolve([]));
             }
         }),
         vscode.window.tabGroups.onDidChangeTabs(e => {
-            // When a note tab is closed, auto-save its content
+            // When a note / script tab is closed, refresh the matching sidebar.
             for (const tab of e.closed) {
-                if (
-                    tab.input instanceof vscode.TabInputText &&
-                    tab.input.uri.scheme === NoteFileSystemProvider.scheme
-                ) {
-                    // The FS provider's writeFile has already been called by VS Code
-                    // on dirty-close; just refresh the sidebar to update line counts.
+                if (!(tab.input instanceof vscode.TabInputText)) { continue; }
+                const scheme = tab.input.uri.scheme;
+                if (scheme === NoteFileSystemProvider.scheme) {
                     noteList.refresh();
+                } else if (scheme === ScriptFileSystemProvider.scheme) {
+                    scriptList.refresh();
                 }
             }
         }),

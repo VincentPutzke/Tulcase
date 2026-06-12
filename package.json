@@ -28,6 +28,7 @@
   "activationEvents": [
     "onView:tulcase.todos",
     "onView:tulcase.commands",
+    "onView:tulcase.scripts",
     "onView:tulcase.links",
     "onView:tulcase.lists",
     "onView:tulcase.tags",
@@ -89,6 +90,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show the latest pipeline status for the current Git branch in the status bar."
+        },
+        "tulcase.scripts.interpreter": {
+          "type": "string",
+          "default": "bash",
+          "description": "Interpreter used to run saved scripts in the integrated terminal (e.g. bash, sh, zsh). The script path is passed as the single argument."
         }
       }
     },
@@ -98,6 +104,11 @@
           "id": "tulcase",
           "title": "Tulcase",
           "icon": "media/icon.svg"
+        },
+        {
+          "id": "tulcase-commands",
+          "title": "Commands & Scripts",
+          "icon": "media/commands-icon.svg"
         },
         {
           "id": "tulcase-pipe",
@@ -126,11 +137,6 @@
           "type": "webview"
         },
         {
-          "id": "tulcase.commands",
-          "name": "Commands",
-          "type": "webview"
-        },
-        {
           "id": "tulcase.lists",
           "name": "Notes",
           "type": "webview"
@@ -143,6 +149,18 @@
         {
           "id": "tulcase.sync",
           "name": "Git Sync",
+          "type": "webview"
+        }
+      ],
+      "tulcase-commands": [
+        {
+          "id": "tulcase.commands",
+          "name": "Commands",
+          "type": "webview"
+        },
+        {
+          "id": "tulcase.scripts",
+          "name": "Scripts",
           "type": "webview"
         }
       ],

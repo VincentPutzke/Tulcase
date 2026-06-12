@@ -34,6 +34,7 @@ function buildWebviewAssets() {
         { name: 'record-calendar' },
         { name: 'todo-list' },
         { name: 'command-list' },
+        { name: 'script-list' },
         { name: 'note-list' },
         { name: 'link-list' },
         { name: 'tag-list' },
