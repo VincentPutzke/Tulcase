@@ -17,6 +17,9 @@ const buildOptions = {
     target: 'node18',
     sourcemap: true,
     minify: false,
+    // Prefer ESM package entries: jsonc-parser's CJS entry is a UMD build
+    // whose internal requires esbuild cannot inline (breaks at runtime).
+    mainFields: ['module', 'main'],
 };
 
 /**
