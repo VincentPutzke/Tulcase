@@ -11,3 +11,4 @@ eslint.config.mjs
 .prettierrc
 **/*.test.ts
 **/*.map
+*.log
