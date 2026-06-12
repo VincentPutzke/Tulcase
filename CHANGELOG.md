@@ -24,6 +24,7 @@ Tulcase Pipe: the standalone GitLab-pipelines extension is now a fully integrate
 
 ### Fixed
 - Tag rename/delete now propagates into saved commands again (the propagation helper still read the pre-v1 command store format and skipped current-format files).
+- Git Sync now handles common multi-workspace divergence by fetching, merging, semantically auto-merging Tulcase JSON stores, retrying push races, and opening a resolver panel for remaining conflicts instead of requiring a reset.
 
 ### Changed
 - Database seeding now also creates `pipe_db/scopes.json`; existing databases are seeded on activation (idempotent).
