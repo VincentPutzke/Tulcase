@@ -55,6 +55,7 @@ $mono: var(--vscode-editor-font-family, monospace);
   align-items: center;
   gap: 6px;
   min-height: 24px;
+  position: relative;
 }
 
 .scope-label {
@@ -67,11 +68,19 @@ $mono: var(--vscode-editor-font-family, monospace);
   white-space: nowrap;
 }
 
+// Card actions float above the header on hover — they never reserve space
+// or shorten the label while invisible.
 .scope-card-actions {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 2px;
-  flex-shrink: 0;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: shared.$view-bg;
   visibility: hidden;
 }
 
@@ -79,9 +88,16 @@ $mono: var(--vscode-editor-font-family, monospace);
   visibility: visible;
 }
 
-.bell-btn.bell-on {
-  visibility: visible;
-  color: shared.$yellow;
+// Follow bell — monochrome, subtle when off.
+.bell-btn {
+  opacity: 0.35;
+  flex-shrink: 0;
+
+  &.bell-on { opacity: 1; }
+}
+
+.scope-card:hover .bell-btn {
+  opacity: 1;
 }
 
 .scope-card-body {

@@ -184,6 +184,128 @@
     return out;
   }
 
+  // ── Context menu ─────────────────────────────────────────
+  // All state-changing actions (run / play / retry / cancel) live here so
+  // they cannot be clicked accidentally from hover buttons.
+  const ctxHost = document.createElement('div');
+  document.body.appendChild(ctxHost);
+  let ctxItems = [];
+
+  function closeCtx() {
+    ctxHost.innerHTML = '';
+    ctxItems = [];
+  }
+
+  function showCtx(x, y, items) {
+    closeCtx();
+    ctxItems = items.filter(it => it !== 'sep');
+    let html = '<div class="ctx-menu">';
+    let idx = 0;
+    for (const it of items) {
+      if (it === 'sep') { html += '<div class="ctx-sep"></div>'; continue; }
+      html += '<button class="ctx-item" data-ctx="' + (idx++) + '">'
+        + (it.icon || '') + '<span>' + esc(it.label) + '</span></button>';
+    }
+    html += '</div>';
+    ctxHost.innerHTML = html;
+    const menu = ctxHost.firstElementChild;
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = Math.max(2, Math.min(x, window.innerWidth - rect.width - 4)) + 'px';
+    menu.style.top  = Math.max(2, Math.min(y, window.innerHeight - rect.height - 4)) + 'px';
+    menu.querySelectorAll('[data-ctx]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const item = ctxItems[Number(btn.getAttribute('data-ctx'))];
+        closeCtx();
+        if (item) { item.run(); }
+      });
+    });
+  }
+
+  window.addEventListener('click', closeCtx);
+  window.addEventListener('blur', closeCtx);
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtx(); } });
+  document.querySelector('.tree-pane').addEventListener('scroll', closeCtx, { passive: true });
+
+  function findJobById(id) {
+    for (const s of scopes) {
+      for (const p of (s.pipelines || [])) {
+        const found = findInJobs(p.jobs || [], id);
+        if (found) { return found; }
+      }
+    }
+    return null;
+    function findInJobs(jobs, jobId) {
+      for (const j of jobs) {
+        if (j.id === jobId) { return j; }
+        if (j.children) {
+          const sub = findInJobs(j.children, jobId);
+          if (sub) { return sub; }
+        }
+      }
+      return null;
+    }
+  }
+
+  function findPipelineById(id) {
+    for (const s of scopes) {
+      const hit = (s.pipelines || []).find(p => p.id === id);
+      if (hit) { return hit; }
+    }
+    return null;
+  }
+
+  function showScopeMenu(x, y, scope) {
+    const items = [
+      { icon: ICONS.play, label: 'Run Pipeline…', run: () =>
+          vscode.postMessage({ type: 'runPipeline', project: scope.runProject }) },
+      { icon: scope.follow ? ICONS.bell : ICONS.bellOn,
+        label: scope.follow ? 'Unfollow' : 'Follow (notify on finish)',
+        run: () => vscode.postMessage({ type: 'toggleFollow', scopeId: scope.id }) },
+      'sep',
+      { icon: ICONS.gear, label: 'Manage Scopes…', run: () =>
+          vscode.postMessage({ type: 'openScopes' }) },
+    ];
+    showCtx(x, y, items);
+  }
+
+  function showPipelineMenu(x, y, p) {
+    const items = [];
+    if (p.canRetry)  { items.push({ icon: ICONS.retry,  label: 'Retry Pipeline',  run: () => vscode.postMessage({ type: 'pipeAction', action: 'retry',  pipelineId: p.id }) }); }
+    if (p.canCancel) { items.push({ icon: ICONS.cancel, label: 'Cancel Pipeline', run: () => vscode.postMessage({ type: 'pipeAction', action: 'cancel', pipelineId: p.id }) }); }
+    if (items.length) { items.push('sep'); }
+    items.push(
+      { icon: ICONS.external, label: 'Open in GitLab', run: () => vscode.postMessage({ type: 'pipeAction', action: 'browser', pipelineId: p.id }) },
+      { icon: ICONS.copy,     label: 'Copy URL',       run: () => vscode.postMessage({ type: 'pipeAction', action: 'copy',    pipelineId: p.id }) },
+    );
+    showCtx(x, y, items);
+  }
+
+  function showJobMenu(x, y, j) {
+    const items = [];
+    if (!j.isBridge) {
+      items.push(
+        { icon: ICONS.external, label: 'Open Log',            run: () => vscode.postMessage({ type: 'openJob', jobId: j.id, newTab: false }) },
+        { icon: ICONS.external, label: 'Open Log in New Tab', run: () => vscode.postMessage({ type: 'openJob', jobId: j.id, newTab: true }) },
+      );
+    }
+    const actions = [];
+    if (j.canPlay)   { actions.push({ icon: ICONS.play,   label: 'Run Manual Job', run: () => vscode.postMessage({ type: 'jobAction', action: 'play',   jobId: j.id }) }); }
+    if (j.canRetry)  { actions.push({ icon: ICONS.retry,  label: 'Retry Job',      run: () => vscode.postMessage({ type: 'jobAction', action: 'retry',  jobId: j.id }) }); }
+    if (j.canCancel) { actions.push({ icon: ICONS.cancel, label: 'Cancel Job',     run: () => vscode.postMessage({ type: 'jobAction', action: 'cancel', jobId: j.id }) }); }
+    if (items.length && actions.length) { items.push('sep'); }
+    items.push(...actions);
+    if (items.length) { items.push('sep'); }
+    items.push(
+      { icon: ICONS.external, label: 'Open in GitLab', run: () => vscode.postMessage({ type: 'jobAction', action: 'browser', jobId: j.id }) },
+      { icon: ICONS.copy,     label: 'Copy URL',       run: () => vscode.postMessage({ type: 'jobAction', action: 'copy',    jobId: j.id }) },
+    );
+    if (j.hasArtifacts) {
+      items.push({ icon: ICONS.download, label: 'Download Artifacts', run: () => vscode.postMessage({ type: 'jobAction', action: 'artifacts', jobId: j.id }) });
+    }
+    showCtx(x, y, items);
+  }
+
   // ── Banner ───────────────────────────────────────────────
   function renderBanner() {
     if (!bannerMsg) { banner.innerHTML = ''; return; }
@@ -238,8 +360,11 @@
       const visible = (s.pipelines || []).filter(pipelineMatches);
 
       html += '<div class="section">';
-      html += '<div class="section-header" data-toggle-scope="' + esc(s.id) + '">';
+      html += '<div class="section-header" data-toggle-scope="' + esc(s.id) + '" title="Right-click for actions">';
       html += '<span class="section-chevron' + (isCollapsed ? ' collapsed' : '') + '">▾</span>';
+      html += '<button class="action-btn scope-bell' + (s.follow ? ' bell-on' : '') + '" data-follow="' + esc(s.id) + '" title="'
+            + (s.follow ? 'Following — notifications on pipeline finish (click to unfollow)' : 'Follow — notify when a pipeline finishes')
+            + '">' + (s.follow ? ICONS.bellOn : ICONS.bell) + '</button>';
       html += '<span class="section-label" title="' + esc(s.projects.join(', ')) + '">' + esc(s.label) + '</span>';
       if (s.tags && s.tags.length) {
         html += '<span class="scope-tags">';
@@ -248,13 +373,6 @@
         }
         html += '</span>';
       }
-      html += '<span class="scope-actions">';
-      html += '<button class="action-btn bell-btn' + (s.follow ? ' bell-on' : '') + '" data-follow="' + esc(s.id) + '" title="'
-            + (s.follow ? 'Following — notifications on pipeline finish (click to unfollow)' : 'Follow — notify when a pipeline finishes')
-            + '">' + (s.follow ? ICONS.bellOn : ICONS.bell) + '</button>';
-      html += '<button class="action-btn btn-run" data-run-scope="' + esc(s.id) + '" title="Run pipeline'
-            + (s.runProject ? ' on ' + esc(s.runProject) : '…') + '">' + ICONS.play + '</button>';
-      html += '</span>';
       html += sectionCounts(visible);
       html += '</div>';
       html += '<div class="section-body' + (isCollapsed ? ' collapsed' : '') + '">';
@@ -274,16 +392,15 @@
   function renderPipeline(p) {
     const isCollapsed = collapsed[p.id] !== false; // default collapsed
     let html = '<div class="pipeline">';
-    html += '<div class="pipeline-header" data-toggle="' + p.id + '">';
+    html += '<div class="pipeline-header" data-toggle="' + p.id + '" title="Right-click for actions">';
     html += '<span class="section-chevron' + (isCollapsed ? ' collapsed' : '') + '">▾</span>';
     html += statusBadge(p.status);
     html += '<span class="pipeline-ref" title="' + esc(p.projectPath) + '">' + esc(p.ref) + '</span>';
-    html += '<span class="pipeline-meta">#' + esc(p.iid || p.id);
-    if (p.user) { html += ' · @' + esc(p.user); }
-    html += ' · ' + esc(String(p.sha || '').slice(0, 8)) + ' · ' + esc(timeAgo(p.updatedAt)) + '</span>';
+    html += '<span class="pipeline-time">' + esc(timeAgo(p.updatedAt)) + '</span>';
     html += '<span class="tree-item-actions">';
-    if (p.canRetry)  { html += '<button class="action-btn btn-run"    data-pipe-action="retry"   data-id="' + p.id + '" title="Retry pipeline">'  + ICONS.retry  + '</button>'; }
-    if (p.canCancel) { html += '<button class="action-btn btn-delete" data-pipe-action="cancel"  data-id="' + p.id + '" title="Cancel pipeline">' + ICONS.cancel + '</button>'; }
+    html += '<span class="pipeline-detail">#' + esc(p.iid || p.id);
+    if (p.user) { html += ' · @' + esc(p.user); }
+    html += ' · ' + esc(String(p.sha || '').slice(0, 8)) + '</span>';
     html += '<button class="action-btn btn-edit" data-pipe-action="browser" data-id="' + p.id + '" title="Open in GitLab">' + ICONS.external + '</button>';
     html += '<button class="action-btn btn-copy" data-pipe-action="copy"    data-id="' + p.id + '" title="Copy URL">'       + ICONS.copy     + '</button>';
     html += '</span>';
@@ -319,7 +436,7 @@
     const subKey = 'bridge-' + j.id;
     let html = '<div class="tree-item job-item">';
     html += '<div class="tree-item-row" data-open-job="' + j.id + '" title="'
-          + (j.isBridge ? 'Trigger job' : 'Click: open log here · Ctrl+Click: open in new tab') + '">';
+          + (j.isBridge ? 'Trigger job · Right-click for actions' : 'Click: open log · Ctrl+Click: new tab · Right-click: actions') + '">';
     if (hasSub) {
       const subCollapsed = collapsed[subKey] !== false;
       html += '<span class="section-chevron sub-chevron' + (subCollapsed ? ' collapsed' : '') + '" data-toggle-bridge="' + subKey + '">▾</span>';
@@ -333,9 +450,6 @@
     if (j.isBridge)     { html += '<span class="tree-item-detail dim">trigger' + (j.hasDownstream ? '' : ' (pending)') + '</span>'; }
     html += '</div></div>';
     html += '<div class="tree-item-actions">';
-    if (j.canPlay)   { html += '<button class="action-btn btn-run"    data-job-action="play"   data-id="' + j.id + '" title="Run manual job">' + ICONS.play  + '</button>'; }
-    if (j.canRetry)  { html += '<button class="action-btn btn-run"    data-job-action="retry"  data-id="' + j.id + '" title="Retry job">'      + ICONS.retry + '</button>'; }
-    if (j.canCancel) { html += '<button class="action-btn btn-delete" data-job-action="cancel" data-id="' + j.id + '" title="Cancel job">'     + ICONS.cancel + '</button>'; }
     html += '<button class="action-btn btn-edit" data-job-action="browser" data-id="' + j.id + '" title="Open in GitLab">' + ICONS.external + '</button>';
     html += '<button class="action-btn btn-copy" data-job-action="copy"    data-id="' + j.id + '" title="Copy URL">'       + ICONS.copy     + '</button>';
     if (j.hasArtifacts) {
@@ -365,11 +479,17 @@
   function bind() {
     tree.querySelectorAll('[data-toggle-scope]').forEach(el => {
       el.addEventListener('click', e => {
-        if (e.target.closest('[data-follow]') || e.target.closest('[data-run-scope]')) { return; }
+        if (e.target.closest('[data-follow]')) { return; }
         const id = el.getAttribute('data-toggle-scope');
         collapsedScopes[id] = !collapsedScopes[id];
         persist();
         render();
+      });
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const scope = scopes.find(s => s.id === el.getAttribute('data-toggle-scope'));
+        if (scope) { showScopeMenu(e.clientX, e.clientY, scope); }
       });
     });
 
@@ -380,14 +500,6 @@
       });
     });
 
-    tree.querySelectorAll('[data-run-scope]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const scope = scopes.find(s => s.id === btn.getAttribute('data-run-scope'));
-        vscode.postMessage({ type: 'runPipeline', project: scope && scope.runProject });
-      });
-    });
-
     tree.querySelectorAll('[data-toggle]').forEach(el => {
       el.addEventListener('click', e => {
         if (e.target.closest('[data-pipe-action]')) { return; }
@@ -395,6 +507,12 @@
         collapsed[id] = !(collapsed[id] !== false);
         persist();
         render();
+      });
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const p = findPipelineById(Number(el.getAttribute('data-toggle')));
+        if (p) { showPipelineMenu(e.clientX, e.clientY, p); }
       });
     });
 
@@ -414,6 +532,12 @@
           jobId: Number(el.getAttribute('data-open-job')),
           newTab: e.ctrlKey || e.metaKey,
         });
+      });
+      el.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const j = findJobById(Number(el.getAttribute('data-open-job')));
+        if (j) { showJobMenu(e.clientX, e.clientY, j); }
       });
     });
 

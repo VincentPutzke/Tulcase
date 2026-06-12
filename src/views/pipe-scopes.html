@@ -267,10 +267,10 @@
     html += '<label class="toggle" title="' + (s.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable') + '">'
           + '<input type="checkbox" data-enable="' + esc(s.id) + '"' + (s.enabled ? ' checked' : '') + '>'
           + '<span class="toggle-track"></span></label>';
-    html += '<span class="scope-label">' + esc(s.label) + '</span>';
     html += '<button class="action-btn bell-btn' + (s.follow ? ' bell-on' : '') + '" data-follow="' + esc(s.id) + '" title="'
           + (s.follow ? 'Following — click to stop notifications' : 'Follow — notify when a pipeline finishes')
           + '">' + (s.follow ? ICONS.bellOn : ICONS.bell) + '</button>';
+    html += '<span class="scope-label">' + esc(s.label) + '</span>';
     html += '<span class="scope-card-actions">';
     html += '<button class="action-btn btn-edit"   data-edit-scope="'   + esc(s.id) + '" title="Edit">'      + ICONS.edit  + '</button>';
     html += '<button class="action-btn btn-copy"   data-dup-scope="'    + esc(s.id) + '" title="Duplicate">' + ICONS.copy  + '</button>';

@@ -133,8 +133,17 @@ export class LogLens implements vscode.Disposable {
         }
         const isPinned = this._pinned.has(key);
 
+        // Preferred switch mechanism: a VS Code *preview tab*.  Opening the
+        // next log as preview replaces the previous one in place — same tab
+        // slot, title updates, no flash of two open files.  Falls back to
+        // manual slot management when the user disabled preview tabs.
+        const previewEnabled = vscode.workspace
+            .getConfiguration('workbench.editor')
+            .get<boolean>('enablePreview', true);
+        const usePreview = !opts.newTab && !isPinned && previewEnabled;
+
         const previousSwitch = this._switchUri;
-        const reuseSlot = !opts.newTab && !isPinned
+        const reuseSlot = !usePreview && !opts.newTab && !isPinned
             && previousSwitch !== undefined && previousSwitch !== key;
 
         // Open in the column of the previous switch tab so the "slot" stays put.
@@ -142,7 +151,7 @@ export class LogLens implements vscode.Disposable {
 
         const doc = await vscode.workspace.openTextDocument(uri);
         const editor = await vscode.window.showTextDocument(doc, {
-            preview: false,
+            preview: usePreview,
             viewColumn: slotColumn ?? vscode.ViewColumn.Active,
         });
 
@@ -152,9 +161,9 @@ export class LogLens implements vscode.Disposable {
         this._applyDecorations(editor);
         this._revealTail(editor);
 
-        if (!opts.newTab && !isPinned) {
+        if (!usePreview && !opts.newTab && !isPinned) {
             this._switchUri = key;
-            // Context switch: close the previous switch-slot tab.
+            // Context switch (manual fallback): close the previous slot tab.
             if (reuseSlot) {
                 const prev = findTab(previousSwitch!);
                 if (prev) {

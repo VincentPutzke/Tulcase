@@ -56,23 +56,29 @@ Scopes → pipelines → stages → jobs, with downstream (child) pipelines nest
 under their trigger jobs. Filters at the top (text matches branch, author,
 SHA, project; plus a status dropdown) apply instantly and persist.
 
-Actions appear on hover, depending on state:
+Safe actions (open in GitLab, copy URL, download artifacts) appear on hover.
+Everything state-changing lives in the **right-click context menu**, so it
+can never be clicked by accident:
 
-| Target   | Actions |
-|----------|---------|
-| Scope    | follow bell, run pipeline |
+| Target   | Right-click menu |
+|----------|------------------|
+| Scope    | run pipeline, follow/unfollow, manage scopes |
 | Pipeline | retry (failed/canceled), cancel (active), open in GitLab, copy URL |
-| Job      | play (manual), retry (finished), cancel (active), open in GitLab, copy URL, download artifacts |
+| Job      | open log (here / new tab), play (manual), retry (finished), cancel (active), open in GitLab, copy URL, artifacts |
 
-**Run Pipeline** (toolbar or scope header) walks you through project →
+The follow bell sits at the front of each scope header (subtle when off,
+solid while following) and toggles with a click.
+
+**Run Pipeline** (toolbar or scope context menu) walks you through project →
 branch (live from the API, or any ref) → optional CI/CD variables, file
 variables, and `spec:inputs` values → go.
 
 ## Job logs
 
-- **Click** a job: the log opens in the *switch slot* — a single reusable
-  editor tab. Clicking another job replaces it, so browsing many jobs never
-  floods your editor.
+- **Click** a job: the log opens as a *preview tab* — clicking another job
+  replaces it in place (same tab slot, no flicker), so browsing many jobs
+  never floods your editor. (With `workbench.editor.enablePreview` disabled,
+  the extension swaps the tab manually instead.)
 - **Ctrl/Cmd + Click**: the log opens as an additional pinned tab and stays.
 
 Logs are read-only, render ANSI colors, auto-follow the tail while you're at
