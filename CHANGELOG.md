@@ -5,7 +5,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.8.2] - 2026-06-13
 
 ### Summary
 Scripts: a full reusable-script tool alongside Commands, in a new dedicated activity-bar tab.
