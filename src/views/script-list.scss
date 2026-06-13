@@ -1,0 +1,36 @@
+// ── Script List Webview Styles ──────────────────────────────────────────────
+// Imports shared styles; adds a description sub-line and the placeholder badge.
+@use 'shared';
+
+// One-line script description under the label.
+.tree-item-desc {
+  font-size  : 11px;
+  color      : var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.7));
+  margin-top : 1px;
+  overflow   : hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Make the script content area read as clickable (opens the file).
+.tree-item-content[data-open] {
+  cursor: pointer;
+}
+
+// ── Placeholder badge ─────────────────────────────────────────────────────────
+.tree-item-placeholders {
+  display: inline-flex;
+  margin-left: 4px;
+}
+
+.placeholder-badge {
+  display       : inline-flex;
+  align-items   : center;
+  gap           : 3px;
+  font-size     : 10px;
+  padding       : 1px 6px;
+  border-radius : 8px;
+  background    : var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
+  color         : var(--vscode-badge-foreground, var(--vscode-descriptionForeground));
+  white-space   : nowrap;
+}

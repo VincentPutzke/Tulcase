@@ -23,6 +23,7 @@ const EMPTY_DB_STORES: Record<string, string> = {
     [path.join('todo_db', 'recurring.json')]: '[]',
     [path.join('tags_db', 'tags.json')]:      '{"tags":{}}',
     [path.join('commands_db', 'commands.json')]: '{"items":[]}',
+    [path.join('scripts_db', 'scripts.json')]: '{"items":[],"folders":[]}',
     [path.join('links_db', 'links.json')]:    '{"root":[]}',
     [path.join('lists_db', 'lists.json')]:    '{"notes":[],"folders":[]}',
     [path.join('pipe_db', 'scopes.json')]:    '{"scopes":[],"logRules":[]}',
@@ -46,6 +47,8 @@ export interface TulcaseSettings {
     tagsFile: string;
     recurringFile: string;
     commandsFile: string;
+    scriptsFile: string;
+    scriptsDir: string;
     linksFile: string;
     listsFile: string;
     recordsDir: string;
@@ -116,6 +119,8 @@ export function ensureDatabase(dbDir: string): void {
     }
     // Ensure records_db exists (no seed data — it fills over time)
     fs.mkdirSync(path.join(dbDir, 'records_db'), { recursive: true });
+    // Ensure the scripts file directory exists (holds one .sh file per script)
+    fs.mkdirSync(path.join(dbDir, 'scripts_db', 'files'), { recursive: true });
 }
 
 /**
@@ -165,6 +170,8 @@ function derivePaths(rootDir: string, dbName: string) {
         tagsFile:      path.join(base, 'tags_db', 'tags.json'),
         recurringFile: path.join(base, 'todo_db', 'recurring.json'),
         commandsFile:  path.join(base, 'commands_db', 'commands.json'),
+        scriptsFile:   path.join(base, 'scripts_db', 'scripts.json'),
+        scriptsDir:    path.join(base, 'scripts_db', 'files'),
         linksFile:     path.join(base, 'links_db', 'links.json'),
         listsFile:     path.join(base, 'lists_db', 'lists.json'),
         recordsDir:    path.join(base, 'records_db'),

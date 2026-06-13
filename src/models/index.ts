@@ -5,4 +5,5 @@ export { CommandItem, CommandFolder, CommandStore, LegacyCommandEntry, LegacyCom
 export { LinkNode, LinkStore } from './link.model';
 export { MiniList, ListItem, ListStore } from './list.model';
 export { NoteItem, NoteFolder, NoteStore } from './note.model';
+export { ScriptItem, ScriptFolder, ScriptStore } from './script.model';
 export { RecordEntry, RecordDb, RecordIndexEntry } from './record.model';

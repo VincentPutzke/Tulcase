@@ -25,6 +25,8 @@ import { TodoListViewProvider } from './views/todo-list.view';
 import { TagTreeProvider } from './providers/tag-tree.provider';
 import { TagListViewProvider } from './views/tag-list.view';
 import { CommandListViewProvider } from './views/command-list.view';
+import { ScriptListViewProvider } from './views/script-list.view';
+import { ScriptFileSystemProvider } from './data/script-fs';
 import { LinkListViewProvider } from './views/link-list.view';
 import { NoteListViewProvider } from './views/note-list.view';
 import { NoteFileSystemProvider } from './data/note-fs';
@@ -34,6 +36,7 @@ import { RecordCalendarViewProvider } from './views/record-calendar.view';
 import { registerTodoCommands } from './commands/todo-commands';
 import { registerTagCommands } from './commands/tag-commands';
 import { registerCommandCommands } from './commands/command-commands';
+import { registerScriptCommands } from './commands/script-commands';
 import { registerLinkCommands } from './commands/link-commands';
 import { registerListCommands } from './commands/list-commands';
 import { registerRecordCommands } from './commands/record-commands';
@@ -42,6 +45,7 @@ import { registerPlaceholderCommands } from './utils/placeholder-resolve';
 import { StatusBar } from './views/status-bar';
 import { SyncService } from './sync/sync-service';
 import { SyncPanelViewProvider } from './views/sync-panel.view';
+import { openSyncConflictResolver } from './views/sync-conflict-resolver';
 import { AutoSync } from './sync/auto-sync';
 import { registerChatTools } from './chat/tools';
 import { registerPipeChatTools } from './chat/pipe-tools';
@@ -61,6 +65,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const tagList     = new TagListViewProvider(settings, tagTree);
     const todoList    = new TodoListViewProvider(settings, tagTree);
     const commandList = new CommandListViewProvider(settings, tagTree);
+    const scriptList  = new ScriptListViewProvider(settings, tagTree);
+    const scriptFs    = new ScriptFileSystemProvider(settings);
     const linkList    = new LinkListViewProvider(settings, tagTree);
     const noteList    = new NoteListViewProvider(settings, tagTree);
     const noteFs      = new NoteFileSystemProvider(settings);
@@ -70,6 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // Sync panel
     const syncService = new SyncService(settings, context.secrets);
+    syncService.setConflictResolver(openSyncConflictResolver);
     const syncPanel   = new SyncPanelViewProvider(syncService, context.secrets);
 
     // File watcher for cross-instance sync (created early so the pipe
@@ -97,6 +104,12 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.registerWebviewViewProvider(
             CommandListViewProvider.viewType,
             commandList,
+            { webviewOptions: { retainContextWhenHidden: true } },
+        ),
+        vscode.workspace.registerFileSystemProvider(ScriptFileSystemProvider.scheme, scriptFs),
+        vscode.window.registerWebviewViewProvider(
+            ScriptListViewProvider.viewType,
+            scriptList,
             { webviewOptions: { retainContextWhenHidden: true } },
         ),
         vscode.window.registerWebviewViewProvider(
@@ -133,6 +146,7 @@ export function activate(context: vscode.ExtensionContext): void {
         tagTree.refresh();
         tagList.refresh();
         commandList.refresh();
+        scriptList.refresh();
         linkList.refresh();
         noteList.refresh();
         recordCalendar.refresh();
@@ -152,6 +166,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerTodoCommands(context, settings, todoList, tagTree);
     registerTagCommands(context, settings, tagList, refreshAll);
     registerCommandCommands(context, settings, commandList, tagTree);
+    registerScriptCommands(context, settings, scriptList, tagTree);
     registerLinkCommands(context, settings, linkList);
     registerListCommands(context, settings, noteList, tagTree);
     registerRecordCommands(context, settings, recordCalendar);
@@ -165,10 +180,14 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('tulcase.refresh', refreshAll),
         vscode.commands.registerCommand('tulcase.sync.commit', () => syncService.commit()),
         vscode.commands.registerCommand('tulcase.sync.push', () => syncService.push()),
-        vscode.commands.registerCommand('tulcase.sync.pull', () => syncService.pull()),
+        vscode.commands.registerCommand('tulcase.sync.pull', () => syncService.pull({ interactive: true })),
         vscode.commands.registerCommand('tulcase.sync.fullSync', async () => {
             const ok = await syncService.setup();
-            if (ok) { await syncService.fullSync(); }
+            if (ok) { await syncService.fullSync({ interactive: true }); }
+        }),
+        vscode.commands.registerCommand('tulcase.sync.resolveConflicts', async () => {
+            const ok = await syncService.setup({ interactive: true });
+            if (ok) { await syncService.fullSync({ interactive: true }); }
         }),
         vscode.commands.registerCommand('tulcase.sync.resetToRemote', async () => {
             const confirm = await vscode.window.showWarningMessage(
@@ -195,6 +214,7 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher.onTodosChanged(() => { todoList.refresh(); statusBar.update(); });
     watcher.onTagsChanged(() => { tagTree.refresh(); tagList.refresh(); });
     watcher.onCommandsChanged(() => commandList.refresh());
+    watcher.onScriptsChanged(() => scriptList.refresh());
     watcher.onLinksChanged(() => linkList.refresh());
     watcher.onListsChanged(() => { noteList.refresh(); noteDecorator.refreshAll(); });
     watcher.onRecordsChanged(() => recordCalendar.refresh());
@@ -206,21 +226,23 @@ export function activate(context: vscode.ExtensionContext): void {
     // 8. Auto-save notes on tab close
     context.subscriptions.push(
         vscode.workspace.onWillSaveTextDocument(e => {
-            // Ensure aplist documents are always saved (no dirty prompt)
-            if (e.document.uri.scheme === NoteFileSystemProvider.scheme) {
+            // Ensure note / script documents are always saved (no dirty prompt)
+            if (
+                e.document.uri.scheme === NoteFileSystemProvider.scheme ||
+                e.document.uri.scheme === ScriptFileSystemProvider.scheme
+            ) {
                 e.waitUntil(Promise.resolve([]));
             }
         }),
         vscode.window.tabGroups.onDidChangeTabs(e => {
-            // When a note tab is closed, auto-save its content
+            // When a note / script tab is closed, refresh the matching sidebar.
             for (const tab of e.closed) {
-                if (
-                    tab.input instanceof vscode.TabInputText &&
-                    tab.input.uri.scheme === NoteFileSystemProvider.scheme
-                ) {
-                    // The FS provider's writeFile has already been called by VS Code
-                    // on dirty-close; just refresh the sidebar to update line counts.
+                if (!(tab.input instanceof vscode.TabInputText)) { continue; }
+                const scheme = tab.input.uri.scheme;
+                if (scheme === NoteFileSystemProvider.scheme) {
                     noteList.refresh();
+                } else if (scheme === ScriptFileSystemProvider.scheme) {
+                    scriptList.refresh();
                 }
             }
         }),

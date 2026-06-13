@@ -170,6 +170,91 @@ export async function gitFetch(dir: string, remoteUrl: string, pat: string): Pro
     return run(dir, ['fetch', url]);
 }
 
+/**
+ * Fetch the remote `main` into the `origin/main` tracking ref.
+ * (A plain `git fetch <url>` only updates FETCH_HEAD — the tracking ref the
+ * merge/ahead-behind logic relies on would stay stale.)
+ */
+export async function gitFetchMain(dir: string, remoteUrl: string, pat: string): Promise<GitResult> {
+    const url = authenticatedUrl(remoteUrl, pat);
+    return run(dir, ['fetch', url, '+main:refs/remotes/origin/main']);
+}
+
+/** Commits on `origin/main` that HEAD doesn't have (how far we are behind). */
+export async function behindCount(dir: string): Promise<number> {
+    const r = await run(dir, ['rev-list', '--count', 'HEAD..origin/main']);
+    return r.code === 0 ? Number(r.stdout.trim()) || 0 : 0;
+}
+
+/** Commits on HEAD that `origin/main` doesn't have (how far we are ahead). */
+export async function aheadCount(dir: string): Promise<number> {
+    const r = await run(dir, ['rev-list', '--count', 'origin/main..HEAD']);
+    return r.code === 0 ? Number(r.stdout.trim()) || 0 : 0;
+}
+
+/** `git merge <ref> --no-edit` — does NOT auto-abort on conflict. */
+export async function gitMerge(dir: string, ref: string): Promise<GitResult> {
+    return run(dir, ['merge', '--no-edit', ref]);
+}
+
+/** `git merge --ff-only <ref>`. */
+export async function gitMergeFfOnly(dir: string, ref: string): Promise<GitResult> {
+    return run(dir, ['merge', '--ff-only', ref]);
+}
+
+/** Abort an in-progress merge (best effort). */
+export async function gitMergeAbort(dir: string): Promise<GitResult> {
+    return run(dir, ['merge', '--abort']);
+}
+
+/** Whether a merge is currently in progress (MERGE_HEAD exists). */
+export async function isMergeInProgress(dir: string): Promise<boolean> {
+    const r = await run(dir, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
+    return r.code === 0;
+}
+
+/** Repo-relative paths of files with unresolved merge conflicts. */
+export async function listConflictedFiles(dir: string): Promise<string[]> {
+    const r = await run(dir, ['diff', '--name-only', '--diff-filter=U']);
+    if (r.code !== 0) { return []; }
+    return r.stdout.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+/**
+ * Content of one side of a conflicted file from the index.
+ * Stage 1 = common ancestor, 2 = ours (local), 3 = theirs (remote).
+ * Returns undefined when that stage doesn't exist (e.g. add/add has no base).
+ */
+export async function getStageContent(
+    dir: string,
+    file: string,
+    stage: 1 | 2 | 3,
+): Promise<string | undefined> {
+    const r = await run(dir, ['show', `:${stage}:${file}`]);
+    return r.code === 0 ? r.stdout : undefined;
+}
+
+/** Stage a single file (marks its conflict as resolved). */
+export async function stageFile(dir: string, file: string): Promise<GitResult> {
+    return run(dir, ['add', '--', file]);
+}
+
+/** Resolve a conflicted file by taking one side wholesale, then stage it. */
+export async function takeConflictSide(
+    dir: string,
+    file: string,
+    side: 'ours' | 'theirs',
+): Promise<GitResult> {
+    const co = await run(dir, ['checkout', side === 'ours' ? '--ours' : '--theirs', '--', file]);
+    if (co.code !== 0) { return co; }
+    return stageFile(dir, file);
+}
+
+/** Conclude an in-progress merge with a commit (after all conflicts staged). */
+export async function gitCommitMerge(dir: string, message: string): Promise<GitResult> {
+    return run(dir, ['commit', '--no-edit', '-m', message]);
+}
+
 /** Get the timestamp of the last commit (ISO format), or undefined. */
 export async function lastCommitTime(dir: string): Promise<string | undefined> {
     const r = await run(dir, ['log', '-1', '--format=%cI']);

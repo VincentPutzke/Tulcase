@@ -28,6 +28,7 @@
   "activationEvents": [
     "onView:tulcase.todos",
     "onView:tulcase.commands",
+    "onView:tulcase.scripts",
     "onView:tulcase.links",
     "onView:tulcase.lists",
     "onView:tulcase.tags",
@@ -89,6 +90,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show the latest pipeline status for the current Git branch in the status bar."
+        },
+        "tulcase.scripts.interpreter": {
+          "type": "string",
+          "default": "bash",
+          "description": "Interpreter used to run saved scripts in the integrated terminal (e.g. bash, sh, zsh). The script path is passed as the single argument."
         }
       }
     },
@@ -98,6 +104,11 @@
           "id": "tulcase",
           "title": "Tulcase",
           "icon": "media/icon.svg"
+        },
+        {
+          "id": "tulcase-commands",
+          "title": "Commands & Scripts",
+          "icon": "media/commands-icon.svg"
         },
         {
           "id": "tulcase-pipe",
@@ -126,11 +137,6 @@
           "type": "webview"
         },
         {
-          "id": "tulcase.commands",
-          "name": "Commands",
-          "type": "webview"
-        },
-        {
           "id": "tulcase.lists",
           "name": "Notes",
           "type": "webview"
@@ -143,6 +149,18 @@
         {
           "id": "tulcase.sync",
           "name": "Git Sync",
+          "type": "webview"
+        }
+      ],
+      "tulcase-commands": [
+        {
+          "id": "tulcase.commands",
+          "name": "Commands",
+          "type": "webview"
+        },
+        {
+          "id": "tulcase.scripts",
+          "name": "Scripts",
           "type": "webview"
         }
       ],
@@ -208,6 +226,24 @@
         "title": "Insert Command in Terminal",
         "category": "Tulcase",
         "icon": "$(terminal)"
+      },
+      {
+        "command": "tulcase.script.add",
+        "title": "Add Script",
+        "category": "Tulcase",
+        "icon": "$(add)"
+      },
+      {
+        "command": "tulcase.script.open",
+        "title": "Open Script",
+        "category": "Tulcase",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "tulcase.script.run",
+        "title": "Run Script",
+        "category": "Tulcase",
+        "icon": "$(play)"
       },
       {
         "command": "tulcase.link.add",
@@ -298,6 +334,11 @@
       {
         "command": "tulcase.sync.fullSync",
         "title": "Sync: Full Sync",
+        "category": "Tulcase"
+      },
+      {
+        "command": "tulcase.sync.resolveConflicts",
+        "title": "Sync: Resolve Conflicts",
         "category": "Tulcase"
       },
       {
@@ -407,6 +448,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "tulcase.script.add",
+          "when": "view == tulcase.scripts",
+          "group": "navigation@1"
+        },
         {
           "command": "tulcase.tag.add",
           "when": "view == tulcase.tags",
@@ -1132,6 +1178,214 @@
             "id": {
               "type": "string",
               "description": "The command or folder ID to move."
+            },
+            "targetFolderId": {
+              "type": "string",
+              "description": "Destination folder ID. Omit or empty for root."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_list_scripts",
+        "displayName": "Tulcase: List Scripts",
+        "toolReferenceName": "tulcase_list_scripts",
+        "icon": "$(terminal-bash)",
+        "userDescription": "List all Tulcase saved scripts and folders, with optional tag filtering.",
+        "modelDescription": "List Tulcase scripts (reusable shell scripts). Returns scripts (id, label, description, tags, folder, createdAt, updatedAt) and folders. Script bodies live in .sh files on disk and are NOT included here — use tulcase_read_script to get a body. Optionally filter by tag.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "Filter scripts to only those with this tag."
+            }
+          }
+        }
+      },
+      {
+        "name": "tulcase_read_script",
+        "displayName": "Tulcase: Read Script",
+        "toolReferenceName": "tulcase_read_script",
+        "icon": "$(open-preview)",
+        "userDescription": "Read the full body of a Tulcase script by ID.",
+        "modelDescription": "Read the full .sh body and metadata of a Tulcase script by its ID. Returns the script metadata, the content string, and the list of <$name$> placeholders found in the body. Use tulcase_list_scripts first to find valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The script ID to read."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_add_script",
+        "displayName": "Tulcase: Add Script",
+        "toolReferenceName": "tulcase_add_script",
+        "icon": "$(add)",
+        "userDescription": "Create a new Tulcase script (with its .sh body).",
+        "modelDescription": "Create a new Tulcase script. Requires a label and the content (the shell script body, written to a .sh file on disk). Optionally set a description, tags, and folder ID. Use <$name$> tokens in the content for placeholders that are filled in at run time. Add a '# tulcase: no-confirm' comment line to skip the run confirmation.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "Display name for the script."
+            },
+            "content": {
+              "type": "string",
+              "description": "The shell script body (.sh file content)."
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional one-line description."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Tag names to attach."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Folder ID. Omit or empty for root."
+            }
+          },
+          "required": [
+            "label",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_edit_script",
+        "displayName": "Tulcase: Edit Script",
+        "toolReferenceName": "tulcase_edit_script",
+        "icon": "$(edit)",
+        "userDescription": "Edit a Tulcase script (label, description, body, tags, or folder).",
+        "modelDescription": "Edit a Tulcase script by ID. Can change label, description, content (the .sh body), tags, or folder. Only the provided fields change. Use tulcase_list_scripts first to get valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The script ID to edit."
+            },
+            "label": {
+              "type": "string",
+              "description": "New display name."
+            },
+            "content": {
+              "type": "string",
+              "description": "New shell script body (.sh file content)."
+            },
+            "description": {
+              "type": "string",
+              "description": "New one-line description."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replace tags with this list."
+            },
+            "folder": {
+              "type": "string",
+              "description": "Move to this folder ID. Use an empty string for root."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_delete_script",
+        "displayName": "Tulcase: Delete Script",
+        "toolReferenceName": "tulcase_delete_script",
+        "icon": "$(trash)",
+        "userDescription": "Delete a Tulcase script and its .sh file by ID.",
+        "modelDescription": "Permanently delete a Tulcase script by its ID, removing both its metadata and its backing .sh file. Use tulcase_list_scripts first to find valid IDs.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The script ID to delete."
+            }
+          },
+          "required": [
+            "id"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_manage_script_folder",
+        "displayName": "Tulcase: Manage Script Folder",
+        "toolReferenceName": "tulcase_manage_script_folder",
+        "icon": "$(folder)",
+        "userDescription": "Create, rename, or delete script folders in Tulcase.",
+        "modelDescription": "Manage Tulcase script folders. Action create makes a folder optionally under parentId. Action rename changes a folder name by id. Action delete removes a folder by id and reparents its direct child scripts and direct subfolders to the deleted folder's parent.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "create",
+                "rename",
+                "delete"
+              ],
+              "description": "Folder operation to perform."
+            },
+            "id": {
+              "type": "string",
+              "description": "Existing folder ID. Required for rename and delete."
+            },
+            "name": {
+              "type": "string",
+              "description": "Folder name. Required for create and rename."
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent folder ID for create. Omit or empty for root."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      },
+      {
+        "name": "tulcase_move_script_entry",
+        "displayName": "Tulcase: Move Script Entry",
+        "toolReferenceName": "tulcase_move_script_entry",
+        "icon": "$(move)",
+        "userDescription": "Move a script or script folder into another folder or back to root.",
+        "modelDescription": "Move a Tulcase script entry by id. The id may belong to either a script or a folder. targetFolderId selects the destination folder. Omit targetFolderId or use an empty string to move the entry to root.",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The script or folder ID to move."
             },
             "targetFolderId": {
               "type": "string",

@@ -118,3 +118,16 @@ Tulcase becomes much more valuable when each module has one clear job:
 - Records for evidence
 
 That separation keeps each surface simple and keeps the whole system fast.
+
+## 11. Let Git Sync reconcile normal multi-workspace edits
+
+When the same data repository is open from multiple workspaces, Git Sync now works best as the shared handoff point instead of a reset button.
+
+Useful habits:
+
+- keep auto-sync enabled for routine commit, pull, and push cycles
+- use **Sync: Full Sync** before switching machines or ending a session
+- if both workspaces edited the same data, let the sync flow merge first
+- when a resolver panel opens, choose Local or Remote per file and finish the merge from there
+
+Tulcase data stores are merged at the item level where possible, so common cases such as one note added on each machine should sync without manual conflict work.

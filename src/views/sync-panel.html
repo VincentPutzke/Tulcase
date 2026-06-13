@@ -28,6 +28,7 @@
       <button class="sync-btn sync-btn-secondary" id="btnPush" disabled>Push</button>
       <button class="sync-btn sync-btn-secondary" id="btnPull" disabled>Pull</button>
       <button class="sync-btn sync-btn-primary" id="btnFullSync" disabled>Full Sync</button>
+      <button class="sync-btn sync-btn-primary" id="btnResolve" disabled>Resolve Conflicts</button>
     </div>
   </div>
 
@@ -69,6 +70,7 @@
   var btnPush     = document.getElementById('btnPush');
   var btnPull     = document.getElementById('btnPull');
   var btnFullSync = document.getElementById('btnFullSync');
+  var btnResolve  = document.getElementById('btnResolve');
   var btnSetup    = document.getElementById('btnSetup');
   var autoSyncEl  = document.getElementById('autoSync');
 
@@ -77,6 +79,7 @@
   btnPush.addEventListener('click',     function () { vscode.postMessage({ type: 'push' }); });
   btnPull.addEventListener('click',     function () { vscode.postMessage({ type: 'pull' }); });
   btnFullSync.addEventListener('click', function () { vscode.postMessage({ type: 'fullSync' }); });
+  btnResolve.addEventListener('click',  function () { vscode.postMessage({ type: 'resolveConflicts' }); });
   btnSetup.addEventListener('click',    function () { vscode.postMessage({ type: 'openSetup' }); });
 
   // ── Auto-sync toggle ───────────────────────────────
@@ -102,10 +105,12 @@
 
     var configured = state.status !== 'not-configured' && state.status !== 'no-git';
     var busy       = state.status === 'syncing';
+    var conflict   = state.status === 'conflict';
     btnCommit.disabled   = !configured || busy;
     btnPush.disabled     = !configured || busy;
     btnPull.disabled     = !configured || busy;
     btnFullSync.disabled = !configured || busy;
+    btnResolve.disabled  = !configured || busy || !conflict;
   }
 
   // ── Message handler ─────────────────────────────────
