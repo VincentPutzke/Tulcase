@@ -165,17 +165,16 @@ body.sidebar-mode .tree-pane {
   padding-bottom : 0px;
 }
 
+// The markup ships an empty `.search-icon` span (no glyph is rendered), so it
+// must not reserve horizontal space — otherwise the input text starts with a
+// blank gap on the left. Kept hidden so the input padding can stay symmetric.
 .search-icon {
-  position       : absolute;
-  left           : 8px;
-  font-size      : 14px;
-  opacity        : 0.5;
-  pointer-events : none;
+  display: none;
 }
 
 .search-input {
   width         : 100%;
-  padding       : 5px 8px 5px 28px;
+  padding       : 5px 8px;
   background    : $input-bg;
   color         : $input-fg;
   border        : 1px solid $input-border;

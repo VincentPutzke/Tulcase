@@ -41,8 +41,21 @@
       <option value="skipped">Skipped</option>
     </select>
   </div>
-  <!-- Workspace-local tag filter (per-workspace, not synced). Hidden when no tags. -->
-  <div class="tag-filter-bar" id="tag-filter" hidden></div>
+  <!-- Workspace-local tag filter (per-workspace, not synced). Hidden when no tags.
+       Type a tag and press Enter to add it as a filter bubble. -->
+  <div class="tag-filter" id="tag-filter" hidden>
+    <input
+      class="search-input tag-filter-input"
+      id="tag-filter-input"
+      type="text"
+      placeholder="Filter by tag — type and press Enter"
+      spellcheck="false"
+      autocomplete="off"
+      list="tag-filter-suggestions"
+    >
+    <datalist id="tag-filter-suggestions"></datalist>
+    <div class="tag-filter-chips" id="tag-filter-chips"></div>
+  </div>
 </div>
 
 <!-- ── Tree pane ────────────────────────────────────────── -->
@@ -599,29 +612,44 @@
   elText.addEventListener('input', applyFilter);
   elStatus.addEventListener('change', applyFilter);
 
-  // ── Workspace-local tag filter ───────────────────────────
-  const elTagFilter = document.getElementById('tag-filter');
+  // ── Workspace-local tag filter (type → Enter → bubble) ───
+  const elTagFilter   = document.getElementById('tag-filter');
+  const elTagInput    = document.getElementById('tag-filter-input');
+  const elTagChips    = document.getElementById('tag-filter-chips');
+  const elTagSuggest  = document.getElementById('tag-filter-suggestions');
+
+  function tagColor(name) {
+    const found = availableTags.find(t => t.name === name);
+    return found ? found.color : 'var(--vscode-descriptionForeground)';
+  }
 
   function renderTagFilter() {
-    if (!availableTags.length) {
+    // Only offer tag filtering when there are tagged scopes to filter.
+    if (!availableTags.length && !selectedTags.length) {
       elTagFilter.hidden = true;
-      elTagFilter.innerHTML = '';
       return;
     }
     elTagFilter.hidden = false;
+
+    // Autocomplete suggestions = available tags not already selected.
     const sel = new Set(selectedTags);
+    elTagSuggest.innerHTML = availableTags
+      .filter(t => !sel.has(t.name))
+      .map(t => '<option value="' + esc(t.name) + '"></option>')
+      .join('');
+
+    // Bubbles for the tags the user added (each removable; Clear when >1).
     let html = '';
-    for (const t of availableTags) {
-      const on = sel.has(t.name);
-      html += '<button class="tag-chip' + (on ? ' active' : '') + '" data-tag="' + esc(t.name)
-            + '" title="' + (on ? 'Click to remove from filter' : 'Click to filter by this tag') + '">'
-            + '<span class="tag-chip-dot" style="background:' + esc(t.color) + ';"></span>'
-            + esc(t.name) + '</button>';
+    for (const name of selectedTags) {
+      html += '<span class="tag-chip active" data-remove-tag="' + esc(name) + '" title="Remove filter">'
+            + '<span class="tag-chip-dot" style="background:' + esc(tagColor(name)) + ';"></span>'
+            + esc(name)
+            + '<span class="tag-chip-x">×</span></span>';
     }
-    if (sel.size > 0) {
-      html += '<button class="tag-chip tag-chip-clear" data-clear-tags="1" title="Show all scopes">Clear</button>';
+    if (selectedTags.length > 1) {
+      html += '<button class="tag-chip tag-chip-clear" data-clear-tags="1" title="Show all scopes">Clear all</button>';
     }
-    elTagFilter.innerHTML = html;
+    elTagChips.innerHTML = html;
   }
 
   function setTagFilter(tags) {
@@ -632,16 +660,29 @@
     vscode.postMessage({ type: 'setTagFilter', tags: tags });
   }
 
-  elTagFilter.addEventListener('click', (e) => {
-    const clear = e.target.closest('[data-clear-tags]');
-    if (clear) { setTagFilter([]); return; }
-    const chip = e.target.closest('[data-tag]');
+  function addTagFromInput() {
+    const value = elTagInput.value.trim();
+    elTagInput.value = '';
+    if (!value || selectedTags.includes(value)) { return; }
+    setTagFilter(selectedTags.concat([value]));
+  }
+
+  elTagInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTagFromInput();
+    } else if (e.key === 'Backspace' && !elTagInput.value && selectedTags.length) {
+      // Empty input + Backspace removes the last bubble (common token-field UX).
+      setTagFilter(selectedTags.slice(0, -1));
+    }
+  });
+
+  elTagChips.addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear-tags]')) { setTagFilter([]); return; }
+    const chip = e.target.closest('[data-remove-tag]');
     if (!chip) { return; }
-    const name = chip.getAttribute('data-tag');
-    const next = selectedTags.includes(name)
-      ? selectedTags.filter(t => t !== name)
-      : selectedTags.concat([name]);
-    setTagFilter(next);
+    const name = chip.getAttribute('data-remove-tag');
+    setTagFilter(selectedTags.filter(t => t !== name));
   });
 
   // Cap the persisted collapse state: once it grows past the threshold,

@@ -41,14 +41,27 @@
   }
 }
 
-// ── Workspace-local tag filter chips ──────────────────────────────────────────
-.tag-filter-bar {
+// ── Workspace-local tag filter (type → Enter → bubble) ─────────────────────────
+.tag-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+
+  &[hidden] { display: none; }
+}
+
+.tag-filter-input {
+  // Inherits .search-input; nothing extra needed beyond the shared box.
+  font-size: 12px;
+}
+
+.tag-filter-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 6px;
 
-  &[hidden] { display: none; }
+  &:empty { display: none; }
 }
 
 .tag-chip {
@@ -83,6 +96,13 @@
   height: 8px;
   border-radius: 50%;
   flex: 0 0 auto;
+}
+
+.tag-chip-x {
+  margin-left: 2px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.8;
 }
 
 // Banner styles come from _shared.scss.
