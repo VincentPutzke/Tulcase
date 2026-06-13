@@ -37,6 +37,12 @@ export class PipelinePoller extends PollerBase {
         private readonly client:    GitLabClient,
         private readonly store:     PipelineStore,
         private readonly scopes:    PipeScopeStore,
+        /**
+         * Optional workspace-local gate: scopes for which this returns false
+         * are neither fetched nor kept in the store (the tag filter uses this
+         * so excluded pipelines stop updating). Defaults to "everything active".
+         */
+        private readonly isScopeActive: (scope: PipeScope) => boolean = () => true,
     ) {
         super();
     }
@@ -67,18 +73,20 @@ export class PipelinePoller extends PollerBase {
 
     protected async tick(signal: AbortSignal): Promise<void> {
         const all = await this.scopes.listScopes();
-        const enabled = all.filter(s => s.enabled);
+        // The tag filter (if any) excludes scopes from BOTH the store and the
+        // fetch set, so filtered-out pipelines stop updating entirely.
+        const active = all.filter(s => s.enabled && this.isScopeActive(s));
 
-        // Keep data for every enabled scope (even in followed-only mode the
+        // Keep data for every active scope (even in followed-only mode the
         // hidden view should show recent data when re-opened), but only fetch
         // the mode's subset.  Mode 'off' still serves explicit `tickNow()`
         // calls (refresh command, post-action re-polls) with a full fetch —
         // scheduled polling simply never runs in that mode.
-        this.store.pruneScopeIds(enabled.map(s => s.id));
+        this.store.pruneScopeIds(active.map(s => s.id));
 
         const toFetch = this._mode === 'followed'
-            ? enabled.filter(s => s.follow)
-            : enabled;
+            ? active.filter(s => s.follow)
+            : active;
         if (toFetch.length === 0) { return; }
 
         const concurrency = this.getConfig().maxConcurrentRequests;

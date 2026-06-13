@@ -6,6 +6,7 @@ import type { PipelineStore } from '../pipe/pipeline-store';
 import type { PipeScopeStore } from '../pipe/scope-store';
 import type { GitLabSecrets } from '../pipe/secrets';
 import type { PipelinePoller } from '../pipe/pipeline-poller';
+import type { PipeTagFilter } from '../pipe/tag-filter';
 import type { Job, Pipeline, PipeScope } from '../pipe/models';
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from '../pipe/models';
 import type { Subscription } from '../pipe/events';
@@ -35,6 +36,7 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
         private readonly scopes: PipeScopeStore,
         private readonly secrets: GitLabSecrets,
         private readonly poller: PipelinePoller,
+        private readonly tagFilter: PipeTagFilter,
         /** Called with the view's visibility so the feature can pick a poll mode. */
         private readonly onVisibility: (visible: boolean) => void,
     ) {
@@ -44,6 +46,7 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
             // coalesce them into a single webview refresh.
             store.onDidChange(() => this._refreshSoon()),
             scopes.onDidChange(() => this._refreshSoon()),
+            tagFilter.onDidChange(() => this._refreshSoon()),
             poller.onError(err => this._showBanner(err.message)),
             poller.onTickStart(() => this._clearBanner()),
         );
@@ -83,10 +86,14 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
         project?: string;
         action?: string;
         newTab?: boolean;
+        tags?: string[];
     }): Promise<void> {
         switch (msg.type) {
             case 'requestData':
                 await this._sendData();
+                break;
+            case 'setTagFilter':
+                await this.tagFilter.setSelected(Array.isArray(msg.tags) ? msg.tags : []);
                 break;
             case 'refresh':
                 await vscode.commands.executeCommand('tulcase.pipe.refresh');
@@ -161,14 +168,32 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
             this.tagTree.getTagMap(),
         ]);
 
-        const scopes = allScopes
-            .filter(s => s.enabled)
+        const enabled = allScopes.filter(s => s.enabled);
+
+        // The tag universe for the filter chips is built from ALL enabled
+        // scopes (so filtered-out scopes can still be re-selected), with colors.
+        const tagNames = new Set<string>();
+        for (const s of enabled) {
+            for (const name of s.tags) { tagNames.add(name); }
+        }
+        const availableTags = Array.from(tagNames)
+            .sort((a, b) => a.localeCompare(b))
+            .map(name => ({ name, color: tagMap[name]?.color ?? DEFAULT_TAG_COLOR }));
+
+        const selectedTags = this.tagFilter.selected;
+
+        // Only scopes passing the workspace-local tag filter are shown.
+        const scopes = enabled
+            .filter(s => this.tagFilter.matches(s))
             .map(s => this._serializeScope(s, tagMap));
 
         this._view.webview.postMessage({
             type: 'updateData',
             hasToken,
             totalScopes: allScopes.length,
+            enabledScopes: enabled.length,
+            availableTags,
+            selectedTags,
             scopes,
         });
     }
