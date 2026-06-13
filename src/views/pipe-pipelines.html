@@ -41,6 +41,8 @@
       <option value="skipped">Skipped</option>
     </select>
   </div>
+  <!-- Workspace-local tag filter (per-workspace, not synced). Hidden when no tags. -->
+  <div class="tag-filter-bar" id="tag-filter" hidden></div>
 </div>
 
 <!-- ── Tree pane ────────────────────────────────────────── -->
@@ -68,11 +70,14 @@
   }
 
   // ── Reactive state ───────────────────────────────────────
-  let scopes      = [];
-  let hasToken    = false;
-  let totalScopes = 0;
-  let gotData     = false;
-  let bannerMsg   = null;
+  let scopes        = [];
+  let hasToken      = false;
+  let totalScopes   = 0;
+  let enabledScopes = 0;
+  let availableTags = [];   // [{ name, color }] across all enabled scopes
+  let selectedTags  = [];   // workspace-local selection (authoritative host-side)
+  let gotData       = false;
+  let bannerMsg     = null;
 
   // ── DOM refs ─────────────────────────────────────────────
   const tree     = document.getElementById('tree-content');
@@ -345,6 +350,14 @@
       bindEmpty();
       return;
     }
+    if (scopes.length === 0 && selectedTags.length > 0 && enabledScopes > 0) {
+      tree.innerHTML =
+        '<div class="empty-state">No scopes match the selected tag filter.<br><br>'
+        + '<button class="add-btn empty-state-btn" data-clear-tags="1">Clear Tag Filter</button>'
+        + '</div>';
+      bindEmpty();
+      return;
+    }
     if (scopes.length === 0) {
       tree.innerHTML =
         '<div class="empty-state">All scopes are disabled. Enable one in the Pipe Scopes view.<br><br>'
@@ -474,6 +487,9 @@
         vscode.postMessage({ type: btn.getAttribute('data-empty-action') });
       });
     });
+    tree.querySelectorAll('[data-clear-tags]').forEach(btn => {
+      btn.addEventListener('click', () => setTagFilter([]));
+    });
   }
 
   function bind() {
@@ -583,6 +599,51 @@
   elText.addEventListener('input', applyFilter);
   elStatus.addEventListener('change', applyFilter);
 
+  // ── Workspace-local tag filter ───────────────────────────
+  const elTagFilter = document.getElementById('tag-filter');
+
+  function renderTagFilter() {
+    if (!availableTags.length) {
+      elTagFilter.hidden = true;
+      elTagFilter.innerHTML = '';
+      return;
+    }
+    elTagFilter.hidden = false;
+    const sel = new Set(selectedTags);
+    let html = '';
+    for (const t of availableTags) {
+      const on = sel.has(t.name);
+      html += '<button class="tag-chip' + (on ? ' active' : '') + '" data-tag="' + esc(t.name)
+            + '" title="' + (on ? 'Click to remove from filter' : 'Click to filter by this tag') + '">'
+            + '<span class="tag-chip-dot" style="background:' + esc(t.color) + ';"></span>'
+            + esc(t.name) + '</button>';
+    }
+    if (sel.size > 0) {
+      html += '<button class="tag-chip tag-chip-clear" data-clear-tags="1" title="Show all scopes">Clear</button>';
+    }
+    elTagFilter.innerHTML = html;
+  }
+
+  function setTagFilter(tags) {
+    // Optimistic local update for instant feedback; host echoes the
+    // authoritative value back in the next updateData.
+    selectedTags = tags;
+    renderTagFilter();
+    vscode.postMessage({ type: 'setTagFilter', tags: tags });
+  }
+
+  elTagFilter.addEventListener('click', (e) => {
+    const clear = e.target.closest('[data-clear-tags]');
+    if (clear) { setTagFilter([]); return; }
+    const chip = e.target.closest('[data-tag]');
+    if (!chip) { return; }
+    const name = chip.getAttribute('data-tag');
+    const next = selectedTags.includes(name)
+      ? selectedTags.filter(t => t !== name)
+      : selectedTags.concat([name]);
+    setTagFilter(next);
+  });
+
   // Cap the persisted collapse state: once it grows past the threshold,
   // drop entries for pipelines/bridges not present in the current data.
   // (Not run on every update — early empty snapshots must not wipe
@@ -612,11 +673,15 @@
   window.addEventListener('message', event => {
     const msg = event.data;
     if (msg.type === 'updateData') {
-      scopes      = msg.scopes || [];
-      hasToken    = !!msg.hasToken;
-      totalScopes = msg.totalScopes || 0;
-      gotData     = true;
+      scopes        = msg.scopes || [];
+      hasToken      = !!msg.hasToken;
+      totalScopes   = msg.totalScopes || 0;
+      enabledScopes = msg.enabledScopes || 0;
+      availableTags = msg.availableTags || [];
+      selectedTags  = msg.selectedTags || [];
+      gotData       = true;
       pruneCollapsed();
+      renderTagFilter();
       render();
     } else if (msg.type === 'banner') {
       bannerMsg = msg.text ? { text: msg.text, kind: msg.kind || 'error' } : null;

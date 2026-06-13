@@ -18,6 +18,7 @@ import { GitLabSecrets } from './secrets';
 import { PipelineStore } from './pipeline-store';
 import { PipeScopeStore } from './scope-store';
 import { PipelinePoller } from './pipeline-poller';
+import { PipeTagFilter } from './tag-filter';
 import { LogPoller } from './log-poller';
 import { LogDocumentProvider } from './log-document';
 import { AnsiDecorationManager } from './ansi';
@@ -40,6 +41,7 @@ export class PipeFeature implements vscode.Disposable {
     readonly client: GitLabClient;
     readonly secrets: GitLabSecrets;
     readonly poller: PipelinePoller;
+    readonly tagFilter: PipeTagFilter;
 
     private readonly logPoller: LogPoller;
     private readonly logDoc: LogDocumentProvider;
@@ -74,8 +76,11 @@ export class PipeFeature implements vscode.Disposable {
             this.scopeStore.markSelfWrite = options.markSelfWrite;
         }
         this.pipelineStore = new PipelineStore();
+        // Workspace-local tag filter (persisted in workspaceState, never synced).
+        this.tagFilter = new PipeTagFilter(context.workspaceState);
         this.poller = new PipelinePoller(
             () => getPipeConfig(), this.client, this.pipelineStore, this.scopeStore,
+            scope => this.tagFilter.matches(scope),
         );
 
         // ── Log plumbing ──────────────────────────────────────────────────
@@ -99,6 +104,7 @@ export class PipeFeature implements vscode.Disposable {
         this.pipelinesView = new PipePipelinesViewProvider(
             settings, tagTree,
             this.pipelineStore, this.scopeStore, this.secrets, this.poller,
+            this.tagFilter,
             visible => {
                 this._viewVisible = visible;
                 this._applyPollMode();
@@ -142,6 +148,12 @@ export class PipeFeature implements vscode.Disposable {
             this.scopeStore.onDidChange(() => {
                 void this._refreshFollowFlag().then(() => this.poller.tickNow());
             }),
+            // Tag filter change → re-render the view and re-poll so excluded
+            // scopes are pruned and newly-included ones fetched immediately.
+            this.tagFilter.onDidChange(() => {
+                this.pipelinesView.refresh();
+                void this.poller.tickNow();
+            }),
         );
         this._disposables.push(
             onPipeConfigChange(() => {
@@ -154,7 +166,7 @@ export class PipeFeature implements vscode.Disposable {
         this._disposables.push(
             this.poller, this.logPoller, this.logLens, this.logDoc, this.ansi,
             this.notifier, this.statusBar, this.pipelinesView, this.scopesView,
-            this.pipelineStore, this.scopeStore, this.secrets,
+            this.pipelineStore, this.scopeStore, this.secrets, this.tagFilter,
         );
 
         // Initial follow state (enables background polling without the view).
