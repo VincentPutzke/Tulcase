@@ -5,6 +5,20 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.3] - 2026-06-13
+
+### Summary
+Workspace-local tag filter for the Pipelines view; confirmed GitLab tokens are never synced.
+
+### Added
+- **Pipeline tag filter (per workspace)**: the Pipelines view shows toggleable tag chips built from your scopes' tags. Selecting tags narrows the view to matching scopes (OR semantics; empty = all), with a **Clear** action. The selection is stored in VS Code `workspaceState`, so it is **per workspace, survives restarts, and is never written to the data directory** — every workspace filters the *same* shared scope list independently, and the filter is never carried by Git Sync.
+- Scopes excluded by the tag filter are **pruned from the store and no longer polled**, so filtered-out pipelines stop updating until re-included.
+
+### Security
+- Verified that GitLab Personal Access Tokens (both Pipe and Git Sync) are stored only in VS Code's encrypted `SecretStorage` and never written to any file under the synced data directory; the sync remote stores a credential-free URL. No token is ever pushed to the sync repository.
+
+---
+
 ## [1.8.2] - 2026-06-13
 
 ### Summary
