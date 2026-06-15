@@ -104,7 +104,7 @@ export function groupByCategory(
 }
 
 /** Create a data-URI SVG circle icon for the given hex colour. */
-function colorCircleUri(hexColor: string): vscode.Uri {
+export function colorCircleUri(hexColor: string): vscode.Uri {
     const svg =
         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">` +
         `<circle cx="8" cy="8" r="6" fill="${hexColor}"/>` +
