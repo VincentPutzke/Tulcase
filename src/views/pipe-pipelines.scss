@@ -51,8 +51,16 @@
   &[hidden] { display: none; }
 }
 
+.tag-filter-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .tag-filter-input {
   // Inherits .search-input; nothing extra needed beyond the shared box.
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 12px;
 }
 

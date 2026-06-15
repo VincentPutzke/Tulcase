@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import type { TulcaseSettings } from '../config';
-import { DEFAULT_TAG_COLOR } from '../models/tag.model';
+import { DEFAULT_TAG_COLOR, DEFAULT_TAG_CATEGORY } from '../models/tag.model';
+import type { TagDef } from '../models/tag.model';
+import { groupByCategory, colorCircleUri } from '../data/tag-picker';
 import type { TagTreeProvider } from '../providers/tag-tree.provider';
 import type { PipelineStore } from '../pipe/pipeline-store';
 import type { PipeScopeStore } from '../pipe/scope-store';
@@ -95,6 +97,9 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
             case 'setTagFilter':
                 await this.tagFilter.setSelected(Array.isArray(msg.tags) ? msg.tags : []);
                 break;
+            case 'pickTags':
+                await this._pickTagFilter();
+                break;
             case 'refresh':
                 await vscode.commands.executeCommand('tulcase.pipe.refresh');
                 break;
@@ -155,6 +160,65 @@ export class PipePipelinesViewProvider extends BaseListViewProvider implements v
         };
         const command = commands[action];
         if (command) { await vscode.commands.executeCommand(command, pipelineId); }
+    }
+
+    /**
+     * Open the native, themed multi-select tag picker (the same QuickPick UX as
+     * the Todo tag prompt: colored checkbox list, ↑/↓ to move, Space to toggle).
+     * Limited to tags that actually appear on enabled scopes.
+     */
+    private async _pickTagFilter(): Promise<void> {
+        const [allScopes, tagMap] = await Promise.all([
+            this.scopes.listScopes(),
+            this.tagTree.getTagMap(),
+        ]);
+
+        const names = new Set<string>();
+        for (const s of allScopes) {
+            if (!s.enabled) { continue; }
+            for (const t of s.tags) { names.add(t); }
+        }
+        if (names.size === 0) {
+            vscode.window.showInformationMessage(
+                'No tags on any enabled scope. Add tags to scopes in the Pipe Scopes view first.',
+            );
+            return;
+        }
+
+        // Restrict the picker to scope tags; fall back to defaults for tags that
+        // have no global definition yet.
+        const scoped: Record<string, TagDef> = {};
+        for (const name of names) {
+            scoped[name] = tagMap[name] ?? { color: DEFAULT_TAG_COLOR, category: DEFAULT_TAG_CATEGORY };
+        }
+
+        const selected = new Set(this.tagFilter.selected);
+        const items: (vscode.QuickPickItem & { tagName: string })[] = [];
+        for (const [category, tags] of groupByCategory(scoped)) {
+            items.push({ label: category, kind: vscode.QuickPickItemKind.Separator, tagName: '' });
+            for (const [name, def] of tags) {
+                items.push({
+                    label: name,
+                    description: def.color,
+                    iconPath: colorCircleUri(def.color),
+                    picked: selected.has(name),
+                    tagName: name,
+                });
+            }
+        }
+
+        const picked = await vscode.window.showQuickPick(items, {
+            canPickMany: true,
+            placeHolder: 'Filter pipelines by tag (Space to toggle, Enter to apply)',
+            matchOnDescription: false,
+        });
+        if (!picked) { return; } // cancelled — leave the filter unchanged
+
+        await this.tagFilter.setSelected(
+            picked
+                .filter(i => i.kind !== vscode.QuickPickItemKind.Separator)
+                .map(i => i.tagName),
+        );
     }
 
     // ── Data push ──────────────────────────────────────────────────────────────

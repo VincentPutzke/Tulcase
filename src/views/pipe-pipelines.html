@@ -42,18 +42,19 @@
     </select>
   </div>
   <!-- Workspace-local tag filter (per-workspace, not synced). Hidden when no tags.
-       Type a tag and press Enter to add it as a filter bubble. -->
+       Type a tag + Enter to add a bubble, or use the picker for a checkbox list. -->
   <div class="tag-filter" id="tag-filter" hidden>
-    <input
-      class="search-input tag-filter-input"
-      id="tag-filter-input"
-      type="text"
-      placeholder="Filter by tag — type and press Enter"
-      spellcheck="false"
-      autocomplete="off"
-      list="tag-filter-suggestions"
-    >
-    <datalist id="tag-filter-suggestions"></datalist>
+    <div class="tag-filter-input-row">
+      <input
+        class="search-input tag-filter-input"
+        id="tag-filter-input"
+        type="text"
+        placeholder="Filter by tag — type and press Enter"
+        spellcheck="false"
+        autocomplete="off"
+      >
+      <button class="add-btn add-btn-secondary btn-icon-only" id="tag-filter-pick" title="Pick tags from a list"></button>
+    </div>
     <div class="tag-filter-chips" id="tag-filter-chips"></div>
   </div>
 </div>
@@ -120,6 +121,7 @@
     bell:     '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     bellOn:   '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>',
     pipeEmpty:'<svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="6" y1="8.5" x2="12" y2="15.5"/><line x1="18" y1="8.5" x2="12" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/></svg>',
+    tag:      '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.4" fill="currentColor"/></svg>',
   };
   document.getElementById('btn-refresh').innerHTML = ICONS.refresh;
   document.getElementById('btn-scopes').innerHTML  = ICONS.gear;
@@ -613,10 +615,11 @@
   elStatus.addEventListener('change', applyFilter);
 
   // ── Workspace-local tag filter (type → Enter → bubble) ───
-  const elTagFilter   = document.getElementById('tag-filter');
-  const elTagInput    = document.getElementById('tag-filter-input');
-  const elTagChips    = document.getElementById('tag-filter-chips');
-  const elTagSuggest  = document.getElementById('tag-filter-suggestions');
+  const elTagFilter = document.getElementById('tag-filter');
+  const elTagInput  = document.getElementById('tag-filter-input');
+  const elTagChips  = document.getElementById('tag-filter-chips');
+  const elTagPick   = document.getElementById('tag-filter-pick');
+  elTagPick.innerHTML = ICONS.tag;
 
   function tagColor(name) {
     const found = availableTags.find(t => t.name === name);
@@ -630,13 +633,6 @@
       return;
     }
     elTagFilter.hidden = false;
-
-    // Autocomplete suggestions = available tags not already selected.
-    const sel = new Set(selectedTags);
-    elTagSuggest.innerHTML = availableTags
-      .filter(t => !sel.has(t.name))
-      .map(t => '<option value="' + esc(t.name) + '"></option>')
-      .join('');
 
     // Bubbles for the tags the user added (each removable; Clear when >1).
     let html = '';
@@ -675,6 +671,11 @@
       // Empty input + Backspace removes the last bubble (common token-field UX).
       setTagFilter(selectedTags.slice(0, -1));
     }
+  });
+
+  // Open the native, themed multi-select tag picker (checkbox list, ↑/↓, SPACE).
+  elTagPick.addEventListener('click', () => {
+    vscode.postMessage({ type: 'pickTags' });
   });
 
   elTagChips.addEventListener('click', (e) => {
