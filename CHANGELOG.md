@@ -5,6 +5,17 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.4] - 2026-06-15
+
+### Changed
+- **Pipeline tag filter is now a token field**: type a tag and press Enter to add it as a removable bubble (Backspace on an empty box removes the last; ×/Clear remove). Replaces the always-on chip toggles.
+- **Tag picker matches the Todo tag prompt**: a new picker button opens the native, themed VS Code multi-select QuickPick — colored circle per tag, grouped by category, ↑/↓ to navigate, Space to toggle — instead of the unstyled browser dropdown.
+
+### Fixed
+- Filter text boxes across all views (Commands, Notes, Scripts, Links, Pipelines, …) no longer reserve empty space on the left for a non-rendered search icon, so placeholder and typed text start flush left.
+
+---
+
 ## [1.8.3] - 2026-06-13
 
 ### Summary
