@@ -17,6 +17,7 @@
  */
 
 import type { Pipeline, Job, GitLabStatus } from './models';
+import { Semaphore } from './concurrency';
 
 export class GitLabApiError extends Error {
     constructor(
@@ -78,6 +79,37 @@ export interface BranchHit {
     default: boolean;
 }
 
+/** A group search hit / enumerated subgroup (for the Registry + scope editor). */
+export interface GroupHit {
+    id: number;
+    fullPath: string;
+    name: string;
+}
+
+/** A project enumerated under a group (Registry folder tree / Pipe expansion). */
+export interface ProjectNode {
+    id: number;
+    pathWithNamespace: string;
+    name: string;
+}
+
+/** A package version row from the project packages API. */
+export interface GitLabPackage {
+    id: number;
+    name: string;
+    version: string;
+    packageType: string;
+    status: string;
+}
+
+/** A file belonging to a package version. */
+export interface GitLabPackageFile {
+    id: number;
+    fileName: string;
+    size?: number;
+    sha256?: string;
+}
+
 export interface ClientOptions {
     /** Override `globalThis.fetch` (used by tests). */
     fetch?: typeof fetch;
@@ -85,6 +117,12 @@ export interface ClientOptions {
     maxRetries?: number;
     /** Cap on `Retry-After` seconds we'll honour (default 60). */
     maxRetryAfterSeconds?: number;
+    /**
+     * Global ceiling on concurrent in-flight requests. A function so the
+     * ceiling can track the setting without reconstructing the client.
+     * Defaults to 8.
+     */
+    maxConcurrent?: () => number;
 }
 
 export class GitLabClient {
@@ -92,6 +130,9 @@ export class GitLabClient {
     private readonly _fetch: typeof fetch;
     private readonly _maxRetries: number;
     private readonly _maxRetryAfter: number;
+    private readonly _maxConcurrent: () => number;
+    /** One shared ceiling across ALL requests this client issues. */
+    private readonly _sem: Semaphore;
 
     constructor(
         private readonly auth: AuthProvider,
@@ -100,6 +141,8 @@ export class GitLabClient {
         this._fetch         = opts.fetch ?? globalThis.fetch.bind(globalThis);
         this._maxRetries    = opts.maxRetries ?? 3;
         this._maxRetryAfter = opts.maxRetryAfterSeconds ?? 60;
+        this._maxConcurrent = opts.maxConcurrent ?? (() => 8);
+        this._sem           = new Semaphore(this._maxConcurrent());
     }
 
     // ── Health / token check ─────────────────────────────────────────────────
@@ -315,6 +358,133 @@ export class GitLabClient {
         }));
     }
 
+    // ── Groups (Registry folders + Pipe group expansion) ─────────────────────
+
+    /** Search groups the user can see (for the scope editor's group picker). */
+    async searchGroups(query: string, signal?: AbortSignal): Promise<GroupHit[]> {
+        const qs = new URLSearchParams({ search: query, per_page: '30' });
+        const raw = await this._get<Array<{ id: number; full_path: string; name: string }>>(
+            `/groups?${qs.toString()}`, signal,
+        );
+        return raw.map(g => ({ id: g.id, fullPath: g.full_path, name: g.name }));
+    }
+
+    /** Immediate subgroups of a group (lazy Registry folder browsing). */
+    async listSubgroups(groupRef: string | number, signal?: AbortSignal): Promise<GroupHit[]> {
+        const rows = await this._getAllPages<{ id: number; full_path: string; name: string }>(
+            `/groups/${this._enc(groupRef)}/subgroups`,
+            { per_page: '100', all_available: 'false' }, signal,
+        );
+        return rows.map(g => ({ id: g.id, fullPath: g.full_path, name: g.name }));
+    }
+
+    /**
+     * Projects under a group. `includeSubgroups` = true does the whole subtree
+     * in one paginated sweep (Pipe expansion); false lists only the group's
+     * direct projects (lazy Registry folder browsing). Shared projects excluded.
+     */
+    async listGroupProjects(
+        groupRef: string | number,
+        includeSubgroups: boolean,
+        signal?: AbortSignal,
+    ): Promise<ProjectNode[]> {
+        const rows = await this._getAllPages<{ id: number; path_with_namespace: string; name: string }>(
+            `/groups/${this._enc(groupRef)}/projects`,
+            {
+                per_page: '100',
+                include_subgroups: String(includeSubgroups),
+                with_shared: 'false',
+                archived: 'false',
+            }, signal,
+        );
+        return rows.map(p => ({ id: p.id, pathWithNamespace: p.path_with_namespace, name: p.name }));
+    }
+
+    // ── Package registry ─────────────────────────────────────────────────────
+
+    /** Ready package versions of a project (half-uploaded/errored ones dropped). */
+    async listProjectPackages(
+        projectRef: string | number,
+        signal?: AbortSignal,
+    ): Promise<GitLabPackage[]> {
+        const rows = await this._getAllPages<{
+            id: number; name: string; version: string; package_type: string; status?: string;
+        }>(
+            `/projects/${this._enc(projectRef)}/packages`,
+            { per_page: '100', order_by: 'created_at', sort: 'desc' },
+            signal, [403, 404],   // registry disabled on a project → treat as empty
+        );
+        return rows
+            .filter(p => (p.status ?? 'default') === 'default')
+            .map(p => ({
+                id: p.id, name: p.name, version: p.version,
+                packageType: p.package_type, status: p.status ?? 'default',
+            }));
+    }
+
+    /** Files of a package version, deduped by file name (keep the newest row). */
+    async listPackageFiles(
+        projectRef: string | number,
+        packageId: number,
+        signal?: AbortSignal,
+    ): Promise<GitLabPackageFile[]> {
+        const rows = await this._getAllPages<{
+            id: number; file_name: string; size?: number; file_sha256?: string;
+        }>(
+            `/projects/${this._enc(projectRef)}/packages/${packageId}/package_files`,
+            { per_page: '100' }, signal, [403, 404],
+        );
+        const byName = new Map<string, GitLabPackageFile>();
+        for (const r of rows) {
+            byName.set(r.file_name, {
+                id: r.id, fileName: r.file_name, size: r.size, sha256: r.file_sha256,
+            });
+        }
+        return [...byName.values()];
+    }
+
+    /** Download URL for a file in a GENERIC package (the only type v1 downloads). */
+    genericPackageFileUrl(
+        projectRef: string | number,
+        packageName: string,
+        version: string,
+        fileName: string,
+    ): string {
+        return this._url(
+            `/projects/${this._enc(projectRef)}/packages/generic/`
+            + `${this._enc(packageName)}/${this._enc(version)}/${this._enc(fileName)}`,
+        );
+    }
+
+    /**
+     * Fetch a package file as a binary response, streamable to disk.
+     *
+     * GitLab redirects package downloads to object storage (pre-signed URL).
+     * `fetch` would forward our `PRIVATE-TOKEN` across that origin (a token
+     * leak, and some backends reject the extra header), so we follow redirects
+     * MANUALLY and drop the token on the redirected hop.
+     */
+    async fetchPackageFile(url: string, signal?: AbortSignal): Promise<Response> {
+        const token = await this.auth.getToken();
+        const firstHeaders: Record<string, string> = { 'Accept': '*/*' };
+        if (token) { firstHeaders['PRIVATE-TOKEN'] = token; }
+
+        let res = await this._sem.run(() =>
+            this._fetch(url, { headers: firstHeaders, redirect: 'manual', signal }));
+
+        let hops = 0;
+        while (REDIRECT_STATUS.has(res.status) && hops < 5) {
+            const loc = res.headers.get('location');
+            if (!loc) { break; }
+            // Redirected hop: NO PRIVATE-TOKEN (pre-signed URL carries its own auth).
+            res = await this._sem.run(() =>
+                this._fetch(loc, { headers: { 'Accept': '*/*' }, redirect: 'manual', signal }));
+            hops++;
+        }
+        if (!res.ok) { throw await this._toError(url, res); }
+        return res;
+    }
+
     // ── Job trace (live log) ─────────────────────────────────────────────────
 
     async getJobTrace(
@@ -387,6 +557,42 @@ export class GitLabClient {
         return meta;
     }
 
+    private _enc(ref: string | number): string {
+        return encodeURIComponent(String(ref));
+    }
+
+    /**
+     * GET every page of a list endpoint, following `x-next-page`.
+     * Statuses in `tolerate` (e.g. 403/404 for a disabled registry) resolve to
+     * an empty result instead of throwing, so one bad project/group doesn't
+     * fail the whole browse.
+     */
+    private async _getAllPages<T>(
+        basePath: string,
+        params: Record<string, string>,
+        signal?: AbortSignal,
+        tolerate: number[] = [],
+    ): Promise<T[]> {
+        const all: T[] = [];
+        let page = 1;
+        while (true) {
+            const qs = new URLSearchParams({ ...params, page: String(page) });
+            const url = this._url(`${basePath}?${qs.toString()}`);
+            const res = await this._fetchRaw(url, { headers: await this._headers(), signal });
+            if (tolerate.includes(res.status)) { break; }
+            if (!res.ok) { throw await this._toError(url, res); }
+            const batch = await res.json() as T[];
+            all.push(...batch);
+            const next = res.headers.get('x-next-page');
+            const nextPage = Number(next);
+            if (!next || batch.length === 0 || !Number.isFinite(nextPage) || nextPage <= page) {
+                break;
+            }
+            page = nextPage;
+        }
+        return all;
+    }
+
     private _url(pathStr: string): string {
         const base = this.auth.baseUrl().replace(/\/+$/, '').replace(/\/api\/v4$/, '');
         const tail = pathStr.startsWith('/') ? pathStr : `/${pathStr}`;
@@ -435,9 +641,13 @@ export class GitLabClient {
         },
     ): Promise<Response> {
         let attempt = 0;
-         
+        // Keep the shared ceiling in step with the current setting, then run
+        // each fetch attempt through it (the retry sleep releases the permit,
+        // so a backing-off request never occupies a slot).
+        this._sem.setLimit(this._maxConcurrent());
+
         while (true) {
-            const res = await this._fetch(url, init);
+            const res = await this._sem.run(() => this._fetch(url, init));
             if (res.status !== 429 || attempt >= this._maxRetries) { return res; }
             const retryAfter = parseRetryAfter(res.headers.get('retry-after')) ?? (1 + attempt);
             const delaySec = Math.min(this._maxRetryAfter, Math.max(1, retryAfter));
@@ -473,6 +683,9 @@ export function describeApiError(err: unknown): string {
 }
 
 // ── Free helpers ────────────────────────────────────────────────────────────
+
+/** HTTP statuses we follow manually when downloading package files. */
+const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
 
 function parseRetryAfter(value: string | null): number | undefined {
     if (!value) { return undefined; }

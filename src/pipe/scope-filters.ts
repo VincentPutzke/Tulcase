@@ -41,6 +41,22 @@ export function applyScopeFilters(
     return filtered.slice();
 }
 
+/**
+ * Whether a scope passes a workspace-local tag filter.
+ *
+ * An empty selection means "no filter" — every scope passes.  Otherwise a
+ * scope passes when it carries at least one of the selected tags (OR semantics).
+ * Pure helper so both the poller (what to fetch) and the view (what to show)
+ * agree on inclusion.
+ */
+export function scopeMatchesTags(
+    scope: Pick<PipeScope, 'tags'>,
+    selectedTags: readonly string[],
+): boolean {
+    if (selectedTags.length === 0) { return true; }
+    return scope.tags.some(tag => selectedTags.includes(tag));
+}
+
 /** Build the most useful server-side params for a scope (per project). */
 export function scopeToServerParams(scope: PipeScope): {
     perPage: number;

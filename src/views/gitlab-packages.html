@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'none';
+           script-src 'nonce-{{NONCE}}';
+           style-src  'unsafe-inline';"
+>
+<style>{{STYLE}}</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- ── Controls pane ────────────────────────────────────── -->
+<div class="controls-pane">
+  <div class="add-bar">
+    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-refresh" title="Refresh packages"></button>
+  </div>
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      class="search-input"
+      id="search"
+      type="text"
+      placeholder="Filter scopes by name…"
+      spellcheck="false"
+    >
+  </div>
+  <div class="tag-filter" id="tag-filter" hidden>
+    <div class="tag-filter-input-row">
+      <input
+        class="search-input tag-filter-input"
+        id="tag-filter-input"
+        type="text"
+        placeholder="Filter by tag — type and press Enter"
+        spellcheck="false"
+        autocomplete="off"
+      >
+      <button class="add-btn add-btn-secondary btn-icon-only" id="tag-filter-pick" title="Pick tags from a list"></button>
+    </div>
+    <div class="tag-filter-chips" id="tag-filter-chips"></div>
+  </div>
+</div>
+
+<!-- ── Tree pane ────────────────────────────────────────── -->
+<div class="tree-pane">
+  <div id="toast-host"></div>
+  <div id="content"></div>
+</div>
+
+</div>
+
+<script nonce="{{NONCE}}">
+(function () {
+  'use strict';
+  const vscode = acquireVsCodeApi();
+
+  const saved = vscode.getState() || {};
+  let query = saved.query || '';
+
+  // ── State ────────────────────────────────────────────────
+  let gotInit = false;
+  let hasToken = false;
+  let registryScopeCount = 0;
+  let tagMap = {};
+  let selectedTags = [];
+
+  const nodesById   = new Map();   // id -> node
+  const childrenIds = new Map();   // parentId -> [childId]  ('' = roots)
+  const expanded    = new Set();   // expanded node ids
+  const loading     = new Set();   // ids awaiting first children
+  const errors      = new Map();   // id -> error string
+  let focusedId = null;
+  let toastTimer = null;
+
+  const content  = document.getElementById('content');
+  const toastEl  = document.getElementById('toast-host');
+  const searchEl = document.getElementById('search');
+  const tagFilter = document.getElementById('tag-filter');
+  const tagInput = document.getElementById('tag-filter-input');
+  const tagPick = document.getElementById('tag-filter-pick');
+  const tagChips = document.getElementById('tag-filter-chips');
+  searchEl.value = query;
+
+  // ── Utils ────────────────────────────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function visualDepth(id) {
+    if (id === '') { return 0; }
+    return (id.match(/\/(?:group|project|pkg|ver):/g) || []).length;
+  }
+
+  const ICONS = {
+    refresh: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    download:'<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    open:    '<svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    scope:   '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.2 7.8 10.8 15.8M15.8 7.8 13.2 15.8M8.5 6h7"/></svg>',
+    folder:  '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M7 11h10"/></svg>',
+    project: '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+    package: '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 3 6.5v11L12 21.5 21 17.5v-11L12 2.5z"/><path d="M3 6.5 12 10.5 21 6.5M12 10.5v11"/></svg>',
+    version: '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 11 3.82A2 2 0 0 0 9.59 3H4a1 1 0 0 0-1 1v5.59A2 2 0 0 0 3.82 11l9.59 9.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83z"/><circle cx="7.5" cy="7.5" r="1"/></svg>',
+    shield:  '<svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    tag:     '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.4" fill="currentColor"/></svg>',
+  };
+  const KIND_ICON = { scope: ICONS.scope, group: ICONS.folder, project: ICONS.project, package: ICONS.package, version: ICONS.version };
+  document.getElementById('btn-refresh').innerHTML = ICONS.refresh;
+  tagPick.innerHTML = ICONS.tag;
+
+  // ── Toast ────────────────────────────────────────────────
+  function showToast(text, kind) {
+    toastEl.innerHTML =
+      '<div class="banner' + (kind === 'error' ? '' : ' banner-info') + '">'
+      + '<span>' + esc(text) + '</span>'
+      + '<button class="banner-close" id="toast-close">×</button></div>';
+    document.getElementById('toast-close').addEventListener('click', clearToast);
+    if (toastTimer) { clearTimeout(toastTimer); }
+    if (kind !== 'error') { toastTimer = setTimeout(clearToast, 5000); }
+  }
+  function clearToast() { toastEl.innerHTML = ''; if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; } }
+
+  // ── Workspace-local tag filter (type → Enter → bubble) ───
+  function availableTags() { return Object.keys(tagMap).sort((a, b) => a.localeCompare(b)); }
+  function tagColor(name) { return (tagMap[name] && tagMap[name].color) || 'var(--vscode-descriptionForeground)'; }
+  function renderTagFilter() {
+    if (!availableTags().length && !selectedTags.length) {
+      tagFilter.hidden = true;
+      return;
+    }
+    tagFilter.hidden = false;
+
+    let html = '';
+    for (const name of selectedTags) {
+      html += '<span class="tag-chip active" data-remove-tag="' + esc(name) + '" title="Remove filter">'
+        + '<span class="tag-chip-dot" style="background:' + esc(tagColor(name)) + ';"></span>'
+        + esc(name)
+        + '<span class="tag-chip-x">×</span></span>';
+    }
+    if (selectedTags.length > 1) {
+      html += '<button class="tag-chip tag-chip-clear" data-clear-tags="1" title="Show all scopes">Clear all</button>';
+    }
+    tagChips.innerHTML = html;
+  }
+  function setTagFilter(tags) {
+    selectedTags = tags;
+    renderTagFilter();
+    vscode.postMessage({ type: 'setTagFilter', tags: tags });
+  }
+  function addTagFromInput() {
+    const value = tagInput.value.trim();
+    tagInput.value = '';
+    if (!value || selectedTags.includes(value)) { return; }
+    setTagFilter(selectedTags.concat([value]));
+  }
+
+  // ── Root filtering (free-text over scope labels) ─────────
+  function filteredRootIds() {
+    const ids = childrenIds.get('') || [];
+    if (!query) { return ids; }
+    const q = query.toLowerCase();
+    return ids.filter(id => (nodesById.get(id)?.label || '').toLowerCase().includes(q));
+  }
+
+  // ── Render: tree markup (incremental) ────────────────────
+  function nodeHtml(node) {
+    const pad = 4 + visualDepth(node.id) * 10;
+    const isOpen = expanded.has(node.id);
+    const chev = node.expandable
+      ? '<span class="tw-chevron" data-action="toggle" data-id="' + esc(node.id) + '">' + (isOpen ? '▾' : '▸') + '</span>'
+      : '<span class="tw-chevron tw-chevron-leaf"></span>';
+
+    let actions = '';
+    if (node.kind === 'version') {
+      if (node.downloadable) {
+        actions += '<button class="action-btn btn-copy" data-action="download" data-id="' + esc(node.id) + '" title="Download version">' + ICONS.download + '</button>';
+      } else {
+        actions += '<button class="action-btn" disabled title="Only generic packages can be downloaded. Use Open in GitLab.">' + ICONS.download + '</button>';
+      }
+      actions += '<button class="action-btn" data-action="open" data-id="' + esc(node.id) + '" title="Open in GitLab">' + ICONS.open + '</button>';
+    } else {
+      actions += '<button class="action-btn btn-edit" data-action="refresh" data-id="' + esc(node.id) + '" title="Refresh">' + ICONS.refresh + '</button>';
+      if (node.kind !== 'scope') {
+        actions += '<button class="action-btn" data-action="open" data-id="' + esc(node.id) + '" title="Open in GitLab">' + ICONS.open + '</button>';
+      }
+    }
+
+    let html = '<div class="tw-node" role="treeitem" data-id="' + esc(node.id) + '"'
+      + ' tabindex="' + (node.id === focusedId ? '0' : '-1') + '"'
+      + (node.expandable ? ' aria-expanded="' + (isOpen ? 'true' : 'false') + '"' : '')
+      + ' aria-label="' + esc(node.label) + '">';
+    html += '<div class="tw-row" data-action="toggle" data-id="' + esc(node.id) + '" style="padding-left:' + pad + 'px">';
+    html += chev;
+    html += '<span class="tw-icon">' + (KIND_ICON[node.kind] || '') + '</span>';
+    html += '<span class="tw-label">' + esc(node.label) + '</span>';
+    html += '<span class="tw-actions">' + actions + '</span>';
+    html += '</div>';
+    html += '<div class="tw-group" role="group">' + (isOpen ? childrenHtml(node.id) : '') + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function placeholder(parentId, text, cls) {
+    const pad = 4 + (visualDepth(parentId) + 1) * 10 + 14;
+    return '<div class="tw-placeholder ' + (cls || '') + '" style="padding-left:' + pad + 'px">' + text + '</div>';
+  }
+
+  function childrenHtml(parentId) {
+    if (errors.has(parentId)) {
+      return placeholder(parentId,
+        esc(errors.get(parentId)) + ' <a href="#" data-action="retry" data-id="' + esc(parentId) + '">Retry</a>',
+        'tw-error');
+    }
+    if (!childrenIds.has(parentId)) {
+      return loading.has(parentId) ? placeholder(parentId, 'Loading…', 'tw-loading') : '';
+    }
+    const ids = childrenIds.get(parentId);
+    if (ids.length === 0) { return placeholder(parentId, 'Empty', 'tw-empty'); }
+    return ids.map(id => nodeHtml(nodesById.get(id))).join('');
+  }
+
+  function nodeEl(id) {
+    if (id === '') { return document.getElementById('tree'); }
+    const all = document.querySelectorAll('.tw-node');
+    for (const el of all) { if (el.dataset.id === id) { return el; } }
+    return undefined;
+  }
+  function groupEl(id) {
+    if (id === '') { return document.getElementById('tree'); }
+    const n = nodeEl(id);
+    return n ? n.querySelector(':scope > .tw-group') : undefined;
+  }
+
+  /** Re-render only one node's child group (expand / collapse / refresh). */
+  function regroup(parentId) {
+    const g = groupEl(parentId);
+    if (!g) { return; }
+    // Only steal focus back if it was actually inside the subtree we replace
+    // (a background poll regrouping an unrelated node must not grab focus).
+    const hadFocus = g.contains(document.activeElement);
+    g.innerHTML = childrenHtml(parentId);
+    const pe = nodeEl(parentId);
+    if (pe) {
+      const open = expanded.has(parentId);
+      pe.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const ch = pe.querySelector(':scope > .tw-row .tw-chevron');
+      if (ch && !ch.classList.contains('tw-chevron-leaf')) { ch.textContent = open ? '▾' : '▸'; }
+    }
+    restoreFocus();
+    if (hadFocus) {
+      const el = (focusedId && nodeEl(focusedId)) || pe;
+      if (el) { el.focus(); }
+    }
+  }
+
+  // ── Render: shell (empty states vs tree) ─────────────────
+  function renderView() {
+    if (!gotInit) { content.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
+    if (!hasToken) {
+      content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + ICONS.shield + '</div>'
+        + 'No GitLab token set — packages can’t be listed.<br><br>'
+        + '<button class="add-btn empty-state-btn" id="empty-token">Set GitLab token</button></div>';
+      document.getElementById('empty-token').addEventListener('click', () => vscode.postMessage({ type: 'setToken' }));
+      return;
+    }
+    if (registryScopeCount === 0) {
+      content.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + ICONS.scope + '</div>'
+        + 'No Scope is Registry-enabled.<br>Turn on the <b>Registry</b> switch on a Scope to browse its packages here.<br><br>'
+        + '<button class="add-btn empty-state-btn" id="empty-scopes">Open Scopes</button></div>';
+      document.getElementById('empty-scopes').addEventListener('click', () => vscode.postMessage({ type: 'openScopes' }));
+      return;
+    }
+    // Tree
+    let tree = document.getElementById('tree');
+    if (!tree) {
+      content.innerHTML = '<div id="tree" role="tree" aria-label="GitLab packages"></div>';
+      tree = document.getElementById('tree');
+    }
+    mountRoots();
+  }
+
+  function mountRoots() {
+    const tree = document.getElementById('tree');
+    if (!tree) { return; }
+    const ids = filteredRootIds();
+    if (ids.length === 0) {
+      const total = (childrenIds.get('') || []).length;
+      tree.innerHTML = '<div class="no-results">' + (total === 0 ? 'No packages to show.' : 'No scopes match your filter.') + '</div>';
+      return;
+    }
+    tree.innerHTML = ids.map(id => nodeHtml(nodesById.get(id))).join('');
+    restoreFocus();
+  }
+
+  // ── Focus / keyboard ─────────────────────────────────────
+  function restoreFocus() {
+    if (!focusedId) { return; }
+    const el = nodeEl(focusedId);
+    if (el) { el.setAttribute('tabindex', '0'); }
+  }
+  function setFocus(id, doFocus) {
+    const prev = focusedId && nodeEl(focusedId);
+    if (prev) { prev.setAttribute('tabindex', '-1'); }
+    focusedId = id;
+    const el = nodeEl(id);
+    if (el) { el.setAttribute('tabindex', '0'); if (doFocus) { el.focus(); } }
+  }
+  function visibleIds() {
+    return [...document.querySelectorAll('.tw-node')].map(e => e.dataset.id);
+  }
+  function parentIdOf(id) {
+    const cut = id.lastIndexOf('/');
+    return cut < 0 ? '' : id.slice(0, cut);
+  }
+
+  function toggle(id) {
+    const node = nodesById.get(id);
+    if (!node || !node.expandable) { return; }
+    if (expanded.has(id)) {
+      expanded.delete(id);
+      vscode.postMessage({ type: 'collapse', nodeId: id });
+      regroup(id);
+    } else {
+      expanded.add(id);
+      if (!childrenIds.has(id)) { loading.add(id); }
+      vscode.postMessage({ type: 'expand', nodeId: id });
+      regroup(id);
+    }
+  }
+
+  function activate(id) {
+    const node = nodesById.get(id);
+    if (!node) { return; }
+    if (node.expandable) { toggle(id); }
+    else if (node.kind === 'version' && node.downloadable) { vscode.postMessage({ type: 'download', nodeId: id }); }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (!focusedId) { return; }
+    const order = visibleIds();
+    const idx = order.indexOf(focusedId);
+    if (idx < 0) { return; }
+    const node = nodesById.get(focusedId);
+    switch (e.key) {
+      case 'ArrowDown': if (idx < order.length - 1) { setFocus(order[idx + 1], true); } e.preventDefault(); break;
+      case 'ArrowUp':   if (idx > 0) { setFocus(order[idx - 1], true); } e.preventDefault(); break;
+      case 'ArrowRight':
+        if (node && node.expandable && !expanded.has(focusedId)) { toggle(focusedId); }
+        else if (idx < order.length - 1) { setFocus(order[idx + 1], true); }
+        e.preventDefault(); break;
+      case 'ArrowLeft':
+        if (node && node.expandable && expanded.has(focusedId)) { toggle(focusedId); }
+        else { const p = parentIdOf(focusedId); if (p && nodeEl(p)) { setFocus(p, true); } }
+        e.preventDefault(); break;
+      case 'Enter': case ' ': activate(focusedId); e.preventDefault(); break;
+      case 'Home': if (order.length) { setFocus(order[0], true); } e.preventDefault(); break;
+      case 'End':  if (order.length) { setFocus(order[order.length - 1], true); } e.preventDefault(); break;
+    }
+  });
+
+  // ── Click delegation ─────────────────────────────────────
+  content.addEventListener('click', e => {
+    const target = e.target.closest('[data-action]');
+    if (!target) { return; }
+    const action = target.getAttribute('data-action');
+    const id = target.getAttribute('data-id');
+    if (action === 'toggle') { setFocus(id); toggle(id); }
+    else if (action === 'download') { vscode.postMessage({ type: 'download', nodeId: id }); }
+    else if (action === 'open') { vscode.postMessage({ type: 'openInBrowser', nodeId: id }); }
+    else if (action === 'refresh') { errors.delete(id); if (childrenIds.has(id) || expanded.has(id)) { vscode.postMessage({ type: 'refreshNode', nodeId: id }); } }
+    else if (action === 'retry') { e.preventDefault(); errors.delete(id); loading.add(id); vscode.postMessage({ type: 'expand', nodeId: id }); regroup(id); }
+  });
+  content.addEventListener('focusin', e => {
+    const n = e.target.closest && e.target.closest('.tw-node');
+    if (n && n.dataset.id !== focusedId) { setFocus(n.dataset.id); }
+  });
+
+  // ── Inbound children / data merge ────────────────────────
+  function setChildren(parentId, nodes, error) {
+    loading.delete(parentId);
+    if (error) { errors.set(parentId, error); }
+    else {
+      errors.delete(parentId);
+      childrenIds.set(parentId, nodes.map(n => n.id));
+      for (const n of nodes) { nodesById.set(n.id, n); }
+    }
+    regroup(parentId);
+  }
+
+  function applyRoots(nodes) {
+    const ids = nodes.map(n => n.id);
+    childrenIds.set('', ids);
+    for (const n of nodes) { nodesById.set(n.id, n); }
+    // Prune cached state for scopes that vanished (a node's first '/' segment
+    // is its owning scope's node id, e.g. `scope:s1`).
+    const keep = new Set(ids);
+    const gone = (id) => { const root = id.split('/')[0]; return !keep.has(root); };
+    for (const set of [expanded, loading]) {
+      for (const id of [...set]) { if (gone(id)) { set.delete(id); } }
+    }
+    for (const map of [childrenIds, errors]) {
+      for (const id of [...map.keys()]) { if (id !== '' && gone(id)) { map.delete(id); } }
+    }
+    if (focusedId && gone(focusedId)) { focusedId = ids[0] || null; }
+    renderView();
+  }
+
+  // ── Toolbar ──────────────────────────────────────────────
+  document.getElementById('btn-refresh').addEventListener('click', () => vscode.postMessage({ type: 'refreshAll' }));
+  searchEl.addEventListener('input', () => {
+    query = searchEl.value.trim();
+    vscode.setState({ query: query });
+    if (document.getElementById('tree')) { mountRoots(); }
+  });
+  tagInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTagFromInput();
+    } else if (e.key === 'Backspace' && !tagInput.value && selectedTags.length) {
+      setTagFilter(selectedTags.slice(0, -1));
+    }
+  });
+  tagPick.addEventListener('click', () => vscode.postMessage({ type: 'pickTags' }));
+  tagChips.addEventListener('click', e => {
+    if (e.target.closest('[data-clear-tags]')) { setTagFilter([]); return; }
+    const chip = e.target.closest('[data-remove-tag]');
+    if (!chip) { return; }
+    setTagFilter(selectedTags.filter(t => t !== chip.getAttribute('data-remove-tag')));
+  });
+
+  // ── Messages ─────────────────────────────────────────────
+  window.addEventListener('message', event => {
+    const msg = event.data;
+    if (msg.type === 'init') {
+      hasToken = !!msg.hasToken;
+      registryScopeCount = msg.registryScopeCount || 0;
+      tagMap = msg.tagMap || {};
+      selectedTags = msg.selectedTags || [];
+      gotInit = true;
+      renderTagFilter();
+      renderView();
+    } else if (msg.type === 'roots') {
+      applyRoots(msg.nodes || []);
+    } else if (msg.type === 'children') {
+      setChildren(msg.parentId, msg.nodes || [], msg.error);
+    } else if (msg.type === 'tagFilter') {
+      selectedTags = msg.tags || [];
+      renderTagFilter();
+    } else if (msg.type === 'toast') {
+      showToast(msg.text, msg.kind);
+    }
+  });
+
+  vscode.postMessage({ type: 'requestData' });
+})();
+</script>
+
+</body>
+</html>

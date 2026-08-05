@@ -12,7 +12,14 @@
 import { JsonStore } from '../data/json-store';
 import { generateId } from '../utils/id';
 import { Emitter } from './events';
-import { normalizeScope, type PipeScope } from './models';
+import {
+    normalizeScope,
+    normalizeSource,
+    syncScopeShadows,
+    SCOPE_SCHEMA_VERSION,
+    type PipeScope,
+    type PipeSource,
+} from './models';
 import {
     isBuiltinRule,
     normalizeRule,
@@ -26,6 +33,20 @@ export interface PipeScopeFile {
 }
 
 const EMPTY: PipeScopeFile = { scopes: [], logRules: [] };
+
+/** Current wall-clock timestamp for the `updatedAt` sync-merge tiebreak. */
+function nowIso(): string {
+    return new Date().toISOString();
+}
+
+/** Signature used to dedupe scopes on legacy import (type+ref set). */
+function sourceSignature(scope: PipeScope): string {
+    return scope.sources
+        .map(s => `${s.type}:${s.ref}`)
+        .slice()
+        .sort()
+        .join('|');
+}
 
 /** Settings surface needed by the store (kept minimal for tests). */
 export interface ScopePathProvider {
@@ -112,8 +133,9 @@ export class PipeScopeStore {
             : generateId('scope');
         const normalized = normalizeScope(scope, fallbackId);
         if (!normalized) {
-            throw new Error('A scope needs at least one project.');
+            throw new Error('A scope needs at least one source (project or group).');
         }
+        normalized.updatedAt = nowIso();
         const idx = data.scopes.findIndex(s => s.id === normalized.id);
         if (idx >= 0) {
             data.scopes[idx] = normalized;
@@ -140,6 +162,12 @@ export class PipeScopeStore {
         const src = data.scopes[idx];
         const copy: PipeScope = {
             ...src,
+            // Deep-clone sources INCLUDING each exclude[] so editing the copy's
+            // exclusions never mutates the original.
+            sources: src.sources.map(s => ({
+                ...s,
+                exclude: s.exclude ? [...s.exclude] : undefined,
+            })),
             projects: [...src.projects],
             tags: [...src.tags],
             statusFilter: src.statusFilter ? [...src.statusFilter] : undefined,
@@ -147,6 +175,7 @@ export class PipeScopeStore {
             id: generateId('scope'),
             label: `${src.label} (copy)`,
             follow: false,
+            updatedAt: nowIso(),
         };
         data.scopes.splice(idx + 1, 0, copy);
         await this._write(data);
@@ -165,8 +194,17 @@ export class PipeScopeStore {
         return true;
     }
 
+    async setPipeEnabled(id: string, enabled: boolean): Promise<void> {
+        await this._patchScope(id, s => { s.pipeEnabled = enabled; });
+    }
+
+    async setRegistryEnabled(id: string, enabled: boolean): Promise<void> {
+        await this._patchScope(id, s => { s.registryEnabled = enabled; });
+    }
+
+    /** @deprecated alias of {@link setPipeEnabled} kept for existing callers. */
     async setEnabled(id: string, enabled: boolean): Promise<void> {
-        await this._patchScope(id, s => { s.enabled = enabled; });
+        await this.setPipeEnabled(id, enabled);
     }
 
     async setFollow(id: string, follow: boolean): Promise<void> {
@@ -175,6 +213,37 @@ export class PipeScopeStore {
 
     async setTags(id: string, tags: string[]): Promise<void> {
         await this._patchScope(id, s => { s.tags = tags; });
+    }
+
+    /** Append a source (project or group). Ignores unusable input. */
+    async addSource(id: string, source: PipeSource | unknown): Promise<void> {
+        const clean = normalizeSource(source);
+        if (!clean) { return; }
+        await this._patchScope(id, s => {
+            if (!s.sources.some(x => x.type === clean.type && x.ref === clean.ref)) {
+                s.sources.push(clean);
+            }
+        });
+    }
+
+    /** Remove a source matched by type+ref. */
+    async removeSource(id: string, type: PipeSource['type'], ref: string): Promise<void> {
+        await this._patchScope(id, s => {
+            s.sources = s.sources.filter(x => !(x.type === type && x.ref === ref));
+        });
+    }
+
+    /** Replace the exclusion list of a group source (matched by ref). */
+    async setSourceExclude(id: string, ref: string, exclude: string[]): Promise<void> {
+        const clean = exclude
+            .filter(e => typeof e === 'string' && e.trim().length > 0)
+            .map(e => e.trim());
+        await this._patchScope(id, s => {
+            const source = s.sources.find(x => x.type === 'group' && x.ref === ref);
+            if (!source) { return; }
+            if (clean.length > 0) { source.exclude = clean; }
+            else { delete source.exclude; }
+        });
     }
 
     // ── Custom log-rule mutations ────────────────────────────────────────────
@@ -242,13 +311,14 @@ export class PipeScopeStore {
         for (const raw of rawScopes) {
             const scope = normalizeScope(raw, generateId('scope'));
             if (!scope) { continue; }
-            // Avoid exact duplicates (same label + same project set).
+            // Avoid exact duplicates (same label + same source set).
+            const signature = sourceSignature(scope);
             const exists = data.scopes.some(s =>
-                s.label === scope.label &&
-                s.projects.slice().sort().join('|') === scope.projects.slice().sort().join('|'),
+                s.label === scope.label && sourceSignature(s) === signature,
             );
             if (exists) { continue; }
             scope.id = generateId('scope');
+            scope.updatedAt = nowIso();
             data.scopes.push(scope);
             scopeCount++;
         }
@@ -275,13 +345,17 @@ export class PipeScopeStore {
         const scope = data.scopes.find(s => s.id === id);
         if (!scope) { return; }
         patch(scope);
+        syncScopeShadows(scope);      // keep projects/enabled shadows current
+        scope.updatedAt = nowIso();   // bump the sync-merge tiebreak
         await this._write(data);
     }
 
     private async _write(data: PipeScopeFile): Promise<void> {
         const path = this.filePath;
         this.markSelfWrite?.(path);
-        await this._store.write(path, data);
+        // Dual-write: `schemaVersion` marks v2; each scope carries its v1
+        // shadows (projects/enabled) so an older build can still read them.
+        await this._store.write(path, { schemaVersion: SCOPE_SCHEMA_VERSION, ...data });
         this._cache = { path, data };
         this._onDidChange.fire();
     }

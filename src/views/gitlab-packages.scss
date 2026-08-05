@@ -1,0 +1,181 @@
+// ── Tulcase GitLab · Packages (Registry) view ─────────────────────────────────
+// A lazy, node-keyed tree: scope → group/project folders → package → version.
+// Rows are patched in place (incremental DOM); the container scrolls.
+
+@use 'shared';
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+.btn-icon-only {
+  flex: 0 0 auto;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .icon { display: block; }
+}
+
+// ── Workspace-local tag filter (type → Enter → bubble) ─────────────────────
+.tag-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+
+  &[hidden] { display: none; }
+}
+
+.tag-filter-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-filter-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.tag-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+
+  &:empty { display: none; }
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.3));
+  border-radius: 11px;
+  background: var(--vscode-input-background, rgba(128, 128, 128, 0.12));
+  color: var(--vscode-descriptionForeground, var(--vscode-foreground));
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+
+  &:hover { border-color: var(--vscode-focusBorder); }
+
+  &.active {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-background);
+  }
+
+  &.tag-chip-clear { font-style: italic; }
+}
+
+.tag-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.tag-chip-x {
+  margin-left: 2px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+// ── Tree ──────────────────────────────────────────────────────────────────────
+#tree {
+  outline: none;
+}
+
+.tw-node {
+  outline: none;
+
+  &:focus > .tw-row,
+  &[tabindex="0"]:focus-visible > .tw-row {
+    outline        : 1px solid var(--vscode-focusBorder);
+    outline-offset : -1px;
+    border-radius  : 4px;
+  }
+}
+
+.tw-row {
+  display     : flex;
+  align-items : center;
+  gap         : 6px;
+  padding     : 4px 6px 4px 0;
+  cursor      : pointer;
+  user-select : none;
+  border-radius: 4px;
+
+  &:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12)); }
+}
+
+.tw-chevron {
+  flex-shrink : 0;
+  width       : 14px;
+  text-align  : center;
+  font-size   : 11px;
+  opacity     : 0.85;
+}
+.tw-chevron-leaf { visibility: hidden; }
+
+.tw-icon {
+  flex-shrink : 0;
+  display     : flex;
+  align-items : center;
+  opacity     : 0.7;
+
+  .icon { display: block; }
+}
+
+.tw-label {
+  flex          : 1;
+  min-width     : 0;
+  font-size     : 13px;
+  white-space   : nowrap;
+  overflow      : hidden;
+  text-overflow : ellipsis;
+}
+
+.tw-actions {
+  display     : flex;
+  align-items : center;
+  gap         : 1px;
+  flex-shrink : 0;
+  visibility  : hidden;
+
+  .action-btn { width: 22px; height: 22px; }
+  .action-btn[disabled] { opacity: 0.35; cursor: default; }
+  .action-btn[disabled]:hover { background: transparent; }
+}
+.tw-row:hover .tw-actions,
+.tw-node:focus > .tw-row .tw-actions {
+  visibility: visible;
+}
+
+.tw-group { }
+
+// ── Per-node placeholders (loading / error / empty) ───────────────────────────
+.tw-placeholder {
+  font-size   : 11.5px;
+  padding-top : 3px;
+  padding-bottom: 3px;
+  color       : var(--vscode-descriptionForeground, rgba(128, 128, 128, 0.8));
+}
+.tw-error {
+  color: var(--vscode-errorForeground, #f14c4c);
+
+  a { color: var(--vscode-textLink-foreground); cursor: pointer; }
+}
+.tw-loading { font-style: italic; }
+
+.empty-state-btn {
+  flex        : 0 0 auto;
+  display     : inline-block;
+  width       : auto;
+  padding     : 5px 14px;
+}
