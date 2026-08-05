@@ -40,6 +40,7 @@ function buildWebviewAssets() {
         { name: 'sync-panel' },
         { name: 'pipe-pipelines' },
         { name: 'pipe-scopes' },
+        { name: 'gitlab-packages' },
     ];
 
     for (const wv of webviews) {

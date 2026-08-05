@@ -520,8 +520,13 @@
       el.addEventListener('click', e => {
         if (e.target.closest('[data-job-action]')) { return; }
         const bridgeToggle = e.target.closest('[data-toggle-bridge]');
-        if (bridgeToggle) {
-          const key = bridgeToggle.getAttribute('data-toggle-bridge');
+        const jobId = Number(el.getAttribute('data-open-job'));
+        const job = findJobById(jobId);
+        const bridgeKey = job && job.isBridge && job.children && job.children.length > 0
+          ? 'bridge-' + job.id
+          : null;
+        if (bridgeToggle || bridgeKey) {
+          const key = bridgeToggle ? bridgeToggle.getAttribute('data-toggle-bridge') : bridgeKey;
           collapsed[key] = !(collapsed[key] !== false);
           persist();
           render();
@@ -529,7 +534,7 @@
         }
         vscode.postMessage({
           type: 'openJob',
-          jobId: Number(el.getAttribute('data-open-job')),
+          jobId: jobId,
           newTab: e.ctrlKey || e.metaKey,
         });
       });
