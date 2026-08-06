@@ -40,6 +40,8 @@ export interface RegistryNode {
     version?: string;
     /** version only: true when the file(s) can be downloaded (generic in v1). */
     downloadable?: boolean;
+    /** scope only: Tulcase tag names attached to the scope. */
+    tags?: string[];
 }
 
 /** A package name+type with its versions (grouped from the flat API rows). */
@@ -76,7 +78,7 @@ export function groupPackages(packages: readonly GitLabPackage[]): PackageGroup[
 
 /** Top-level nodes: one per registry-enabled scope (collapsed). */
 export function buildScopeNodes(
-    scopes: ReadonlyArray<{ id: string; label: string; registryEnabled: boolean; sources: PipeSource[] }>,
+    scopes: ReadonlyArray<{ id: string; label: string; registryEnabled: boolean; sources: PipeSource[]; tags?: string[] }>,
 ): RegistryNode[] {
     return scopes
         .filter(s => s.registryEnabled && s.sources.length > 0)
@@ -86,6 +88,7 @@ export function buildScopeNodes(
             label: s.label,
             scopeId: s.id,
             expandable: true,
+            tags: s.tags ?? [],
         }));
 }
 

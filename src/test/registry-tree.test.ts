@@ -47,7 +47,7 @@ describe('groupPackages', () => {
 });
 
 describe('node builders', () => {
-    const scope = (o: Partial<{ id: string; label: string; registryEnabled: boolean; sources: PipeSource[] }> = {}) => ({
+    const scope = (o: Partial<{ id: string; label: string; registryEnabled: boolean; sources: PipeSource[]; tags: string[] }> = {}) => ({
         id: 's1', label: 'Backend', registryEnabled: true,
         sources: [{ type: 'group', ref: 'acme/backend' }] as PipeSource[], ...o,
     });
@@ -60,6 +60,11 @@ describe('node builders', () => {
         ]);
         expect(nodes.map(n => n.scopeId)).toEqual(['s1']);
         expect(nodes[0]).toMatchObject({ kind: 'scope', expandable: true });
+    });
+
+    it('buildScopeNodes carries scope tags for root headers', () => {
+        const nodes = buildScopeNodes([scope({ tags: ['release', 'backend'] })]);
+        expect(nodes[0].tags).toEqual(['release', 'backend']);
     });
 
     it('buildSourceNodes makes group + project folders', () => {

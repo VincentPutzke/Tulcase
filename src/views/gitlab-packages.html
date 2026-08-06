@@ -16,9 +16,6 @@
 
 <!-- ── Controls pane ────────────────────────────────────── -->
 <div class="controls-pane">
-  <div class="add-bar">
-    <button class="add-btn add-btn-secondary btn-icon-only" id="btn-refresh" title="Refresh packages"></button>
-  </div>
   <div class="search-bar">
     <span class="search-icon"></span>
     <input
@@ -109,7 +106,6 @@
     tag:     '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.4" fill="currentColor"/></svg>',
   };
   const KIND_ICON = { scope: ICONS.scope, group: ICONS.folder, project: ICONS.project, package: ICONS.package, version: ICONS.version };
-  document.getElementById('btn-refresh').innerHTML = ICONS.refresh;
   tagPick.innerHTML = ICONS.tag;
 
   // ── Toast ────────────────────────────────────────────────
@@ -168,11 +164,43 @@
 
   // ── Render: tree markup (incremental) ────────────────────
   function nodeHtml(node) {
-    const pad = 4 + visualDepth(node.id) * 10;
+    if (node.kind === 'scope') { return scopeHtml(node); }
+    return childNodeHtml(node);
+  }
+
+  function scopeHtml(node) {
+    const isOpen = expanded.has(node.id);
+    let html = '<div class="section tw-node" role="treeitem" data-id="' + esc(node.id) + '"'
+      + ' tabindex="' + (node.id === focusedId ? '0' : '-1') + '"'
+      + ' aria-expanded="' + (isOpen ? 'true' : 'false') + '"'
+      + ' aria-label="' + esc(node.label) + '">';
+    html += '<div class="section-header package-scope-header" data-toggle-node="' + esc(node.id) + '">';
+    html += '<span class="section-chevron' + (isOpen ? '' : ' collapsed') + '">▾</span>';
+    html += '<span class="section-icon package-scope-icon">' + ICONS.scope + '</span>';
+    html += '<span class="section-label">' + esc(node.label) + '</span>';
+    if (node.tags && node.tags.length) {
+      html += '<span class="scope-tags">';
+      for (const name of node.tags) {
+        html += '<span class="tree-item-tag" style="color:' + esc(tagColor(name)) + ';">' + esc(name) + '</span>';
+      }
+      html += '</span>';
+    }
+    html += '<span class="section-actions">';
+    html += '<button class="action-btn btn-edit" data-action="refresh" data-id="' + esc(node.id) + '" title="Refresh scope">' + ICONS.refresh + '</button>';
+    html += '</span>';
+    html += '</div>';
+    html += '<div class="section-body tw-group' + (isOpen ? '' : ' collapsed') + '" role="group">'
+      + (isOpen ? childrenHtml(node.id) : '') + '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function childNodeHtml(node) {
+    const pad = visualDepth(node.id) * 10;
     const isOpen = expanded.has(node.id);
     const chev = node.expandable
-      ? '<span class="tw-chevron" data-action="toggle" data-id="' + esc(node.id) + '">' + (isOpen ? '▾' : '▸') + '</span>'
-      : '<span class="tw-chevron tw-chevron-leaf"></span>';
+      ? '<span class="section-chevron registry-chevron' + (isOpen ? '' : ' collapsed') + '">▾</span>'
+      : '<span class="section-chevron registry-chevron registry-chevron-leaf"></span>';
 
     let actions = '';
     if (node.kind === 'version') {
@@ -189,15 +217,20 @@
       }
     }
 
-    let html = '<div class="tw-node" role="treeitem" data-id="' + esc(node.id) + '"'
+    let html = '<div class="tree-item registry-item tw-node" role="treeitem" data-id="' + esc(node.id) + '"'
       + ' tabindex="' + (node.id === focusedId ? '0' : '-1') + '"'
       + (node.expandable ? ' aria-expanded="' + (isOpen ? 'true' : 'false') + '"' : '')
       + ' aria-label="' + esc(node.label) + '">';
-    html += '<div class="tw-row" data-action="toggle" data-id="' + esc(node.id) + '" style="padding-left:' + pad + 'px">';
+    html += '<div class="tree-item-row" data-toggle-node="' + esc(node.id) + '" style="padding-left:' + pad + 'px">';
     html += chev;
-    html += '<span class="tw-icon">' + (KIND_ICON[node.kind] || '') + '</span>';
-    html += '<span class="tw-label">' + esc(node.label) + '</span>';
-    html += '<span class="tw-actions">' + actions + '</span>';
+    html += '<span class="tree-item-icon registry-node-icon">' + (KIND_ICON[node.kind] || '') + '</span>';
+    html += '<div class="tree-item-content">';
+    html += '<div class="tree-item-label">' + esc(node.label) + '</div>';
+    html += '<div class="tree-item-meta">';
+    if (node.kind === 'package' && node.packageType) { html += '<span class="tree-item-detail">' + esc(node.packageType) + '</span>'; }
+    if (node.kind === 'version' && !node.downloadable) { html += '<span class="tree-item-detail dim">open in GitLab</span>'; }
+    html += '</div></div>';
+    html += '<span class="tree-item-actions registry-actions">' + actions + '</span>';
     html += '</div>';
     html += '<div class="tw-group" role="group">' + (isOpen ? childrenHtml(node.id) : '') + '</div>';
     html += '</div>';
@@ -205,7 +238,7 @@
   }
 
   function placeholder(parentId, text, cls) {
-    const pad = 4 + (visualDepth(parentId) + 1) * 10 + 14;
+    const pad = (visualDepth(parentId) + 1) * 10 + 28;
     return '<div class="tw-placeholder ' + (cls || '') + '" style="padding-left:' + pad + 'px">' + text + '</div>';
   }
 
@@ -232,7 +265,7 @@
   function groupEl(id) {
     if (id === '') { return document.getElementById('tree'); }
     const n = nodeEl(id);
-    return n ? n.querySelector(':scope > .tw-group') : undefined;
+    return n ? n.querySelector(':scope > .tw-group, :scope > .section-body') : undefined;
   }
 
   /** Re-render only one node's child group (expand / collapse / refresh). */
@@ -247,8 +280,12 @@
     if (pe) {
       const open = expanded.has(parentId);
       pe.setAttribute('aria-expanded', open ? 'true' : 'false');
-      const ch = pe.querySelector(':scope > .tw-row .tw-chevron');
-      if (ch && !ch.classList.contains('tw-chevron-leaf')) { ch.textContent = open ? '▾' : '▸'; }
+      const ch = pe.querySelector(':scope > .tree-item-row .section-chevron, :scope > .section-header .section-chevron');
+      if (ch && !ch.classList.contains('registry-chevron-leaf')) {
+        ch.classList.toggle('collapsed', !open);
+      }
+      const sectionBody = pe.querySelector(':scope > .section-body');
+      if (sectionBody) { sectionBody.classList.toggle('collapsed', !open); }
     }
     restoreFocus();
     if (hadFocus) {
@@ -365,14 +402,20 @@
   // ── Click delegation ─────────────────────────────────────
   content.addEventListener('click', e => {
     const target = e.target.closest('[data-action]');
-    if (!target) { return; }
-    const action = target.getAttribute('data-action');
-    const id = target.getAttribute('data-id');
-    if (action === 'toggle') { setFocus(id); toggle(id); }
-    else if (action === 'download') { vscode.postMessage({ type: 'download', nodeId: id }); }
-    else if (action === 'open') { vscode.postMessage({ type: 'openInBrowser', nodeId: id }); }
-    else if (action === 'refresh') { errors.delete(id); if (childrenIds.has(id) || expanded.has(id)) { vscode.postMessage({ type: 'refreshNode', nodeId: id }); } }
-    else if (action === 'retry') { e.preventDefault(); errors.delete(id); loading.add(id); vscode.postMessage({ type: 'expand', nodeId: id }); regroup(id); }
+    if (target) {
+      const action = target.getAttribute('data-action');
+      const id = target.getAttribute('data-id');
+      if (action === 'download') { vscode.postMessage({ type: 'download', nodeId: id }); }
+      else if (action === 'open') { vscode.postMessage({ type: 'openInBrowser', nodeId: id }); }
+      else if (action === 'refresh') { errors.delete(id); if (childrenIds.has(id) || expanded.has(id)) { vscode.postMessage({ type: 'refreshNode', nodeId: id }); } }
+      else if (action === 'retry') { e.preventDefault(); errors.delete(id); loading.add(id); vscode.postMessage({ type: 'expand', nodeId: id }); regroup(id); }
+      return;
+    }
+    const toggleTarget = e.target.closest('[data-toggle-node]');
+    if (!toggleTarget) { return; }
+    const id = toggleTarget.getAttribute('data-toggle-node');
+    setFocus(id);
+    toggle(id);
   });
   content.addEventListener('focusin', e => {
     const n = e.target.closest && e.target.closest('.tw-node');
@@ -410,7 +453,6 @@
   }
 
   // ── Toolbar ──────────────────────────────────────────────
-  document.getElementById('btn-refresh').addEventListener('click', () => vscode.postMessage({ type: 'refreshAll' }));
   searchEl.addEventListener('input', () => {
     query = searchEl.value.trim();
     vscode.setState({ query: query });
